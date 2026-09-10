@@ -37,7 +37,7 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 - Translates a whole page, keeping the original in place and showing the translation under each block. A replace mode is one click away, with the original as a hover tooltip.
 - Detects the page language locally. You can override it.
 - Keeps inline links and formatting inside sentences, and leaves code blocks, brand names marked `translate="no"`, and form fields alone. Web addresses, email addresses and reference numbers come back exactly as they went in.
-- Follows content that arrives later, so infinite scroll and single-page apps get translated too. It notices revealed panels, text the page rewrites in place, and open shadow roots.
+- Follows content that arrives later, so infinite scroll and single-page apps get translated too. It notices revealed panels, text the page rewrites in place, open shadow roots, and frames from the same site.
 - Handles a page written in more than one language. A quoted paragraph that declares its own `lang` is translated with that language's model, or left alone if you do not have it.
 - Restores the original page without a reload.
 - Translates a selection from the context menu, and translates what you have typed into a text box from the same menu.
