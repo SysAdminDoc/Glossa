@@ -720,3 +720,54 @@ test("an attribute inside a translate=no element is left alone through the prope
   Object.defineProperty(image, "translate", { value: false, configurable: true });
   assert.deepEqual(collectSegments(body, options).filter((s) => s.kind === "attribute"), []);
 });
+
+
+test("an attribute the page rewrites after translation is the page's again", async () => {
+  const { attributeSegment } = await import("../src/content/segmenter.ts");
+  const body = load(`<p><a href="#h" id="link" title="Consulta los horarios">Horarios</a></p>`);
+  const [first] = collectSegments(body, options).filter((s) => s.kind === "attribute");
+  assert.ok(first);
+  const renderer = new Renderer();
+  renderer.apply(first, "Check the opening hours", { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" });
+  const link = window.document.getElementById("link")! as unknown as Element;
+  // Marked: the same attribute is not offered twice.
+  assert.equal(attributeSegment(link, "title", options), null);
+  link.setAttribute("title", "Quedan tres plazas libres");
+  renderer.forgetAttribute(link, "title");
+  const again = attributeSegment(link, "title", options);
+  assert.equal(again && again.kind === "attribute" ? again.text : null, "Quedan tres plazas libres");
+  renderer.restoreAll();
+  assert.equal(link.getAttribute("title"), "Quedan tres plazas libres", "restore put an old original over the page's value");
+});
+
+test("a single changed attribute obeys the same rules as the full pass", async () => {
+  const { attributeSegment } = await import("../src/content/segmenter.ts");
+  load(
+    `<form>` +
+      `<input id="go" type="submit" value="Guardar cambios" />` +
+      `<div contenteditable="true"><a id="e" href="#" title="Nota del editor">x</a></div>` +
+      `<span class="notranslate"><a id="n" href="#" title="Marca registrada">y</a></span>` +
+      `<a id="ok" href="#" title="Consulta los horarios">z</a>` +
+      `</form>`
+  );
+  const byId = (id: string) => window.document.getElementById(id) as unknown as Element;
+  assert.equal(attributeSegment(byId("go"), "value", options), null, "a submit button's value is what the form posts");
+  assert.equal(attributeSegment(byId("e"), "title", options), null, "an editable region is left alone");
+  assert.equal(attributeSegment(byId("n"), "title", options), null, "notranslate is honoured");
+  assert.notEqual(attributeSegment(byId("ok"), "title", options), null);
+});
+
+test("forgetting a label drops the value it pinned and leaves the page's text", () => {
+  const body = load(`<select><option id="o">Sala de lectura</option></select>`);
+  const label = collectSegments(body, options).find((s) => s.kind === "label")!;
+  const renderer = new Renderer();
+  renderer.apply(label, "Reading room", { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" });
+  const option = window.document.getElementById("o")! as unknown as Element;
+  assert.equal(option.getAttribute("value"), "Sala de lectura");
+  option.textContent = "Sala nueva";
+  renderer.forgetLabel(option);
+  assert.equal(option.getAttribute("value"), null);
+  assert.equal(option.getAttribute("data-glossa-label"), null);
+  renderer.restoreAll();
+  assert.equal(option.textContent, "Sala nueva");
+});

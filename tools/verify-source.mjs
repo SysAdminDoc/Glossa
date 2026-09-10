@@ -33,20 +33,41 @@ await mkdir(scratch, { recursive: true });
 // Node has no unzip, and the archive is stored (uncompressed), so read it directly.
 const bytes = new Uint8Array(await readFile(archive));
 const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+// The writer never uses data descriptors, zip64 or directory entries, and never writes a comment,
+// so the end-of-central-directory record sits in the last 22 bytes and holds the entry count. Any
+// of those features means this is not an archive the build wrote, and it is refused rather than
+// half-read: a reader that stops early would report a reproducibility failure that is really its
+// own bug.
+const eocd = bytes.length - 22;
+if (eocd < 0 || view.getUint32(eocd, true) !== 0x06054b50) {
+  throw new Error("the source archive does not end with the record this writer puts there");
+}
+const expected = view.getUint16(eocd + 10, true);
+const root_ = path.resolve(scratch) + path.sep;
 let offset = 0;
+let extracted = 0;
 const decoder = new TextDecoder();
 const { writeFile } = await import("node:fs/promises");
 while (offset + 4 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+  const flags = view.getUint16(offset + 6, true);
+  const size = view.getUint32(offset + 18, true);
+  if (flags & 0x0008) throw new Error("the source archive uses data descriptors, which this build never writes");
+  if (size === 0xffffffff) throw new Error("the source archive uses zip64, which this build never writes");
   const nameLength = view.getUint16(offset + 26, true);
   const extraLength = view.getUint16(offset + 28, true);
-  const size = view.getUint32(offset + 18, true);
   const nameStart = offset + 30;
   const name = decoder.decode(bytes.subarray(nameStart, nameStart + nameLength));
   const dataStart = nameStart + nameLength + extraLength;
-  const target = path.join(scratch, name);
+  offset = dataStart + size;
+  extracted++;
+  if (name.endsWith("/")) continue;
+  const target = path.resolve(scratch, name);
+  if (!target.startsWith(root_)) throw new Error(`refusing to unpack ${name} outside the scratch directory`);
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, bytes.subarray(dataStart, dataStart + size));
-  offset = dataStart + size;
+}
+if (extracted !== expected) {
+  throw new Error(`unpacked ${extracted} of the ${expected} entries the archive says it holds`);
 }
 
 console.info("verify-source: npm ci --ignore-scripts");

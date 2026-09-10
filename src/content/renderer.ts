@@ -320,6 +320,28 @@ export class Renderer {
     return dropped || hadMarker;
   }
 
+  // The page rewrote something this extension had translated. The value there now is the page's,
+  // so the record goes without touching it: restoring later must not put an old original back.
+  forgetAttribute(element: Element, attribute: string): void {
+    for (let index = this.records.length - 1; index >= 0; index--) {
+      const record = this.records[index]!;
+      if (record.kind === "attribute" && record.element === element && record.attribute === attribute) {
+        this.records.splice(index, 1);
+      }
+    }
+    element.removeAttribute(attributeMarker(attribute));
+  }
+
+  forgetLabel(element: Element): void {
+    for (let index = this.records.length - 1; index >= 0; index--) {
+      const record = this.records[index]!;
+      if (record.kind !== "label" || record.element !== element) continue;
+      if (record.addedValue) element.removeAttribute("value");
+      this.records.splice(index, 1);
+    }
+    element.removeAttribute(LABEL_MARKER);
+  }
+
   restoreAll(): number {
     let restored = 0;
     for (const record of this.records.reverse()) {

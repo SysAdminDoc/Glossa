@@ -228,6 +228,25 @@ export const MARKER_SELECTOR = [
   `[${LABEL_MARKER}]`
 ].join(", ");
 
+// Every attribute name Glossa can translate, for an observer that has to notice a page rewriting one.
+export const READABLE_ATTRIBUTES: readonly string[] = [
+  ...new Set(TRANSLATABLE_ATTRIBUTES.map(({ attribute }) => attribute))
+];
+
+// One attribute the page just set, judged by the same rules as the full pass. It does not skip
+// elements inside a translated block, because the page rewriting a tooltip in there is exactly the
+// case this exists for, and the full pass would never look.
+export function attributeSegment(element: Element, attribute: string, options: SegmentOptions): Segment | null {
+  if (!TRANSLATABLE_ATTRIBUTES.some((entry) => entry.attribute === attribute && entry.applies(element))) return null;
+  if (element.closest(`${TRANSLATION_TAG.toLowerCase()}, .${TRANSLATION_CLASS}`)) return null;
+  if (isProtected(element)) return null;
+  if (options.skipFormFields && (element as HTMLElement).isContentEditable) return null;
+  if (element.hasAttribute(attributeMarker(attribute))) return null;
+  const text = element.getAttribute(attribute)?.trim() ?? "";
+  if (text.length < 2 || !LETTER.test(text)) return null;
+  return { kind: "attribute", element, attribute, text, lang: effectiveLang(element) };
+}
+
 function collectAttributes(element: Element, out: Segment[]): void {
   for (const { attribute, applies } of TRANSLATABLE_ATTRIBUTES) {
     if (!element.hasAttribute(attribute) || !applies(element)) continue;

@@ -15,6 +15,10 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
 ### Fixed
+- A tooltip or label the page changes after translation is translated again in its new wording, and so is the tab title when a single-page site moves to another route. Showing the original leaves the page's latest values alone.
+- Pressing Escape while a selection or a text box is still being translated keeps the popover closed, and the text box untouched, when the answer arrives.
+- The popover finds a spot clear of a tall selection, beside it if nothing fits above or below. The offer button never sits on top of the selection and disappears when the page scrolls.
+- The source archive states its own file count correctly, marks non-ASCII file names as UTF-8, and `npm run verify:source` refuses an archive it cannot fully read instead of reporting a false mismatch.
 - A page that inserts plain text after the first pass no longer stops the translation of later changes. The attribute pass tripped over text nodes and took the whole update with it.
 - Tooltips, image text and placeholders inside an editable region are left alone, like the text around them, so nothing Glossa writes can be saved into a document you are editing.
 - A submit button keeps its value, so a form sends what it always sent. A dropdown option pins the value the browser would really have submitted, and suggestions in a `<datalist>` are no longer relabelled.

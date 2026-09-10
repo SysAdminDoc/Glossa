@@ -20,6 +20,9 @@ import {
   collectSegments,
   segmentFragment,
   UNIT_ATTRIBUTE,
+  READABLE_ATTRIBUTES,
+  attributeMarker,
+  attributeSegment,
   type Segment
 } from "./segmenter.ts";
 
@@ -39,7 +42,9 @@ const BATCH_MAX_CHARS = 6000;
 // Attributes worth reacting to. `hidden`, `open`, `translate`, `lang` and `aria-hidden` change
 // whether a block should be translated at all; `class` and `style` only ever trigger a re-check of
 // the elements an earlier pass deferred, never a fresh walk of the page.
-const WATCHED_ATTRIBUTES = ["hidden", "open", "translate", "lang", "aria-hidden", "class", "style"];
+// The readable ones are watched too: a page that rewrites a tooltip Glossa translated owns that
+// tooltip again, and its new text needs translating rather than being overwritten on restore.
+const WATCHED_ATTRIBUTES = ["hidden", "open", "translate", "lang", "aria-hidden", "class", "style", ...READABLE_ATTRIBUTES];
 const DIRECT_ATTRIBUTES = new Set(["hidden", "open", "translate", "lang", "aria-hidden"]);
 
 interface Controller {
@@ -54,6 +59,9 @@ interface Controller {
   pending: Set<Node>;
   stale: Set<Element>;
   deferred: Set<Element>;
+  // Readable attributes the page set after the first pass, and whether it changed its own title.
+  attributeChanges: Map<Element, Set<string>>;
+  titleChanged: boolean;
   // Everything the engine has already written on this page, so it is never sent back in.
   output: OutputCache;
   // What `<html lang>` claims. A unit that declares a different language is written in that one.
@@ -98,6 +106,8 @@ function boot(): void {
     pending: new Set(),
     stale: new Set(),
     deferred: new Set(),
+    attributeChanges: new Map(),
+    titleChanged: false,
     output: new OutputCache(),
     pageLanguage: null,
     source: null,
@@ -420,6 +430,9 @@ function startObserver(controller: Controller): void {
     attributes: true,
     attributeFilter: WATCHED_ATTRIBUTES
   });
+  // The tab title lives in <head>. A single-page app sets a new one on every route, and the one
+  // Glossa translated is gone at that point. Same observer, so paused writes cover it as well.
+  if (document.head) observer.observe(document.head, { childList: true, subtree: true, characterData: true });
   controller.observer = observer;
 }
 
@@ -447,6 +460,15 @@ function classify(controller: Controller, mutation: MutationRecord): boolean {
     case "attributes": {
       const element = mutation.target as Element;
       const name = mutation.attributeName ?? "";
+      if (READABLE_ATTRIBUTES.includes(name)) {
+        // The page set a tooltip, a placeholder or a label. If Glossa had translated the old value,
+        // that bookkeeping is stale: what is there now is the page's, and it is translated afresh.
+        if (element.hasAttribute(attributeMarker(name))) controller.renderer.forgetAttribute(element, name);
+        const names = controller.attributeChanges.get(element) ?? new Set<string>();
+        names.add(name);
+        controller.attributeChanges.set(element, names);
+        return true;
+      }
       let queued = false;
       if (name === "lang" || name === "translate") queued = markStale(controller, element) || queued;
       if (DIRECT_ATTRIBUTES.has(name)) {
@@ -462,7 +484,14 @@ function classify(controller: Controller, mutation: MutationRecord): boolean {
 }
 
 function schedule(controller: Controller): void {
-  if (controller.pending.size === 0 && controller.stale.size === 0) return;
+  if (
+    controller.pending.size === 0 &&
+    controller.stale.size === 0 &&
+    controller.attributeChanges.size === 0 &&
+    !controller.titleChanged
+  ) {
+    return;
+  }
   if (controller.observerTimer !== null) window.clearTimeout(controller.observerTimer);
   controller.observerTimer = window.setTimeout(() => {
     controller.observerTimer = null;
@@ -519,6 +548,10 @@ async function translateChanged(controller: Controller): Promise<void> {
   controller.pending.clear();
   const stale = Array.from(controller.stale);
   controller.stale.clear();
+  const attributeChanges = Array.from(controller.attributeChanges);
+  controller.attributeChanges.clear();
+  const retitled = controller.titleChanged;
+  controller.titleChanged = false;
 
   // Dropping our own output is itself a mutation, so do it inside a paused window.
   withObserverPaused(controller, stale, () => {
@@ -537,6 +570,15 @@ async function translateChanged(controller: Controller): Promise<void> {
   });
   const live = candidates.filter((root) => !candidates.some((other) => other !== root && other.contains(root)));
   const segments = collectFromNodes(live, segmentOptions(controller));
+  for (const [element, names] of attributeChanges) {
+    if (!element.isConnected) continue;
+    for (const name of names) {
+      const segment = attributeSegment(element, name, segmentOptions(controller));
+      if (segment) segments.push(segment);
+    }
+  }
+  const title = retitled ? document.querySelector("head > title") : null;
+  if (title) segments.push(...collectFromNodes([title], segmentOptions(controller)));
   if (segments.length === 0) return;
   controller.state.blocksTotal += segments.length;
   await translateByLanguage(controller, segments, source, target, controller.generation);
@@ -559,6 +601,8 @@ function stopObserver(controller: Controller): void {
   controller.observer = null;
   controller.pending.clear();
   controller.stale.clear();
+  controller.attributeChanges.clear();
+  controller.titleChanged = false;
   if (controller.observerTimer !== null) {
     window.clearTimeout(controller.observerTimer);
     controller.observerTimer = null;
@@ -690,7 +734,7 @@ async function translateField(controller: Controller, target: string): Promise<v
     showPopover(t("popoverAlready", target), rect, true);
     return;
   }
-  showPopover(t("popoverTranslating"), rect, false);
+  const pending = showPopover(t("popoverTranslating"), rect, false);
   const request: TranslateRequest = {
     type: "glossa:translate",
     sourceLanguage: source,
@@ -699,6 +743,8 @@ async function translateField(controller: Controller, target: string): Promise<v
     fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
+  // Closed while the engine worked: leave it closed, and leave the field as the reader left it.
+  if (pending !== popoverToken) return;
   if (!response || !response.ok) {
     showPopover(response?.error ?? t("popoverNoAnswer"), rect, true);
     return;
@@ -728,6 +774,9 @@ async function watchSelection(controller: Controller): Promise<void> {
     if (stored) controller.settings = stored as Settings;
     if (controller.settings?.selectionPopup !== true) removeSelectionButton();
   });
+  // The offer is placed against where the selection was. Once the page scrolls it would point at
+  // other text, so it goes; selecting again brings it back.
+  window.addEventListener("scroll", removeSelectionButton, { passive: true, capture: true });
   document.addEventListener("selectionchange", () => {
     if (controller.selectionTimer !== null) window.clearTimeout(controller.selectionTimer);
     controller.selectionTimer = window.setTimeout(() => {
@@ -768,7 +817,9 @@ function offerSelection(controller: Controller): void {
     removeSelectionButton();
     void translateSelection(controller, settings.targetLanguage);
   });
-  button.style.top = `${Math.min(window.innerHeight - 40, Math.max(8, rect.bottom + 6))}px`;
+  // Below the selection when there is room, above it when there is not: never on top of it.
+  const below = rect.bottom + 6;
+  button.style.top = `${below + 32 <= window.innerHeight ? below : Math.max(8, rect.top - 38)}px`;
   button.style.left = `${Math.min(window.innerWidth - 180, Math.max(8, rect.left))}px`;
   document.documentElement.append(button);
 }
@@ -792,7 +843,7 @@ async function translateSelection(controller: Controller, target: string): Promi
     showPopover(t("popoverAlready", target), anchor, true);
     return;
   }
-  showPopover(t("popoverTranslating"), anchor, false);
+  const pending = showPopover(t("popoverTranslating"), anchor, false);
   const request: TranslateRequest = {
     type: "glossa:translate",
     sourceLanguage: source,
@@ -800,6 +851,8 @@ async function translateSelection(controller: Controller, target: string): Promi
     fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
+  // Closed while the engine worked: an answer arriving later must not reopen it.
+  if (pending !== popoverToken) return;
   if (!response || !response.ok) {
     showPopover(response?.error ?? t("popoverNoAnswer"), anchor, true);
     return;
@@ -814,9 +867,13 @@ async function translateSelection(controller: Controller, target: string): Promi
 // document element rather than near the selection, which keeps it out of any editor the page is
 // running: a box inserted inside a rich text editor gets saved as part of the document.
 let closePopover: (() => void) | null = null;
+// Bumped on every show and every dismissal, so a translation that finishes after the reader closed
+// its "Translating…" note can tell, and the popover stays closed.
+let popoverToken = 0;
 
-function showPopover(text: string, anchor: DOMRect | null, isError: boolean): void {
+function showPopover(text: string, anchor: DOMRect | null, isError: boolean): number {
   dismissPopover();
+  const token = ++popoverToken;
   const box = document.createElement("div");
   box.className = `glossa-popover${isError ? " glossa-popover-error" : ""}`;
   box.setAttribute("translate", "no");
@@ -843,9 +900,11 @@ function showPopover(text: string, anchor: DOMRect | null, isError: boolean): vo
     box.remove();
     closePopover = null;
   };
+  return token;
 }
 
 function dismissPopover(): void {
+  popoverToken++;
   if (closePopover) closePopover();
   else document.querySelector(".glossa-popover")?.remove();
 }
@@ -860,11 +919,31 @@ function place(box: HTMLElement, anchor: DOMRect | null): void {
     box.style.left = `${gap * 2}px`;
     return;
   }
-  const below = anchor.bottom + gap;
-  const fitsBelow = below + height <= window.innerHeight - gap;
-  const top = fitsBelow ? below : Math.max(gap, anchor.top - gap - height);
+  const clampLeft = (left: number): number => Math.min(Math.max(gap, left), Math.max(gap, window.innerWidth - width - gap));
+  const clampTop = (top: number): number => Math.min(Math.max(gap, top), Math.max(gap, window.innerHeight - height - gap));
+  let top: number;
+  let left: number;
+  if (anchor.bottom + gap + height <= window.innerHeight - gap) {
+    top = anchor.bottom + gap;
+    left = clampLeft(anchor.left);
+  } else if (anchor.top - gap - height >= gap) {
+    top = anchor.top - gap - height;
+    left = clampLeft(anchor.left);
+  } else if (anchor.right + gap + width <= window.innerWidth - gap) {
+    // A tall selection leaves no room above or below, so the popover goes beside it.
+    top = clampTop(anchor.top);
+    left = anchor.right + gap;
+  } else if (anchor.left - gap - width >= gap) {
+    top = clampTop(anchor.top);
+    left = anchor.left - gap - width;
+  } else {
+    // A selection that fills the screen leaves nowhere clear of it. The bottom corner covers the
+    // least of where the reader started.
+    top = Math.max(gap, window.innerHeight - height - gap);
+    left = clampLeft(window.innerWidth - width - gap);
+  }
   box.style.top = `${top}px`;
-  box.style.left = `${Math.min(Math.max(gap, anchor.left), Math.max(gap, window.innerWidth - width - gap))}px`;
+  box.style.left = `${left}px`;
 }
 
 boot();

@@ -58,13 +58,16 @@ function buildStoreZip(entries) {
 
   for (const entry of entries) {
     const nameBytes = encoder.encode(entry.filename);
+    // Bit 11 says the name is UTF-8. Only set when it matters, so every ASCII-named archive this has
+    // already produced keeps its exact bytes.
+    const flags = nameBytes.length === entry.filename.length ? 0 : 0x0800;
     const crc = crc32(entry.data);
     const size = entry.data.length;
 
     const local = new DataView(new ArrayBuffer(30 + nameBytes.length));
     local.setUint32(0, 0x04034b50, true);
     local.setUint16(4, 20, true);
-    local.setUint16(6, 0, true);
+    local.setUint16(6, flags, true);
     local.setUint16(8, 0, true);
     local.setUint16(10, dosTime, true);
     local.setUint16(12, dosDate, true);
@@ -81,7 +84,7 @@ function buildStoreZip(entries) {
     central.setUint32(0, 0x02014b50, true);
     central.setUint16(4, 20, true);
     central.setUint16(6, 20, true);
-    central.setUint16(8, 0, true);
+    central.setUint16(8, flags, true);
     central.setUint16(10, 0, true);
     central.setUint16(12, dosTime, true);
     central.setUint16(14, dosDate, true);

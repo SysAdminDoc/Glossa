@@ -138,6 +138,13 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on the 500-paragraph fixture the first visible sentence renders before the batch completes, measured in the smoke.
   Complexity: M
 
+- [ ] P2 — G-51 — Make the attribute pass cost proportional to what changed
+  Why: every mutation flush runs `querySelectorAll("*")` over each queued root plus a `closest()` and a dozen `hasAttribute` calls per element, and the markers suppress the output but never the walk, so a page that toggles `hidden` or `aria-hidden` on a large wrapper pays a full rescan every 250 ms.
+  Evidence: adversarial review 2026-09-10, instrumented on a 2,404-element feed (33,014 `hasAttribute` calls per flush, the same on the second pass with everything already marked); src/content/segmenter.ts `collectReadableAttributes`.
+  Touches: src/content/segmenter.ts (skip marked or translated subtrees with one selector query, not per-element checks), src/content/content.ts (queue attribute work only for elements whose attributes actually changed)
+  Acceptance: a second flush over an already-translated 2,000-element subtree performs under a tenth of the first flush's attribute checks, measured in a unit test with counted DOM calls.
+  Complexity: S
+
 ### P3
 
 - [ ] P3 — G-45 — Main-content-first mode

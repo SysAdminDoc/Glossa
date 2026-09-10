@@ -258,6 +258,22 @@ try {
   const panel = await page.$eval("#panel", (element) => element.querySelectorAll("glossa-translation").length);
   assert(panel === 1, `opened details panel carries ${panel} translation blocks`);
 
+  // A page that rewrites a tooltip or its own title after translation owns them again: the new text
+  // is translated, and restoring later leaves the page's latest value where the page put it.
+  await page.evaluate(() => {
+    document.getElementById("tip").setAttribute("title", "Consulta las salas disponibles hoy");
+    document.title = "Página nueva de la biblioteca";
+  });
+  await page.waitForFunction(
+    () => /room|available/i.test(document.getElementById("tip")?.getAttribute("title") ?? ""),
+    null,
+    { timeout: 120_000 }
+  );
+  await page.waitForFunction(() => !/Página/.test(document.title) && document.title.length > 0, null, {
+    timeout: 120_000
+  });
+  console.info(`smoke: rewritten tooltip "${await page.$eval("#tip", (a) => a.getAttribute("title"))}", title "${await page.title()}"`);
+
   // The engine must never be handed its own output. Insert a copy of a finished translation next to
   // a fresh Spanish paragraph: the Spanish one is the positive control that proves the observer ran
   // at all, and the copy must come out with no translation block under it.
@@ -306,7 +322,7 @@ try {
     optionText: document.querySelector("#room option")?.textContent ?? "",
     markers: document.querySelectorAll("[data-glossa-was-placeholder], [data-glossa-was-title], [data-glossa-label]").length
   }));
-  assert(/prueba/.test(restoredAttrs.title), `restore left the title translated: "${restoredAttrs.title}"`);
+  assert(/Página nueva de la biblioteca/.test(restoredAttrs.title), `restore left the title translated: "${restoredAttrs.title}"`);
   assert(
     restoredAttrs.placeholder === "Buscar en el catálogo",
     `restore left the placeholder translated: "${restoredAttrs.placeholder}"`
@@ -603,6 +619,44 @@ try {
   await page.waitForFunction(() => document.querySelector(".glossa-popover") === null, null, { timeout: 5_000 });
   console.info("smoke: Escape closed the popover");
 
+  // Escape while the engine is still working has to keep the popover closed when the answer lands.
+  await page.evaluate(() => {
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector("main"));
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  // With the pivot run on, French needs a model this profile does not have yet, which holds the
+  // "Translating…" note open long enough to press Escape inside it. Without it the answer is usually
+  // back before Escape can land, and the check says so instead of pretending.
+  const lateTarget = process.env.GLOSSA_SMOKE_PIVOT === "1" ? "fr" : "en";
+  const late = worker.evaluate(
+    async ([id, target]) => {
+      await chrome.tabs.sendMessage(id, { type: "glossa:page-command", command: "translate-selection", targetLanguage: target });
+    },
+    [tabId, lateTarget]
+  );
+  const sawTranslating = await page
+    .waitForFunction(() => (document.querySelector(".glossa-popover-body")?.textContent ?? "").includes("…"), null, {
+      timeout: 5_000
+    })
+    .then(
+      () => true,
+      () => false
+    );
+  if (sawTranslating) {
+    await page.keyboard.press("Escape");
+    await late;
+    await page.waitForTimeout(300);
+    assert((await page.$(".glossa-popover")) === null, "the popover came back after Escape once the translation finished");
+    console.info("smoke: Escape during translation kept the popover closed");
+  } else {
+    await late;
+    console.info("smoke: the translation finished before Escape could be pressed (not exercised)");
+    await page.keyboard.press("Escape");
+  }
+
   // A pair with no direct model goes through English, which means two models and two passes inside
   // the engine. It costs another model download, so it runs when asked for rather than every time.
   if (process.env.GLOSSA_SMOKE_PIVOT === "1") {
@@ -624,15 +678,20 @@ try {
     await pivotPopup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${pivotTabId}`);
     await pivotPopup.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
     await pivotPopup.selectOption("#target", "fr");
-    await pivotPopup.waitForFunction(
-      () => /Download|Translate page/.test(document.getElementById("action")?.textContent ?? ""),
-      null,
-      { timeout: 60_000 }
-    );
+    // Wait for the route check for French itself. Waiting on the button alone passed on the button
+    // state left over from the English route, and then read a status line that was not about French.
+    const announced = await pivotPopup
+      .waitForFunction(() => /through English/i.test(document.getElementById("status")?.textContent ?? ""), null, {
+        timeout: 60_000
+      })
+      .then(
+        () => true,
+        () => false
+      );
     const pivotLabel = await pivotPopup.$eval("#action", (button) => button.textContent);
     const pivotStatus = await pivotPopup.$eval("#status", (element) => element.textContent ?? "");
     console.info(`smoke: es->fr reads "${pivotLabel}" (${pivotStatus})`);
-    assert(/through English/i.test(pivotStatus), `the pivot route was not announced: "${pivotStatus}"`);
+    assert(announced, `the pivot route was not announced: "${pivotStatus}"`);
     await pivotPopup.click("#action");
     await pivotPopup.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
       timeout: 600_000

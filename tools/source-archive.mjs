@@ -48,6 +48,14 @@ const members = [...FILES];
 for (const directory of DIRECTORIES) members.push(...(await collect(directory)));
 members.sort();
 
+const entries = [];
+for (const member of members) {
+  const absolute = path.join(root, member);
+  const info = await stat(absolute);
+  if (!info.isFile()) continue;
+  entries.push({ name: member, data: await readFile(absolute) });
+}
+
 const building = `Building Glossa ${pkg.version} from source
 ${"=".repeat(40)}
 
@@ -90,16 +98,9 @@ What the extension does with the network:
   extension, using the WebAssembly engine bundled in the package. There is no analytics, no
   telemetry, no account and no remote configuration.
 
-Files in this archive: ${members.length}
+Files in this archive: ${entries.length + 1}, counting this one
 `;
 
-const entries = [];
-for (const member of members) {
-  const absolute = path.join(root, member);
-  const info = await stat(absolute);
-  if (!info.isFile()) continue;
-  entries.push({ name: member, data: await readFile(absolute) });
-}
 entries.push({ name: "BUILDING.txt", data: Buffer.from(building, "utf8") });
 entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
