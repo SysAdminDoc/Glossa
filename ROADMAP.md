@@ -4,14 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P1
 
-- [ ] G-04 — Keep original inline elements in place instead of re-parsing translated HTML
-  Why: the renderer replaces a unit's children with nodes parsed from the engine's HTML output. Event listeners on inline elements (React links, buttons inside paragraphs) are lost until restore.
-  Evidence: src/content/renderer.ts `parseFragment`; Firefox's translations-document.sys.mjs stamps `data-moz-translations-id` on every descendant before submitting (L3071) and its `merge()` (L6261) reorders the live nodes to match the translated tree, cloning when the engine duplicates an id and keeping original text when a node comes back empty.
-  Research note 2026-09-10: do not build this on engine alignments. bergamot-translator #298 and #362 show alignments attach to tag-plus-token byte ranges, and Bugzilla 1844096 shows pivot alignment duplicating a linked word. Use the id-stamping merge; the engine already carries `data-*` attributes through unchanged.
-  Touches: src/content/renderer.ts, src/content/segmenter.ts (stamp ids in `serializeUnit`)
-  Acceptance: a paragraph containing a link with a click listener still fires that listener after translation in replace mode; the smoke test asserts it.
-  Complexity: L
-
 - [ ] G-05 — Signed Firefox build for permanent installs
   Research note 2026-09-10: blocked on G-24 (`data_collection_permissions` is mandatory for new AMO submissions since 2025-11-03) and G-35 (reproducible source archive; esbuild output triggers AMO's source-submission rule and a reviewer must rebuild a byte-identical XPI). The AMO API is v5; `web-ext sign --channel unlisted --upload-source-code`.
   Why: temporary add-ons vanish when Firefox closes. AMO unlisted signing is automated and needs no public listing.

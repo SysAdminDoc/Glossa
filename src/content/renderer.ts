@@ -1,5 +1,7 @@
 import {
+  clearIds,
   HOLD_ATTRIBUTE,
+  ID_ATTRIBUTE,
   PAD_ATTRIBUTE,
   PARAGRAPH_TAGS,
   TRANSLATION_CLASS,
@@ -25,6 +27,9 @@ interface ElementRecord {
   kind: "element";
   element: Element;
   originalChildren: Node[];
+  // Elements of the page that were reused in the translation rather than copied, with the children
+  // they held before. Restoring means giving each one its own contents back.
+  reused: Array<{ element: Element; children: Node[] }>;
   addedTitle: boolean;
   previousTitle: string | null;
   // A page that labels its own elements keeps its attribute through translate and restore, so the
@@ -129,6 +134,9 @@ export class Renderer {
       block.className = TRANSLATION_CLASS;
       block.setAttribute("lang", options.targetLanguage);
       block.append(...nodes);
+      // The original stays where it is in this mode, so the translation is a copy and the page's
+      // numbering has no meaning inside it.
+      clearIds(block);
       ensureShadowStyle(element);
       element.append(block);
       element.setAttribute(UNIT_ATTRIBUTE, "bilingual");
@@ -136,6 +144,7 @@ export class Renderer {
         kind: "element",
         element,
         originalChildren: [],
+        reused: [],
         addedTitle: false,
         previousTitle: null,
         previousLang: element.getAttribute("lang"),
@@ -146,7 +155,10 @@ export class Renderer {
     const originalChildren = Array.from(element.childNodes);
     const previousTitle = element.getAttribute("title");
     let addedTitle = false;
-    element.replaceChildren(...nodes);
+    // Replace mode owns the block, so the block's own elements can be moved into the translation.
+    const merged = mergeLiveElements(nodes, element);
+    const reused = merged.reused;
+    element.replaceChildren(...merged.nodes);
     if (options.showOriginalOnHover && previousTitle === null) {
       const original = segment.text.replace(/\s+/g, " ").trim();
       if (original) {
@@ -157,7 +169,7 @@ export class Renderer {
     element.setAttribute(UNIT_ATTRIBUTE, "replaced");
     const previousLang = element.getAttribute("lang");
     element.setAttribute("lang", options.targetLanguage);
-    this.records.push({ kind: "element", element, originalChildren, addedTitle, previousTitle, previousLang, appended: null });
+    this.records.push({ kind: "element", element, originalChildren, reused, addedTitle, previousTitle, previousLang, appended: null });
     return applied;
   }
 
@@ -193,6 +205,7 @@ export class Renderer {
       if (owner !== target) continue;
       if (record.appended?.isConnected) record.appended.remove();
       if (record.kind === "element") {
+        clearIds(record.element);
         if (record.addedTitle) record.element.removeAttribute("title");
         // The `lang` we stamped in replace mode says "this is English now". Leaving it behind makes
         // the block look like it is already in the target language, and it would never be offered
@@ -226,10 +239,12 @@ export class Renderer {
       if (record.appended) {
         record.appended.remove();
       } else {
+        for (const { element: reused, children } of record.reused) reused.replaceChildren(...children);
         element.replaceChildren(...record.originalChildren);
         if (record.addedTitle) element.removeAttribute("title");
         else if (record.previousTitle !== null) element.setAttribute("title", record.previousTitle);
       }
+      clearIds(element);
       element.removeAttribute(UNIT_ATTRIBUTE);
       if (record.previousLang === null) element.removeAttribute("lang");
       else element.setAttribute("lang", record.previousLang);
@@ -238,6 +253,58 @@ export class Renderer {
     this.records.length = 0;
     return restored;
   }
+}
+
+// Rebuild the translated tree out of the page's own elements. Every element the engine gave back
+// with a number is looked up in the block being replaced; the translated children move into that
+// element and the copy is thrown away. An id the engine repeated gets a shallow clone, and an
+// element the engine invented or dropped is left as the copy it already is.
+function mergeLiveElements(
+  nodes: Node[],
+  unit: Element
+): { nodes: Node[]; reused: Array<{ element: Element; children: Node[] }> } {
+  const live = new Map<string, Element>();
+  for (const candidate of unit.querySelectorAll(`[${ID_ATTRIBUTE}]`)) {
+    const id = candidate.getAttribute(ID_ATTRIBUTE);
+    if (id !== null) live.set(id, candidate);
+  }
+  if (live.size === 0) return { nodes, reused: [] };
+  const reused: Array<{ element: Element; children: Node[] }> = [];
+  const used = new Set<string>();
+
+  // One fragment so the top level of the translation is walked by the same code as every level
+  // below it. Handling it separately is how a repeated element at the top slips through.
+  const fragment = document.createDocumentFragment();
+  fragment.append(...nodes);
+
+  const visit = (parent: ParentNode): void => {
+    for (const child of Array.from(parent.childNodes)) {
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      const copy = child as Element;
+      // Depth first: the deepest elements are swapped before the ones holding them.
+      visit(copy);
+      const id = copy.getAttribute(ID_ATTRIBUTE);
+      if (id === null) continue;
+      const original = live.get(id);
+      if (!original) continue;
+      if (used.has(id)) {
+        // The engine repeated this element. A shallow clone keeps the markup without pretending
+        // the page's own element is in two places.
+        const clone = original.cloneNode(false) as Element;
+        clone.removeAttribute(ID_ATTRIBUTE);
+        clone.replaceChildren(...Array.from(copy.childNodes));
+        copy.replaceWith(clone);
+        continue;
+      }
+      used.add(id);
+      reused.push({ element: original, children: Array.from(original.childNodes) });
+      original.replaceChildren(...Array.from(copy.childNodes));
+      original.removeAttribute(ID_ATTRIBUTE);
+      copy.replaceWith(original);
+    }
+  };
+  visit(fragment);
+  return { nodes: Array.from(fragment.childNodes), reused };
 }
 
 function wantsBilingual(element: Element, text: string): boolean {
@@ -256,7 +323,13 @@ function parseFragment(html: string, holds: Hold[]): Node[] {
     const index = Number(placeholder.getAttribute(HOLD_ATTRIBUTE));
     const original = holds[index];
     if (original) {
-      placeholder.replaceWith(doc.importNode(original, true));
+      const copy = doc.importNode(original, true);
+      if (copy.nodeType === Node.ELEMENT_NODE) {
+        const element = copy as Element;
+        element.removeAttribute(ID_ATTRIBUTE);
+        for (const nested of element.querySelectorAll(`[${ID_ATTRIBUTE}]`)) nested.removeAttribute(ID_ATTRIBUTE);
+      }
+      placeholder.replaceWith(copy);
     } else {
       placeholder.replaceWith(doc.createTextNode(placeholder.textContent ?? ""));
     }

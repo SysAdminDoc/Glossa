@@ -31,7 +31,12 @@ test("inline-only blocks become one unit each and keep their inline markup", () 
   const segments = collectSegments(body, options);
   const units = segments.filter((s) => s.kind === "element");
   assert.equal(units.length, 3);
-  assert.equal((units[0] as { html: string }).html, 'Hola <a href="#x">mundo</a> y <b>todos</b>.');
+  // Every element is numbered on the way out so replace mode can put the text back into the page's
+  // own elements rather than into copies.
+  assert.equal(
+    (units[0] as { html: string }).html,
+    'Hola <a href="#x" data-glossa-id="0">mundo</a> y <b data-glossa-id="1">todos</b>.'
+  );
 });
 
 test("containers with block children are recursed, and their loose text becomes text segments", () => {
@@ -81,12 +86,14 @@ test("code, pre, translate=no, notranslate, hidden, and inputs are skipped", () 
   const texts = segments.map((s) => (s.kind === "element" ? s.element.textContent : s.text));
   assert.deepEqual(texts, ["Ejecuta npm install ahora.", "Marca registrada"]);
   // The unit still carries the inline code element; the engine's HTML mode leaves it as-is.
-  assert.match((segments[0] as { html: string }).html, /<code>npm install<\/code>/);
+  assert.match((segments[0] as { html: string }).html, /<code data-glossa-id="0">npm install<\/code>/);
   // An inline translate="no" span becomes a var placeholder the engine copies verbatim.
   const brand = segments[1] as { html: string; holds: Element[] };
   assert.equal(brand.html, '<var data-glossa-hold="0">Marca</var> registrada');
+  // The placeholder replaced the numbered element, so no stray numbering is left in the fragment.
   assert.equal(brand.holds.length, 1);
-  assert.equal(brand.holds[0]?.outerHTML, '<span translate="no">Marca</span>');
+  // The live element carries its number until the unit is restored.
+  assert.equal(brand.holds[0]?.outerHTML, '<span translate="no" data-glossa-id="0">Marca</span>');
 });
 
 test("renderer restores protected inline elements from their placeholders", () => {
@@ -449,4 +456,70 @@ test("renderer strips scripts and event handlers from a translated fragment", ()
   const a = block.querySelector("a")!;
   assert.equal(a.getAttribute("onclick"), null);
   assert.equal(a.getAttribute("href"), null);
+});
+
+test("replace mode keeps the page's own link, listeners and all", () => {
+  const body = load(`<p id="p">Visita el <a id="link" href="#c">catálogo en línea</a> antes de venir.</p>`);
+  const link = window.document.getElementById("link")!;
+  let clicks = 0;
+  link.addEventListener("click", () => {
+    clicks++;
+  });
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const html = (segment as { html: string }).html;
+  assert.match(html, /data-glossa-id="0"/);
+  const renderer = new Renderer();
+  renderer.apply(segment, 'Visit the <a id="link" href="#c" data-glossa-id="0">online catalogue</a> before coming.', {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const after = window.document.getElementById("link")!;
+  assert.equal(after, link, "the link was replaced by a copy");
+  assert.equal(after.textContent, "online catalogue");
+  assert.equal(after.getAttribute("data-glossa-id"), null, "the numbering was left in the page");
+  after.dispatchEvent(new window.Event("click"));
+  assert.equal(clicks, 1, "the click listener did not survive the translation");
+
+  renderer.restoreAll();
+  assert.equal(window.document.getElementById("link"), link);
+  assert.equal(link.textContent, "catálogo en línea", "the link's original text did not come back");
+  assert.equal(window.document.getElementById("p")!.querySelector("[data-glossa-id]"), null);
+});
+
+test("an element the engine repeats becomes a copy, not the page's element twice", () => {
+  const body = load(`<p id="p">Compra el <b id="b">libro</b> aquí mismo hoy sin esperas.</p>`);
+  const bold = window.document.getElementById("b")!;
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(
+    segment,
+    'Buy the <b data-glossa-id="0">book</b> here today, the <b data-glossa-id="0">book</b>, without waiting.',
+    { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" }
+  );
+  const p = window.document.getElementById("p")!;
+  const bolds = Array.from(p.querySelectorAll("b"));
+  assert.equal(bolds.length, 2);
+  assert.equal(bolds[0], bold, "the first occurrence should be the page's own element");
+  assert.notEqual(bolds[1], bold, "the page's element cannot be in two places at once");
+  assert.equal(bolds[1]?.getAttribute("data-glossa-id"), null);
+});
+
+test("bilingual mode leaves no numbering in the block it adds", () => {
+  const body = load(`<p id="p">Visita el <a href="#c">catálogo en línea</a> antes de tu visita de hoy.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, 'Visit the <a href="#c" data-glossa-id="0">online catalogue</a> before your visit today.', {
+    displayMode: "bilingual",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const block = window.document.querySelector("#p glossa-translation")!;
+  assert.equal(block.querySelector("[data-glossa-id]"), null);
+  assert.equal(block.querySelector("a")?.getAttribute("href"), "#c");
+  renderer.restoreAll();
+  assert.equal(window.document.getElementById("p")!.querySelector("[data-glossa-id]"), null);
 });

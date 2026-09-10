@@ -262,6 +262,53 @@ try {
   assert(leftovers.blocks === 0 && leftovers.units === 0, `restore left ${leftovers.blocks} blocks and ${leftovers.units} units`);
   assert(/consultar el catálogo en línea/.test(leftovers.intro), "restore did not bring the original paragraph back");
 
+  // Replace mode has to put the translation into the page's own elements. A copy would look the
+  // same and behave differently: this listener is on the element the page created, and it has to
+  // still fire after the paragraph has been translated in place.
+  await page.evaluate(() => {
+    const link = document.querySelector("#intro a");
+    window.__glossaClicks = 0;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.__glossaClicks++;
+    });
+    link.dataset.glossaProbe = "1";
+  });
+  await popup.click("#mode-replace");
+  await popup.click("#action");
+  await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
+    timeout: 240_000
+  });
+  const replaced = await page.evaluate(() => {
+    const link = document.querySelector("#intro a");
+    link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    return {
+      sameNode: link?.dataset.glossaProbe === "1",
+      clicks: window.__glossaClicks,
+      text: link?.textContent ?? "",
+      leftoverIds: document.querySelectorAll("[data-glossa-id]").length,
+      unit: document.getElementById("intro")?.getAttribute("data-glossa-unit")
+    };
+  });
+  console.info(`smoke: replace mode link "${replaced.text}", listener fired ${replaced.clicks} time(s)`);
+  assert(replaced.unit === "replaced", `intro was ${replaced.unit} in replace mode`);
+  assert(replaced.sameNode, "the page's own link was swapped for a copy");
+  assert(replaced.clicks === 1, "the link's click listener did not survive replace mode");
+  assert(/catalog/i.test(replaced.text), `the link text was not translated: "${replaced.text}"`);
+  assert(replaced.leftoverIds === 0, `${replaced.leftoverIds} elements were left numbered`);
+
+  await popup.click("#action");
+  await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Translate page", null, {
+    timeout: 30_000
+  });
+  const restoredLink = await page.$eval("#intro a", (link) => ({
+    same: link.dataset.glossaProbe === "1",
+    text: link.textContent ?? ""
+  }));
+  assert(restoredLink.same, "restore replaced the page's link with a copy");
+  assert(/catálogo/.test(restoredLink.text), `restore left the link translated: "${restoredLink.text}"`);
+  await popup.click("#mode-bilingual");
+
   // Settings have to change behaviour, not just persist. With the default on, an editable block is
   // left alone; with it off, the same block is translated. Anything else means a dead control.
   const editableDefault = await page.$eval("#editable", (element) => element.querySelectorAll("glossa-translation").length);

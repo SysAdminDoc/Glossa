@@ -23,6 +23,14 @@ export type Hold = Element | Text;
 const HOLD_SELECTOR = '[translate="no" i], .notranslate';
 export const HOLD_ATTRIBUTE = "data-glossa-hold";
 
+// Every element inside a unit is numbered before the unit is sent. The engine carries data-*
+// attributes through untouched, so the translation comes back saying which of the page's own
+// elements each piece belongs to, and replace mode can put the text into those elements rather
+// than into copies of them. A copy looks identical and behaves differently: its click handlers,
+// its framework bindings and its focus are all gone. Firefox does the same thing with
+// data-moz-translations-id.
+export const ID_ATTRIBUTE = "data-glossa-id";
+
 // Elements whose contents are never translated, either because the text is not prose or because
 // changing it would break the page.
 const SKIP_TAGS = new Set([
@@ -140,6 +148,7 @@ function effectiveLang(start: Element | null): string | null {
 // Bergamot passes through untouched; the originals are returned so the renderer can put them
 // back by index. Clone and original are walked with the same selector, so indexes line up.
 export function serializeUnit(element: Element): { html: string; holds: Hold[] } {
+  stampIds(element);
   const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR));
   const source = element.textContent ?? "";
   if (holds.length === 0 && !hasProtectedText(source)) {
@@ -157,6 +166,21 @@ export function serializeUnit(element: Element): { html: string; holds: Hold[] }
   });
   protectText(clone, holds);
   return { html: clone.innerHTML, holds };
+}
+
+function stampIds(element: Element): void {
+  let index = 0;
+  for (const child of element.querySelectorAll("*")) {
+    child.setAttribute(ID_ATTRIBUTE, String(index++));
+  }
+}
+
+// Take the numbering back off, which is what restoring a unit has to do.
+export function clearIds(element: Element): void {
+  element.removeAttribute(ID_ATTRIBUTE);
+  for (const child of element.querySelectorAll(`[${ID_ATTRIBUTE}]`)) {
+    child.removeAttribute(ID_ATTRIBUTE);
+  }
 }
 
 // Runs of text the engine must not touch. It has been seen putting a space inside a query string

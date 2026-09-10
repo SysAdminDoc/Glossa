@@ -8,6 +8,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The engine lets go of its models after fifteen seconds of quiet, and on Chrome the hidden document that hosts it closes too, so an idle browser is not holding a few hundred megabytes.
 - A processor that cannot run the engine is reported plainly ("this computer's processor lacks the SIMD instructions the engine needs") before anything is downloaded, instead of failing with a stack trace.
 - A translation whose engine dies mid page is retried once on a fresh engine rather than ending the page.
+- Replace mode keeps the page's own links and buttons instead of rebuilding them, so anything the page had attached to them still works after a translation. Restoring puts each one's original text back.
 - Model downloads survive a bad connection: a dropped transfer picks up where it stopped instead of starting the whole file again, and a download can be cancelled from the options page. Two pages asking for the same language share one download, and a download that would not fit is refused before it starts with the numbers to explain why.
 - The options page can send downloads back to Mozilla's CDN after it has fallen back to the bucket.
 - Language detection only looks at prose now. A page of numbers, dates or links is reported as undetectable and left alone instead of being guessed at, and a language you choose by hand is remembered for that site.
