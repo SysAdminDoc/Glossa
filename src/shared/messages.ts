@@ -91,6 +91,16 @@ export interface ModelsDeleteRequest {
   type: "glossa:models:delete";
   pairKey: string;
 }
+export interface ModelsCancelRequest {
+  type: "glossa:models:cancel";
+  pairKey: string;
+}
+export interface ModelsDownloadsRequest {
+  type: "glossa:models:downloads";
+}
+export interface ModelsResetSourceRequest {
+  type: "glossa:models:reset-source";
+}
 export interface CatalogRefreshRequest {
   type: "glossa:catalog:refresh";
 }
@@ -108,6 +118,9 @@ export type UiRequest =
   | ModelsListRequest
   | ModelsInstallRequest
   | ModelsDeleteRequest
+  | ModelsCancelRequest
+  | ModelsDownloadsRequest
+  | ModelsResetSourceRequest
   | CatalogRefreshRequest
   | RouteStatusRequest;
 
@@ -163,6 +176,9 @@ export type EngineRequest =
   | (EngineEnvelope & { type: "route-status"; sourceLanguage: string; targetLanguage: string })
   | (EngineEnvelope & { type: "models-list" })
   | (EngineEnvelope & { type: "models-delete"; pairKey: string })
+  | (EngineEnvelope & { type: "models-downloads" })
+  | (EngineEnvelope & { type: "models-cancel"; pairKey: string })
+  | (EngineEnvelope & { type: "models-reset-source" })
   | (EngineEnvelope & { type: "catalog-refresh" })
   | (EngineEnvelope & { type: "ping" });
 

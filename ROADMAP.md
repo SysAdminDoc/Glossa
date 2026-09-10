@@ -138,13 +138,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: Esc closes the popover; the close control measures at least 24 by 24 CSS px; the popover is positioned outside the selection rect; on a `contenteditable` page the popover is a sibling of the editor, never inside it, and the editor's `innerHTML` is unchanged afterwards.
   Complexity: S
 
-- [ ] P1 — G-33 — Model download manager: cancel, retry, resume, single flight, storage check
-  Why: a 25 to 57 MB download has no cancel, no retry on a dropped connection, no resume, can be started twice from the popup and the options page, and never checks free storage; the seven-day CDN refusal has no reset.
-  Evidence: Bugzilla 1837123 and 1836465 (Firefox's own interrupted-download and progress bugs), translatelocally #55 (models lost), kiwix-android #2093 (resume unreliability); `model-store.ts` `ensurePair` and `fetchBytes`.
-  Touches: src/engine/model-store.ts (`AbortController`, exponential retry, `Range` resume keyed by record id, in-flight map), src/engine/engine-host.ts (expose active downloads for G-10), src/options/options.ts (cancel button, "reset download source")
-  Acceptance: cancelling mid-download leaves no cache entry and the pair is not listed as installed; killing the network and restoring it completes the download without restarting from zero; two simultaneous requests for one pair perform one download.
-  Complexity: M
-
 - [ ] P1 — G-34 — Release pipeline and version bump script
   Why: no release exists; version strings live in four files edited by hand; the house rule is ZIP as the primary asset with a CRX3 secondary and SHA-256 sidecars.
   Evidence: README install section points at a releases page with nothing on it; tests/manifest.test.ts guards the strings but nothing bumps them; house release rules.

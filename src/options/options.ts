@@ -276,6 +276,21 @@ async function init(): Promise<void> {
     }
   });
 
+  // What is being downloaded right now, so the button can stop it.
+  let downloading: string | null = null;
+
+  $("cancel-download").addEventListener("click", async () => {
+    if (!downloading) return;
+    await sendUi({ type: "glossa:models:cancel", pairKey: downloading }).catch(() => undefined);
+    toast("Download cancelled");
+  });
+
+  $("reset-source").addEventListener("click", async () => {
+    const result = await sendUi<{ byteSource: string }>({ type: "glossa:models:reset-source" });
+    toast(`Next download will try ${result.byteSource === "mozilla-cdn" ? "Mozilla's CDN" : "Mozilla's bucket"} first`, "ok");
+    await refreshModels();
+  });
+
   $("install").addEventListener("click", async () => {
     const from = $<HTMLSelectElement>("install-from").value;
     const to = $<HTMLSelectElement>("install-to").value;
@@ -285,6 +300,7 @@ async function init(): Promise<void> {
     }
     const button = $<HTMLButtonElement>("install");
     button.disabled = true;
+    downloading = `${from}->${to}`;
     showProgress(0, "Starting download…");
     try {
       await sendUi({ type: "glossa:models:install", sourceLanguage: from, targetLanguage: to });
@@ -293,6 +309,7 @@ async function init(): Promise<void> {
       toast(error instanceof Error ? error.message : String(error), "error");
     } finally {
       button.disabled = false;
+      downloading = null;
       hideProgress();
       await refreshModels();
     }

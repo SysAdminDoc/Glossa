@@ -100,6 +100,14 @@ export class EngineHost {
         return this.routeStatus(request.sourceLanguage, request.targetLanguage, environment);
       case "models-list":
         return this.modelsList(environment);
+      case "models-downloads":
+        return { downloads: this.store.activeDownloads() };
+      case "models-cancel":
+        return { cancelled: await this.store.cancel(request.pairKey) };
+      case "models-reset-source": {
+        await this.store.resetSource();
+        return { byteSource: await this.store.activeSource() };
+      }
       case "models-delete":
         return { deleted: await this.deletePair(request.pairKey) };
       case "catalog-refresh": {

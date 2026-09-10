@@ -79,7 +79,12 @@
         <div class="progress" id="progress" hidden>
           <div class="bar"><div class="fill" id="progress-fill"></div></div>
           <div class="progress-text" id="progress-text"></div>
+          <button type="button" class="btn small" id="cancel-download">Cancel download</button>
         </div>
+        <p class="hint">
+          Model files come from Mozilla's attachment CDN, or from Mozilla's model bucket when the CDN
+          refuses this browser. <button type="button" class="btn small" id="reset-source">Try the CDN again</button>
+        </p>
       </section>
 
       <section class="panel">

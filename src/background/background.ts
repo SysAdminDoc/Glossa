@@ -233,6 +233,12 @@ async function handleUiRequest(request: UiRequest): Promise<unknown> {
       return engineCall({ type: "models-list" });
     case "glossa:models:install":
       return engineCall({ type: "ensure-route", sourceLanguage: request.sourceLanguage, targetLanguage: request.targetLanguage });
+    case "glossa:models:cancel":
+      return engineCall({ type: "models-cancel", pairKey: request.pairKey });
+    case "glossa:models:downloads":
+      return engineCall({ type: "models-downloads" });
+    case "glossa:models:reset-source":
+      return engineCall({ type: "models-reset-source" });
     case "glossa:models:delete":
       return engineCall({ type: "models-delete", pairKey: request.pairKey });
     case "glossa:catalog:refresh":
