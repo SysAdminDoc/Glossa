@@ -2,7 +2,7 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-10
 
 ### Added
 - The engine lets go of its models after fifteen seconds of quiet, and on Chrome the hidden document that hosts it closes too, so an idle browser is not holding a few hundred megabytes.
