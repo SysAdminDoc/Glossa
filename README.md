@@ -44,6 +44,8 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 - Per-site rules. Turn Glossa off for a host and it will not even look at its pages. List the languages you read and those pages are never offered.
 - Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
 
+Glossa's own interface follows your browser's language: English, Spanish, German, French, Japanese and Chinese are included, and anything missing falls back to English.
+
 Coverage follows Firefox's catalog: about 60 languages, all pivoting through English. A Spanish to French translation therefore runs two models.
 
 ## Install

@@ -8,28 +8,28 @@
   <body>
     <header class="top">
       <img class="logo" src="icons/icon-32.png" alt="" width="20" height="20" />
-      <h1 class="brand">Glossa</h1>
+      <h1 class="brand" data-i18n="extensionName">Glossa</h1>
       <span class="version" id="version"></span>
     </header>
 
     <main class="card" id="page-card">
       <div class="row">
-        <span class="label">Page language</span>
-        <select id="source" class="select" aria-label="Page language"></select>
+        <span class="label" data-i18n="popupPageLanguage">Page language</span>
+        <select id="source" class="select" aria-label="Page language" data-i18n-attr="aria-label=popupPageLanguage"></select>
       </div>
       <div class="row">
-        <span class="label">Translate to</span>
-        <select id="target" class="select" aria-label="Target language"></select>
+        <span class="label" data-i18n="popupTranslateTo">Translate to</span>
+        <select id="target" class="select" aria-label="Target language" data-i18n-attr="aria-label=popupTranslateTo"></select>
       </div>
-      <div class="row modes" role="group" aria-label="Display mode">
-        <button type="button" class="mode" data-mode="bilingual" id="mode-bilingual" aria-pressed="true">Below original</button>
-        <button type="button" class="mode" data-mode="replace" id="mode-replace" aria-pressed="false">Replace</button>
+      <div class="row modes" role="group" aria-label="Display mode" data-i18n-attr="aria-label=popupModeGroup">
+        <button type="button" class="mode" data-mode="bilingual" id="mode-bilingual" aria-pressed="true" data-i18n="popupModeBilingual">Below original</button>
+        <button type="button" class="mode" data-mode="replace" id="mode-replace" aria-pressed="false" data-i18n="popupModeReplace">Replace</button>
       </div>
       <div class="row grant" id="grant-row" hidden>
-        <p class="grant-text" id="grant-text">Glossa needs permission to reach Mozilla's model hosts before it can download a language.</p>
-        <button type="button" class="btn" id="grant">Allow model downloads</button>
+        <p class="grant-text" id="grant-text" data-i18n="popupGrantExplanation">Glossa needs permission to reach Mozilla's model hosts before it can download a language.</p>
+        <button type="button" class="btn" id="grant" data-i18n="popupGrantButton">Allow model downloads</button>
       </div>
-      <button type="button" class="primary" id="action" disabled>Checking page…</button>
+      <button type="button" class="primary" id="action" disabled data-i18n="popupChecking">Checking page…</button>
       <div class="progress" id="progress" hidden>
         <div class="bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="progress-text">
           <div class="fill" id="progress-fill"></div>
@@ -40,8 +40,8 @@
     </main>
 
     <footer class="foot">
-      <span class="privacy">Runs on this device. No page text leaves your browser.</span>
-      <a href="#" id="open-options">Settings &amp; languages</a>
+      <span class="privacy" data-i18n="popupPrivacyLine">Runs on this device. No page text leaves your browser.</span>
+      <a href="#" id="open-options" data-i18n="popupOpenOptions">Settings &amp; languages</a>
     </footer>
     <script src="popup.js"></script>
   </body>

@@ -1,5 +1,6 @@
 import { api } from "../shared/api.ts";
 import { normalizeLanguageTag } from "../shared/catalog.ts";
+import { t } from "../shared/i18n.ts";
 import { loadSettings, SETTINGS_KEY, type Settings } from "../shared/settings.ts";
 import type {
   DetectRequest,
@@ -193,12 +194,12 @@ async function translatePage(
   const source = command.sourceLanguage ?? controller.state.detectedLanguage;
   if (!source) {
     controller.state.translating = false;
-    controller.state.lastError = "Could not detect the page language";
+    controller.state.lastError = t("pageNoLanguage");
     return;
   }
   if (source === command.targetLanguage) {
     controller.state.translating = false;
-    controller.state.lastError = `The page is already in ${command.targetLanguage}`;
+    controller.state.lastError = t("pageAlreadyTarget", command.targetLanguage);
     return;
   }
   controller.state.detectedLanguage = source;
@@ -340,7 +341,7 @@ async function translateSegments(
       return;
     }
     if (!response || !response.ok) {
-      controller.state.lastError = response?.error ?? "No answer from the translation engine";
+      controller.state.lastError = response?.error ?? t("pageEngineSilent");
       // A failing engine fails for every batch, so stop. Every block still carrying a marker has to
       // lose it, or it counts as handled and no later run will ever pick it up again.
       unmarkAll(controller, batches.slice(index));
@@ -642,8 +643,8 @@ function offerSelection(controller: Controller): void {
   button.type = "button";
   button.className = SELECTION_BUTTON_CLASS;
   button.setAttribute("translate", "no");
-  button.textContent = `Translate to ${settings.targetLanguage.toUpperCase()}`;
-  button.title = "Translate the selected text with Glossa";
+  button.textContent = t("selectionOffer", settings.targetLanguage.toUpperCase());
+  button.title = t("selectionOfferTitle");
   // Pressing the button must not take the selection away before it can be read.
   button.addEventListener("mousedown", (event) => event.preventDefault());
   button.addEventListener("click", () => {
@@ -659,7 +660,7 @@ async function translateSelection(controller: Controller, target: string): Promi
   const selection = window.getSelection();
   const text = selection?.toString().trim() ?? "";
   if (!text) {
-    controller.state.lastError = "Nothing is selected";
+    controller.state.lastError = t("popoverNothingSelected");
     return;
   }
   const detectRequest: DetectRequest = { type: "glossa:detect", sample: text.slice(0, 2000), htmlLang: document.documentElement.getAttribute("lang") };
@@ -667,14 +668,14 @@ async function translateSelection(controller: Controller, target: string): Promi
   const source = detected?.language ?? controller.state.detectedLanguage;
   const anchor = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
   if (!source) {
-    showPopover("Could not detect the language of the selection.", anchor, true);
+    showPopover(t("popoverNoLanguage"), anchor, true);
     return;
   }
   if (source === target) {
-    showPopover(`Already in ${target}.`, anchor, true);
+    showPopover(t("popoverAlready", target), anchor, true);
     return;
   }
-  showPopover("Translating…", anchor, false);
+  showPopover(t("popoverTranslating"), anchor, false);
   const request: TranslateRequest = {
     type: "glossa:translate",
     sourceLanguage: source,
@@ -683,7 +684,7 @@ async function translateSelection(controller: Controller, target: string): Promi
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
   if (!response || !response.ok) {
-    showPopover(response?.error ?? "The translation engine did not answer.", anchor, true);
+    showPopover(response?.error ?? t("popoverNoAnswer"), anchor, true);
     return;
   }
   const parsed = new DOMParser().parseFromString(`<body>${response.fragments.join("\n\n")}</body>`, "text/html");
@@ -703,14 +704,14 @@ function showPopover(text: string, anchor: DOMRect | null, isError: boolean): vo
   box.className = `glossa-popover${isError ? " glossa-popover-error" : ""}`;
   box.setAttribute("translate", "no");
   box.setAttribute("role", "dialog");
-  box.setAttribute("aria-label", "Glossa translation");
+  box.setAttribute("aria-label", t("popoverLabel"));
   const body = document.createElement("div");
   body.className = "glossa-popover-body";
   body.textContent = text;
   const close = document.createElement("button");
   close.type = "button";
   close.className = "glossa-popover-close";
-  close.textContent = "Close";
+  close.textContent = t("popoverClose");
   close.addEventListener("click", () => dismissPopover());
   box.append(body, close);
   document.documentElement.append(box);

@@ -1,0 +1,374 @@
+{
+  "extensionName": {
+    "message": "Glossa"
+  },
+  "extensionDescription": {
+    "message": "在你自己的设备上翻译网页。不用云端，不用账号，不发送使用数据。"
+  },
+  "actionTitle": {
+    "message": "用 Glossa 翻译此页面"
+  },
+  "popupPageLanguage": {
+    "message": "页面语言"
+  },
+  "popupTranslateTo": {
+    "message": "翻译成"
+  },
+  "popupModeBilingual": {
+    "message": "在原文下方"
+  },
+  "popupModeReplace": {
+    "message": "替换原文"
+  },
+  "popupModeGroup": {
+    "message": "显示方式"
+  },
+  "popupChecking": {
+    "message": "正在检查页面…"
+  },
+  "popupTranslate": {
+    "message": "翻译页面"
+  },
+  "popupShowOriginal": {
+    "message": "显示原文"
+  },
+  "popupTranslating": {
+    "message": "正在翻译…"
+  },
+  "popupChooseLanguage": {
+    "message": "请选择页面语言"
+  },
+  "popupAlreadyTarget": {
+    "message": "已经是该语言"
+  },
+  "popupNoModel": {
+    "message": "没有适用于该语言对的模型"
+  },
+  "popupDownloadAndTranslate": {
+    "message": "下载 $1 并翻译"
+  },
+  "popupBlockedButton": {
+    "message": "已在此页面关闭"
+  },
+  "popupUnsupportedButton": {
+    "message": "此电脑不支持"
+  },
+  "popupGrantButton": {
+    "message": "允许下载模型"
+  },
+  "popupGrantFirst": {
+    "message": "请先允许下载模型"
+  },
+  "popupGrantExplanation": {
+    "message": "在下载语言之前，Glossa 需要访问 Mozilla 的模型服务器的权限。"
+  },
+  "popupGrantAllowed": {
+    "message": "已允许访问，现在可以下载了。"
+  },
+  "popupGrantRefused": {
+    "message": "没有该权限，Glossa 无法下载语言模型。"
+  },
+  "popupDetectAutomatically": {
+    "message": "自动检测"
+  },
+  "popupInvite": {
+    "message": "点击“翻译页面”即可用你的语言阅读此页。"
+  },
+  "popupUnsupportedPage": {
+    "message": "此页面无法翻译（浏览器或扩展页面）。"
+  },
+  "popupUnsupportedCpu": {
+    "message": "此电脑的处理器缺少翻译引擎所需的 SIMD 指令，Glossa 无法在此运行。"
+  },
+  "popupModelReady": {
+    "message": "模型已就绪。翻译在本机进行。"
+  },
+  "popupModelSize": {
+    "message": "$1 模型安装后占用 $2。"
+  },
+  "popupPivot": {
+    "message": "经由英语翻译（两个模型，占用 $1）。"
+  },
+  "popupNoRoute": {
+    "message": "目前还没有可用于 $1 到 $2 的本地模型。"
+  },
+  "popupCatalogUnavailable": {
+    "message": "无法获取模型目录：$1"
+  },
+  "popupTranslatedBlocks": {
+    "message": "已在本机翻译 $1 个段落。"
+  },
+  "popupRestored": {
+    "message": "已还原原始页面。"
+  },
+  "popupRemembered": {
+    "message": "使用你为此网站选择的语言：$1。"
+  },
+  "popupNoTab": {
+    "message": "没有活动标签页。"
+  },
+  "popupStartingDownload": {
+    "message": "正在开始下载…"
+  },
+  "popupDownloading": {
+    "message": "正在下载 $1：$3 中的 $2"
+  },
+  "popupVerifying": {
+    "message": "正在校验 $1…"
+  },
+  "popupLoadingEngine": {
+    "message": "正在将 $1 载入引擎…"
+  },
+  "popupDownloadFailed": {
+    "message": "下载失败"
+  },
+  "popupTranslatingProgress": {
+    "message": "已翻译 $1 / $2 个段落"
+  },
+  "popupPrivacyLine": {
+    "message": "在本机运行。页面文字不会离开你的浏览器。"
+  },
+  "popupOpenOptions": {
+    "message": "设置与语言"
+  },
+  "selectionOffer": {
+    "message": "翻译成 $1"
+  },
+  "selectionOfferTitle": {
+    "message": "用 Glossa 翻译选中的文字"
+  },
+  "popoverClose": {
+    "message": "关闭"
+  },
+  "popoverLabel": {
+    "message": "Glossa 翻译"
+  },
+  "popoverTranslating": {
+    "message": "正在翻译…"
+  },
+  "popoverNothingSelected": {
+    "message": "未选中任何内容"
+  },
+  "popoverNoLanguage": {
+    "message": "无法识别所选文字的语言。"
+  },
+  "popoverAlready": {
+    "message": "已经是 $1。"
+  },
+  "popoverNoAnswer": {
+    "message": "翻译引擎没有响应。"
+  },
+  "pageNoLanguage": {
+    "message": "无法识别页面语言"
+  },
+  "pageAlreadyTarget": {
+    "message": "此页面已经是 $1"
+  },
+  "pageEngineSilent": {
+    "message": "翻译引擎没有响应"
+  },
+  "blockedBySiteRule": {
+    "message": "Glossa 在 $1 上已关闭。可在设置页面更改。"
+  },
+  "blockedByKnownLanguage": {
+    "message": "你能读懂$1，因此此页面保持原样。"
+  },
+  "optionsTitle": {
+    "message": "Glossa 设置"
+  },
+  "optionsSubtitle": {
+    "message": "在设备上进行页面翻译。"
+  },
+  "optionsTranslationSection": {
+    "message": "翻译"
+  },
+  "optionsTargetLabel": {
+    "message": "将页面翻译成"
+  },
+  "optionsShowLabel": {
+    "message": "翻译显示方式"
+  },
+  "optionsModeBilingual": {
+    "message": "显示在原文下方"
+  },
+  "optionsModeReplace": {
+    "message": "替换原文"
+  },
+  "optionsHover": {
+    "message": "替换模式下悬停显示原文"
+  },
+  "optionsSkipFields": {
+    "message": "不翻译可编辑输入框中的内容"
+  },
+  "optionsSelectionPopup": {
+    "message": "选中文字时提供翻译（默认关闭，关闭时可用右键菜单）"
+  },
+  "optionsKnownSection": {
+    "message": "你能读懂的语言"
+  },
+  "optionsKnownHint": {
+    "message": "这些语言的页面不会提示翻译。"
+  },
+  "optionsAdd": {
+    "message": "添加"
+  },
+  "optionsRemove": {
+    "message": "移除"
+  },
+  "optionsRulesSection": {
+    "message": "站点规则"
+  },
+  "optionsRulesHost": {
+    "message": "站点"
+  },
+  "optionsRulesRule": {
+    "message": "规则"
+  },
+  "optionsRuleNever": {
+    "message": "从不"
+  },
+  "optionsRuleAlways": {
+    "message": "总是"
+  },
+  "optionsRuleNeverLong": {
+    "message": "从不翻译"
+  },
+  "optionsRuleAlwaysLong": {
+    "message": "总是翻译"
+  },
+  "optionsRuleWaiting": {
+    "message": "总是翻译（等待访问权限）"
+  },
+  "optionsRuleWaitingTitle": {
+    "message": "Glossa 没有读取 $1 的权限，因此该规则不起作用。移除后重新添加即可再次授权。"
+  },
+  "optionsRulesEmpty": {
+    "message": "还没有站点规则。"
+  },
+  "optionsRuleHostPlaceholder": {
+    "message": "example.com"
+  },
+  "optionsModelsSection": {
+    "message": "语言模型"
+  },
+  "optionsModelsHint": {
+    "message": "每个模型只从 Mozilla 的目录下载一次，按公布的哈希校验后保存在本机。除此之外不会发送或接收任何内容。"
+  },
+  "optionsRefreshCatalog": {
+    "message": "刷新目录"
+  },
+  "optionsExperimental": {
+    "message": "提供 Mozilla 的预发布模型（阿塞拜疆语、白俄罗斯语、波斯尼亚语、挪威语、新挪威语）。质量未经验证，Firefox 仅在 nightly 版本中提供。"
+  },
+  "optionsModelsPair": {
+    "message": "语言对"
+  },
+  "optionsModelsVersion": {
+    "message": "版本"
+  },
+  "optionsModelsSize": {
+    "message": "大小"
+  },
+  "optionsDownload": {
+    "message": "下载"
+  },
+  "optionsCancelDownload": {
+    "message": "取消下载"
+  },
+  "optionsSourceHint": {
+    "message": "模型文件来自 Mozilla 的 CDN；当 CDN 拒绝此浏览器时，改从 Mozilla 的模型存储桶获取。"
+  },
+  "optionsResetSource": {
+    "message": "再试一次 CDN"
+  },
+  "optionsPrivacySection": {
+    "message": "隐私"
+  },
+  "optionsPrivacyEngine": {
+    "message": "翻译在浏览器内使用 Firefox 所用的 Bergamot 引擎完成。页面文字绝不会离开本机。"
+  },
+  "optionsPrivacyPermission": {
+    "message": "该扩展没有自行读取网站的权限，只有在你要求时才会处理页面。"
+  },
+  "optionsPrivacyNetwork": {
+    "message": "网络访问仅限 Mozilla 运营的三个地址，且只用于获取模型目录和模型文件："
+  },
+  "optionsPrivacyHashes": {
+    "message": "每个文件在使用前都会与 Mozilla 公布的哈希进行校验。"
+  },
+  "optionsPrivacyTelemetry": {
+    "message": "没有账号，不发送使用数据，没有分析，没有崩溃报告。"
+  },
+  "optionsCatalogRefreshed": {
+    "message": "目录已刷新"
+  },
+  "optionsCatalogRefreshFailed": {
+    "message": "刷新目录失败：$1"
+  },
+  "optionsPickTwo": {
+    "message": "请选择两种不同的语言"
+  },
+  "optionsPairReady": {
+    "message": "$1 → $2 已就绪"
+  },
+  "optionsEnterHost": {
+    "message": "请先输入站点名称"
+  },
+  "optionsNoAccessToast": {
+    "message": "没有 $1 的访问权限，该规则无法自动翻译"
+  },
+  "optionsBadHostToast": {
+    "message": "$1 不是 Glossa 可以请求的站点"
+  },
+  "optionsDownloadCancelled": {
+    "message": "已取消下载"
+  },
+  "optionsSourceCdn": {
+    "message": "下次下载将优先尝试 Mozilla 的 CDN"
+  },
+  "optionsSourceBucket": {
+    "message": "下次下载将优先尝试 Mozilla 的存储桶"
+  },
+  "optionsDeleteModel": {
+    "message": "删除"
+  },
+  "optionsSelectKnownLanguage": {
+    "message": "你能读懂的语言"
+  },
+  "optionsSelectRuleKind": {
+    "message": "在此站点的处理方式"
+  },
+  "optionsSelectInstallFrom": {
+    "message": "下载的源语言"
+  },
+  "optionsSelectInstallTo": {
+    "message": "下载的目标语言"
+  },
+  "optionsCatalogLine": {
+    "message": "目录：$1 种源语言，$2 种目标语言，$3 更新。下载来自 $4。"
+  },
+  "optionsCatalogJustNow": {
+    "message": "刚刚"
+  },
+  "optionsCatalogHoursAgo": {
+    "message": "$1 小时前"
+  },
+  "optionsCatalogUnavailableLine": {
+    "message": "无法获取目录：$1"
+  },
+  "optionsCatalogNotFetched": {
+    "message": "尚未获取目录。"
+  },
+  "optionsModelsEmptyLine": {
+    "message": "还没有下载模型。首次翻译时会自动下载所需内容。"
+  },
+  "optionsDeleted": {
+    "message": "已删除 $1"
+  },
+  "optionsSourceCdnName": {
+    "message": "Mozilla 的 CDN"
+  },
+  "optionsSourceBucketName": {
+    "message": "Mozilla 的模型存储桶"
+  }
+}

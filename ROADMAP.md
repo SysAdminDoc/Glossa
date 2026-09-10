@@ -94,13 +94,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on a 500-paragraph fixture the visible paragraphs are translated before any off-screen one and scrolling re-prioritises; a hidden tab issues no engine calls until shown.
   Complexity: L
 
-- [ ] P1 — G-36 — Localise the extension UI
-  Why: a translator whose own popup and options are English-only is a documented complaint; every UI string is hardcoded in HTML and TypeScript and `_locales` holds only the name and description.
-  Evidence: translatelocally #43; `src/popup/popup.html`, `src/options/options.html`, `src/extension/_locales/en/messages.json`.
-  Touches: src/extension/_locales (en plus es, de, fr, ja, zh-Hans as human-written files), src/popup, src/options (a small `t()` over `i18n.getMessage`), tools/build.mjs (fail on missing keys)
-  Acceptance: switching the browser UI language to Spanish renders the popup and options in Spanish; a build with a missing key fails.
-  Complexity: M
-
 ### P2
 
 - [ ] P2 — G-38 — Normalise text before submission: soft hyphens, curly quotes, CJK punctuation spacing, edge whitespace

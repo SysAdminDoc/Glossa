@@ -67,8 +67,58 @@ const copies = [
   ["vendor/bergamot/bergamot-translator.js", "bergamot-translator.js"],
   [`vendor/bergamot/${lock.decompressed.filename}`, "bergamot-translator.wasm"],
   ["vendor/bergamot/LICENSE", "LICENSE.bergamot.txt"],
-  ["src/extension/_locales/en/messages.json", "_locales/en/messages.json"]
 ];
+
+// Every language the interface exists in. English is the fallback for a key a locale is missing,
+// so a new key only has to be added to English to be safe, but the check below makes sure a key the
+// code asks for exists there at all.
+const LOCALES = (await readdir(path.join(root, "src", "extension", "_locales"))).sort();
+for (const locale of LOCALES) {
+  copies.push([`src/extension/_locales/${locale}/messages.json`, `_locales/${locale}/messages.json`]);
+}
+
+// Keys the code asks for, from the markup and from every `t("...")` call. A build that ships a key
+// with no message shows the key to the user, which is exactly the bug this catches.
+const english = JSON.parse(await readFile(path.join(root, "src", "extension", "_locales", "en", "messages.json"), "utf8"));
+const used = new Set();
+const sources = [
+  "src/popup/popup.html",
+  "src/popup/popup.ts",
+  "src/options/options.html",
+  "src/options/options.ts",
+  "src/content/content.ts",
+  "src/shared/settings.ts",
+  "src/extension/manifest.chrome.json",
+  "src/extension/manifest.firefox.json"
+];
+for (const file of sources) {
+  const text = await readFile(path.join(root, file), "utf8");
+  for (const match of text.matchAll(/(?<![A-Za-z0-9_])t\(\s*"([A-Za-z][A-Za-z0-9_]*)"/g)) used.add(match[1]);
+  for (const match of text.matchAll(/data-i18n="([^"]+)"/g)) used.add(match[1]);
+  for (const match of text.matchAll(/data-i18n-attr="([^"]+)"/g)) {
+    for (const pair of match[1].split(",")) {
+      const key = pair.split("=")[1]?.trim();
+      if (key) used.add(key);
+    }
+  }
+  for (const match of text.matchAll(/__MSG_([A-Za-z0-9_]+)__/g)) used.add(match[1]);
+}
+// A stray control character in a source file is invisible in an editor and in most greps, and it
+// silently broke the very check below once: a regex escape written through a shell heredoc became a
+// literal backspace, so the scan matched nothing and reported everything as fine.
+for (const file of sources) {
+  const text = await readFile(path.join(root, file), "utf8");
+  const control = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.exec(text);
+  if (control) {
+    throw new Error(`${file} contains a control character (0x${control[0].charCodeAt(0).toString(16)}) at ${control.index}`);
+  }
+}
+
+const missing = [...used].filter((key) => !english[key]).sort();
+if (missing.length > 0) {
+  throw new Error(`No English message for: ${missing.join(", ")}`);
+}
+console.info(`build: ${Object.keys(english).length} messages, ${LOCALES.length} locales, ${used.size} keys in use`);
 
 for (const target of TARGETS) {
   const targetDir = path.join(dist, target);

@@ -1,0 +1,374 @@
+{
+  "extensionName": {
+    "message": "Glossa"
+  },
+  "extensionDescription": {
+    "message": "Traduce páginas web en tu propio dispositivo. Sin nube, sin cuenta, sin telemetría."
+  },
+  "actionTitle": {
+    "message": "Traducir esta página con Glossa"
+  },
+  "popupPageLanguage": {
+    "message": "Idioma de la página"
+  },
+  "popupTranslateTo": {
+    "message": "Traducir a"
+  },
+  "popupModeBilingual": {
+    "message": "Bajo el original"
+  },
+  "popupModeReplace": {
+    "message": "Reemplazar"
+  },
+  "popupModeGroup": {
+    "message": "Modo de visualización"
+  },
+  "popupChecking": {
+    "message": "Comprobando la página…"
+  },
+  "popupTranslate": {
+    "message": "Traducir página"
+  },
+  "popupShowOriginal": {
+    "message": "Ver original"
+  },
+  "popupTranslating": {
+    "message": "Traduciendo…"
+  },
+  "popupChooseLanguage": {
+    "message": "Elige el idioma de la página"
+  },
+  "popupAlreadyTarget": {
+    "message": "Ya está en este idioma"
+  },
+  "popupNoModel": {
+    "message": "No hay modelo para este par"
+  },
+  "popupDownloadAndTranslate": {
+    "message": "Descargar $1 y traducir"
+  },
+  "popupBlockedButton": {
+    "message": "Desactivado en esta página"
+  },
+  "popupUnsupportedButton": {
+    "message": "No compatible con este equipo"
+  },
+  "popupGrantButton": {
+    "message": "Permitir la descarga de modelos"
+  },
+  "popupGrantFirst": {
+    "message": "Permite antes la descarga de modelos"
+  },
+  "popupGrantExplanation": {
+    "message": "Glossa necesita permiso para acceder a los servidores de modelos de Mozilla antes de descargar un idioma."
+  },
+  "popupGrantAllowed": {
+    "message": "Servidores permitidos. Ya se pueden descargar modelos."
+  },
+  "popupGrantRefused": {
+    "message": "Sin ese permiso Glossa no puede descargar ningún modelo."
+  },
+  "popupDetectAutomatically": {
+    "message": "Detectar automáticamente"
+  },
+  "popupInvite": {
+    "message": "Pulsa Traducir para leer esta página en tu idioma."
+  },
+  "popupUnsupportedPage": {
+    "message": "Esta página no se puede traducir (página del navegador o de una extensión)."
+  },
+  "popupUnsupportedCpu": {
+    "message": "El procesador de este equipo no tiene las instrucciones SIMD que necesita el motor, así que Glossa no puede traducir aquí."
+  },
+  "popupModelReady": {
+    "message": "Modelo listo. La traducción se hace en este dispositivo."
+  },
+  "popupModelSize": {
+    "message": "El modelo de $1 ocupa $2 una vez instalado."
+  },
+  "popupPivot": {
+    "message": "Traduce a través del inglés (dos modelos, $1 en disco)."
+  },
+  "popupNoRoute": {
+    "message": "Todavía no hay ningún modelo local que traduzca de $1 a $2."
+  },
+  "popupCatalogUnavailable": {
+    "message": "El catálogo de modelos no está disponible: $1"
+  },
+  "popupTranslatedBlocks": {
+    "message": "Se han traducido $1 bloques en este dispositivo."
+  },
+  "popupRestored": {
+    "message": "Página original restaurada."
+  },
+  "popupRemembered": {
+    "message": "Se usa $1, el idioma que elegiste para este sitio."
+  },
+  "popupNoTab": {
+    "message": "No hay ninguna pestaña activa."
+  },
+  "popupStartingDownload": {
+    "message": "Comenzando la descarga…"
+  },
+  "popupDownloading": {
+    "message": "Descargando $1: $2 de $3"
+  },
+  "popupVerifying": {
+    "message": "Verificando $1…"
+  },
+  "popupLoadingEngine": {
+    "message": "Cargando $1 en el motor…"
+  },
+  "popupDownloadFailed": {
+    "message": "La descarga ha fallado"
+  },
+  "popupTranslatingProgress": {
+    "message": "Traducidos $1 de $2 bloques"
+  },
+  "popupPrivacyLine": {
+    "message": "Funciona en este dispositivo. El texto de la página no sale de tu navegador."
+  },
+  "popupOpenOptions": {
+    "message": "Ajustes e idiomas"
+  },
+  "selectionOffer": {
+    "message": "Traducir a $1"
+  },
+  "selectionOfferTitle": {
+    "message": "Traducir el texto seleccionado con Glossa"
+  },
+  "popoverClose": {
+    "message": "Cerrar"
+  },
+  "popoverLabel": {
+    "message": "Traducción de Glossa"
+  },
+  "popoverTranslating": {
+    "message": "Traduciendo…"
+  },
+  "popoverNothingSelected": {
+    "message": "No hay nada seleccionado"
+  },
+  "popoverNoLanguage": {
+    "message": "No se ha podido detectar el idioma de la selección."
+  },
+  "popoverAlready": {
+    "message": "Ya está en $1."
+  },
+  "popoverNoAnswer": {
+    "message": "El motor de traducción no ha respondido."
+  },
+  "pageNoLanguage": {
+    "message": "No se ha podido detectar el idioma de la página"
+  },
+  "pageAlreadyTarget": {
+    "message": "La página ya está en $1"
+  },
+  "pageEngineSilent": {
+    "message": "El motor de traducción no ha respondido"
+  },
+  "blockedBySiteRule": {
+    "message": "Glossa está desactivado en $1. Puedes cambiarlo en la página de ajustes."
+  },
+  "blockedByKnownLanguage": {
+    "message": "Lees $1, así que esta página se deja como está."
+  },
+  "optionsTitle": {
+    "message": "Ajustes de Glossa"
+  },
+  "optionsSubtitle": {
+    "message": "Traducción de páginas en el dispositivo."
+  },
+  "optionsTranslationSection": {
+    "message": "Traducción"
+  },
+  "optionsTargetLabel": {
+    "message": "Traducir las páginas a"
+  },
+  "optionsShowLabel": {
+    "message": "Mostrar las traducciones"
+  },
+  "optionsModeBilingual": {
+    "message": "Bajo el original"
+  },
+  "optionsModeReplace": {
+    "message": "En lugar del original"
+  },
+  "optionsHover": {
+    "message": "Mostrar el texto original al pasar el ratón en el modo reemplazar"
+  },
+  "optionsSkipFields": {
+    "message": "No traducir nunca dentro de campos editables"
+  },
+  "optionsSelectionPopup": {
+    "message": "Ofrecer traducción al seleccionar texto (desactivado por defecto; si no, usa el menú contextual)"
+  },
+  "optionsKnownSection": {
+    "message": "Idiomas que lees"
+  },
+  "optionsKnownHint": {
+    "message": "Las páginas en estos idiomas nunca se ofrecen para traducir."
+  },
+  "optionsAdd": {
+    "message": "Añadir"
+  },
+  "optionsRemove": {
+    "message": "Quitar"
+  },
+  "optionsRulesSection": {
+    "message": "Reglas por sitio"
+  },
+  "optionsRulesHost": {
+    "message": "Sitio"
+  },
+  "optionsRulesRule": {
+    "message": "Regla"
+  },
+  "optionsRuleNever": {
+    "message": "Nunca"
+  },
+  "optionsRuleAlways": {
+    "message": "Siempre"
+  },
+  "optionsRuleNeverLong": {
+    "message": "No traducir nunca"
+  },
+  "optionsRuleAlwaysLong": {
+    "message": "Traducir siempre"
+  },
+  "optionsRuleWaiting": {
+    "message": "Traducir siempre (falta el permiso)"
+  },
+  "optionsRuleWaitingTitle": {
+    "message": "Glossa no tiene permiso para leer $1, así que esta regla no hace nada. Quítala y vuelve a añadirla para que se pida."
+  },
+  "optionsRulesEmpty": {
+    "message": "Todavía no hay reglas por sitio."
+  },
+  "optionsRuleHostPlaceholder": {
+    "message": "ejemplo.com"
+  },
+  "optionsModelsSection": {
+    "message": "Modelos de idioma"
+  },
+  "optionsModelsHint": {
+    "message": "Cada modelo se descarga una vez del catálogo de Mozilla, se comprueba con el hash publicado y se guarda en este dispositivo. No se envía ni se recibe nada más."
+  },
+  "optionsRefreshCatalog": {
+    "message": "Actualizar el catálogo"
+  },
+  "optionsExperimental": {
+    "message": "Ofrecer los modelos en pruebas de Mozilla (azerbaiyano, bielorruso, bosnio, noruego, nynorsk). Su calidad no está comprobada y Firefox solo los distribuye en su canal nightly."
+  },
+  "optionsModelsPair": {
+    "message": "Par"
+  },
+  "optionsModelsVersion": {
+    "message": "Versión"
+  },
+  "optionsModelsSize": {
+    "message": "Tamaño"
+  },
+  "optionsDownload": {
+    "message": "Descargar"
+  },
+  "optionsCancelDownload": {
+    "message": "Cancelar la descarga"
+  },
+  "optionsSourceHint": {
+    "message": "Los archivos de los modelos vienen del CDN de Mozilla, o de su bucket de modelos cuando el CDN rechaza este navegador."
+  },
+  "optionsResetSource": {
+    "message": "Volver a probar el CDN"
+  },
+  "optionsPrivacySection": {
+    "message": "Privacidad"
+  },
+  "optionsPrivacyEngine": {
+    "message": "La traducción se hace dentro de tu navegador con el motor Bergamot que usa Firefox. El texto de la página nunca sale de este dispositivo."
+  },
+  "optionsPrivacyPermission": {
+    "message": "La extensión no tiene permiso para leer sitios web por su cuenta. Solo toca una página cuando se lo pides."
+  },
+  "optionsPrivacyNetwork": {
+    "message": "El acceso a la red se limita a tres ubicaciones gestionadas por Mozilla, usadas solo para descargar el catálogo y los archivos de los modelos:"
+  },
+  "optionsPrivacyHashes": {
+    "message": "Cada archivo se comprueba con el hash que publica Mozilla antes de usarse."
+  },
+  "optionsPrivacyTelemetry": {
+    "message": "Sin cuenta, sin telemetría, sin analítica, sin informes de fallos."
+  },
+  "optionsCatalogRefreshed": {
+    "message": "Catálogo actualizado"
+  },
+  "optionsCatalogRefreshFailed": {
+    "message": "No se ha podido actualizar el catálogo: $1"
+  },
+  "optionsPickTwo": {
+    "message": "Elige dos idiomas distintos"
+  },
+  "optionsPairReady": {
+    "message": "$1 → $2 listo"
+  },
+  "optionsEnterHost": {
+    "message": "Escribe primero un nombre de sitio"
+  },
+  "optionsNoAccessToast": {
+    "message": "Sin acceso a $1, esa regla no puede traducir por su cuenta"
+  },
+  "optionsBadHostToast": {
+    "message": "$1 no es un sitio que Glossa pueda solicitar"
+  },
+  "optionsDownloadCancelled": {
+    "message": "Descarga cancelada"
+  },
+  "optionsSourceCdn": {
+    "message": "La próxima descarga probará primero el CDN de Mozilla"
+  },
+  "optionsSourceBucket": {
+    "message": "La próxima descarga probará primero el bucket de Mozilla"
+  },
+  "optionsDeleteModel": {
+    "message": "Eliminar"
+  },
+  "optionsSelectKnownLanguage": {
+    "message": "Idioma que lees"
+  },
+  "optionsSelectRuleKind": {
+    "message": "Qué hacer en este sitio"
+  },
+  "optionsSelectInstallFrom": {
+    "message": "Descargar desde el idioma"
+  },
+  "optionsSelectInstallTo": {
+    "message": "Descargar al idioma"
+  },
+  "optionsCatalogLine": {
+    "message": "Catálogo: $1 idiomas de origen y $2 de destino, actualizado $3. Las descargas vienen de $4."
+  },
+  "optionsCatalogJustNow": {
+    "message": "ahora mismo"
+  },
+  "optionsCatalogHoursAgo": {
+    "message": "hace $1 h"
+  },
+  "optionsCatalogUnavailableLine": {
+    "message": "Catálogo no disponible: $1"
+  },
+  "optionsCatalogNotFetched": {
+    "message": "Todavía no se ha descargado el catálogo."
+  },
+  "optionsModelsEmptyLine": {
+    "message": "Todavía no hay modelos descargados. La primera traducción descarga lo que necesita."
+  },
+  "optionsDeleted": {
+    "message": "Se ha eliminado $1"
+  },
+  "optionsSourceCdnName": {
+    "message": "el CDN de Mozilla"
+  },
+  "optionsSourceBucketName": {
+    "message": "el bucket de modelos de Mozilla"
+  }
+}

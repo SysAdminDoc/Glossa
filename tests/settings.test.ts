@@ -4,7 +4,19 @@ import { test } from "node:test";
 // settings.ts imports the extension API alias at module load. Provide a stub global and the
 // build-time target flag (esbuild substitutes that one in a real build) before the import, so the
 // module evaluates under Node.
-(globalThis as { chrome?: unknown }).chrome = { storage: { local: {} }, i18n: { getUILanguage: () => "en-US" } };
+// The stub answers i18n.getMessage from the real English catalogue, so a test that reads a message
+// is checking what a user would see rather than a placeholder.
+const messages = JSON.parse(
+  await (await import("node:fs/promises")).readFile("src/extension/_locales/en/messages.json", "utf8")
+) as Record<string, { message: string }>;
+(globalThis as { chrome?: unknown }).chrome = {
+  storage: { local: {} },
+  i18n: {
+    getUILanguage: () => "en-US",
+    getMessage: (key: string, substitutions: string[] = []) =>
+      (messages[key]?.message ?? "").replace(/\$(\d)/g, (_, index: string) => substitutions[Number(index) - 1] ?? "")
+  }
+};
 (globalThis as { __GLOSSA_HAS_OFFSCREEN__?: boolean }).__GLOSSA_HAS_OFFSCREEN__ = false;
 const { blockedReason, catalogMaxAgeMs, defaultSettings, hostOf, mergeSettings } = await import("../src/shared/settings.ts");
 
@@ -78,4 +90,29 @@ test("hostOf survives the urls a browser tab can actually hold", () => {
   assert.equal(hostOf("about:blank"), null);
   assert.equal(hostOf(null), null);
   assert.equal(hostOf("not a url"), null);
+});
+
+test("every language the interface ships in carries the same message keys", async () => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const base = "src/extension/_locales";
+  const locales = (await readdir(base)).sort();
+  assert.ok(locales.includes("en"), "English is the fallback and has to exist");
+  const english = Object.keys(messages).sort();
+  for (const locale of locales) {
+    const other = JSON.parse(await readFile(`${base}/${locale}/messages.json`, "utf8")) as Record<string, unknown>;
+    assert.deepEqual(
+      Object.keys(other).sort(),
+      english,
+      `${locale} does not carry the same keys as English`
+    );
+    for (const [key, value] of Object.entries(other)) {
+      const message = (value as { message?: unknown }).message;
+      assert.equal(typeof message, "string", `${locale}/${key} has no message`);
+      assert.ok((message as string).length > 0, `${locale}/${key} is empty`);
+      // A placeholder in English has to survive translation, or the value it stands for is lost.
+      const wanted = (messages[key]?.message.match(/\$\d/g) ?? []).sort();
+      const got = ((message as string).match(/\$\d/g) ?? []).sort();
+      assert.deepEqual(got, wanted, `${locale}/${key} does not use the same placeholders as English`);
+    }
+  }
 });

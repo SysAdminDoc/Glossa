@@ -1,6 +1,7 @@
 import { api } from "../shared/api.ts";
 import { MODEL_ORIGINS } from "../shared/catalog.ts";
 import { formatBytes } from "../shared/hash.ts";
+import { localize, t } from "../shared/i18n.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type {
   ModelsListResponse,
@@ -63,7 +64,7 @@ function fillLanguages(select: HTMLSelectElement, codes: string[], selected: str
   if (includeUnknown) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "Detect automatically";
+    option.textContent = t("popupDetectAutomatically");
     select.append(option);
   }
   const unique = Array.from(new Set(codes)).sort((a, b) => languageName(a).localeCompare(languageName(b)));
@@ -118,57 +119,57 @@ function render(): void {
 
   grantRow.hidden = modelHostsGranted;
   if (!engineSupported) {
-    actionButton.textContent = "Not supported on this computer";
+    actionButton.textContent = t("popupUnsupportedButton");
     actionButton.disabled = true;
     return;
   }
   if (blocked && !page?.translated) {
-    actionButton.textContent = "Turned off for this page";
+    actionButton.textContent = t("popupBlockedButton");
     actionButton.disabled = true;
     return;
   }
   if (!modelHostsGranted && !page?.translated) {
-    actionButton.textContent = "Allow model downloads first";
+    actionButton.textContent = t("popupGrantFirst");
     actionButton.disabled = true;
     return;
   }
   if (!injected) {
-    actionButton.textContent = "Translate page";
+    actionButton.textContent = t("popupTranslate");
     actionButton.disabled = busy;
     return;
   }
   if (page?.translated) {
-    actionButton.textContent = "Show original";
+    actionButton.textContent = t("popupShowOriginal");
     actionButton.classList.add("secondary");
     actionButton.disabled = busy;
     return;
   }
   if (page?.translating) {
-    actionButton.textContent = "Translating…";
+    actionButton.textContent = t("popupTranslating");
     actionButton.disabled = true;
     return;
   }
   if (!source) {
-    actionButton.textContent = "Choose the page language";
+    actionButton.textContent = t("popupChooseLanguage");
     actionButton.disabled = true;
     return;
   }
   if (source === target) {
-    actionButton.textContent = "Already in this language";
+    actionButton.textContent = t("popupAlreadyTarget");
     actionButton.disabled = true;
     return;
   }
   if (route && route.hops === null) {
-    actionButton.textContent = "No model for this pair";
+    actionButton.textContent = t("popupNoModel");
     actionButton.disabled = true;
     return;
   }
   if (route && !route.installed) {
-    actionButton.textContent = `Download ${formatBytes(route.downloadBytes)} and translate`;
+    actionButton.textContent = t("popupDownloadAndTranslate", formatBytes(route.downloadBytes));
     actionButton.disabled = busy;
     return;
   }
-  actionButton.textContent = "Translate page";
+  actionButton.textContent = t("popupTranslate");
   actionButton.disabled = busy;
 }
 
@@ -198,15 +199,15 @@ async function refreshRoute(): Promise<void> {
   }
   route = await sendUi<RouteStatus>({ type: "glossa:route-status", sourceLanguage: source, targetLanguage: target });
   if (route.catalogError && route.hops === null) {
-    setStatus(`Model catalog unavailable: ${route.catalogError}`, "error");
+    setStatus(t("popupCatalogUnavailable", route.catalogError ?? ""), "error");
   } else if (route.hops === null) {
-    setStatus(`No on-device model can translate ${languageName(source)} to ${languageName(target)} yet.`, "warn");
+    setStatus(t("popupNoRoute", languageName(source), languageName(target)), "warn");
   } else if (route.hops.length === 2) {
-    setStatus(`Translates through English (two models, ${formatBytes(route.hops.reduce((s, h) => s + h.bytes, 0))} on disk).`);
+    setStatus(t("popupPivot", formatBytes(route.hops.reduce((sum, hop) => sum + hop.bytes, 0))));
   } else if (!route.installed) {
-    setStatus(`${languageName(source)} → ${languageName(target)} model is ${formatBytes(route.hops[0]?.bytes ?? 0)} once installed.`);
+    setStatus(t("popupModelSize", `${languageName(source)} → ${languageName(target)}`, formatBytes(route.hops[0]?.bytes ?? 0)));
   } else {
-    setStatus("Model ready. Translation runs on this device.", "ok");
+    setStatus(t("popupModelReady"), "ok");
   }
   render();
 }
@@ -229,24 +230,24 @@ async function loadPage(): Promise<void> {
       if (sourceSelect.value !== preferred) sourceSelect.value = "";
     }
     if (remembered && preferred === remembered && remembered !== page.detectedLanguage) {
-      setStatus(`Using ${languageName(remembered)}, the language you chose for this site.`);
+      setStatus(t("popupRemembered", languageName(remembered)));
     }
     if (blocked) {
       // Already shown above; a stale page error must not replace it.
     } else if (page.lastError) {
       setStatus(page.lastError, "error");
     } else if (page.translated) {
-      setStatus(`Translated ${page.blocksDone} blocks on this device.`, "ok");
+      setStatus(t("popupTranslatedBlocks", String(page.blocksDone)), "ok");
     }
   } else {
     page = null;
     route = null;
     if (response.page.reason === "unsupported-page") {
-      setStatus("This page cannot be translated (browser or extension page).", "warn");
+      setStatus(t("popupUnsupportedPage"), "warn");
       actionButton.disabled = true;
       return;
     }
-    if (!blocked) setStatus("Click Translate to read this page in your language.");
+    if (!blocked) setStatus(t("popupInvite"));
   }
   render();
 }
@@ -259,7 +260,7 @@ async function onAction(): Promise<void> {
     if (page?.translated) {
       page = await sendUi<PageState>({ type: "glossa:restore-page", tabId });
       hideProgress();
-      setStatus("Original page restored.", "ok");
+      setStatus(t("popupRestored"), "ok");
       render();
       return;
     }
@@ -267,9 +268,9 @@ async function onAction(): Promise<void> {
     const target = targetSelect.value;
     await saveSettings({ targetLanguage: target, displayMode });
     if (route && !route.installed) {
-      showProgress(0, "Starting download…");
+      showProgress(0, t("popupStartingDownload"));
     } else {
-      showProgress(null, "Translating…");
+      showProgress(null, t("popupTranslating"));
     }
     setStatus("");
     const result = await sendUi<PageState | undefined>({
@@ -300,26 +301,27 @@ api.runtime.onMessage.addListener((message: unknown) => {
   if (!event || event.type !== "glossa:progress") return;
   if (event.phase === "download") {
     const fraction = event.totalBytes > 0 ? event.loadedBytes / event.totalBytes : null;
-    showProgress(fraction, `Downloading ${event.pairKey}: ${formatBytes(event.loadedBytes)} of ${formatBytes(event.totalBytes)}`);
+    showProgress(fraction, t("popupDownloading", event.pairKey, formatBytes(event.loadedBytes), formatBytes(event.totalBytes)));
   } else if (event.phase === "store" || event.phase === "verify" || event.phase === "decompress") {
-    showProgress(null, `Verifying ${event.file ?? event.pairKey}…`);
+    showProgress(null, t("popupVerifying", event.file ?? event.pairKey));
   } else if (event.phase === "load") {
-    showProgress(null, `Loading ${event.pairKey} into the engine…`);
+    showProgress(null, t("popupLoadingEngine", event.pairKey));
   } else if (event.phase === "error") {
     hideProgress();
-    setStatus(event.error ?? "Download failed", "error");
+    setStatus(event.error ?? t("popupDownloadFailed"), "error");
   }
   const state = message as { type?: string; state?: PageState };
   if (state.type === "glossa:page-state" && state.state) {
     page = state.state;
     if (page.translating && page.blocksTotal > 0) {
-      showProgress(page.blocksDone / page.blocksTotal, `Translated ${page.blocksDone} of ${page.blocksTotal} blocks`);
+      showProgress(page.blocksDone / page.blocksTotal, t("popupTranslatingProgress", String(page.blocksDone), String(page.blocksTotal)));
     }
     render();
   }
 });
 
 async function init(): Promise<void> {
+  localize();
   const manifest = api.runtime.getManifest();
   $("version").textContent = `v${manifest.version}`;
 
@@ -331,15 +333,11 @@ async function init(): Promise<void> {
     const models = await sendUi<ModelsListResponse>({ type: "glossa:models:list" });
     engineSupported = models.engineSupported !== false;
     if (!engineSupported) {
-      setStatus(
-        "This computer's processor lacks the SIMD instructions the engine needs, so Glossa cannot translate here.",
-        "error",
-        true
-      );
+      setStatus(t("popupUnsupportedCpu"), "error", true);
     }
     if (models.targets.length > 0) codes = Array.from(new Set([...models.sources, ...models.targets]));
     if (models.catalogError && models.targets.length === 0) {
-      setStatus(`Model catalog unavailable: ${models.catalogError}`, "error");
+      setStatus(t("popupCatalogUnavailable", models.catalogError ?? ""), "error");
     }
   } catch {
     // Fall back to the static list; the route check will surface the real error.
@@ -363,7 +361,7 @@ async function init(): Promise<void> {
     tabId = tab?.id ?? null;
   }
   if (tabId === null) {
-    setStatus("No active tab.", "warn");
+    setStatus(t("popupNoTab"), "warn");
     return;
   }
   try {
@@ -404,11 +402,11 @@ async function init(): Promise<void> {
       async (granted) => {
         modelHostsGranted = granted;
         if (granted) {
-          setStatus("Model hosts allowed. Downloads can run now.", "ok");
+          setStatus(t("popupGrantAllowed"), "ok");
           // No reload needed: the next fetch carries the new permission.
           await refreshRoute();
         } else {
-          setStatus("Without that permission Glossa cannot download a language model.", "warn");
+          setStatus(t("popupGrantRefused"), "warn");
         }
         render();
       },

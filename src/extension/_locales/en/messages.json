@@ -5,10 +5,494 @@
   },
   "extensionDescription": {
     "message": "Translate web pages on your own device. No cloud, no account, no telemetry.",
-    "description": "Extension description shown in the store and the add-ons manager"
+    "description": "Store and add-ons manager description"
   },
   "actionTitle": {
     "message": "Translate this page with Glossa",
     "description": "Toolbar button tooltip"
+  },
+  "popupPageLanguage": {
+    "message": "Page language",
+    "description": "Popup label"
+  },
+  "popupTranslateTo": {
+    "message": "Translate to",
+    "description": "Popup label"
+  },
+  "popupModeBilingual": {
+    "message": "Below original",
+    "description": "Display mode"
+  },
+  "popupModeReplace": {
+    "message": "Replace",
+    "description": "Display mode"
+  },
+  "popupModeGroup": {
+    "message": "Display mode",
+    "description": "Accessible name for the display mode buttons"
+  },
+  "popupChecking": {
+    "message": "Checking page…",
+    "description": "Button label while the popup is still asking about the page"
+  },
+  "popupTranslate": {
+    "message": "Translate page",
+    "description": "Main button"
+  },
+  "popupShowOriginal": {
+    "message": "Show original",
+    "description": "Main button once the page is translated"
+  },
+  "popupTranslating": {
+    "message": "Translating…",
+    "description": "Main button while a page is being translated"
+  },
+  "popupChooseLanguage": {
+    "message": "Choose the page language",
+    "description": "Main button when the page language is unknown"
+  },
+  "popupAlreadyTarget": {
+    "message": "Already in this language",
+    "description": "Main button when the page is already in the target language"
+  },
+  "popupNoModel": {
+    "message": "No model for this pair",
+    "description": "Main button when no model exists for the pair"
+  },
+  "popupDownloadAndTranslate": {
+    "message": "Download $1 and translate",
+    "description": "Main button, $1 is a size such as 24 MB"
+  },
+  "popupBlockedButton": {
+    "message": "Turned off for this page",
+    "description": "Main button when a site rule or a known language rules the page out"
+  },
+  "popupUnsupportedButton": {
+    "message": "Not supported on this computer",
+    "description": "Main button on a machine whose processor cannot run the engine"
+  },
+  "popupGrantButton": {
+    "message": "Allow model downloads",
+    "description": "Button that asks for the model hosts"
+  },
+  "popupGrantFirst": {
+    "message": "Allow model downloads first",
+    "description": "Main button while the model hosts are not allowed"
+  },
+  "popupGrantExplanation": {
+    "message": "Glossa needs permission to reach Mozilla's model hosts before it can download a language.",
+    "description": "Why the button above is there"
+  },
+  "popupGrantAllowed": {
+    "message": "Model hosts allowed. Downloads can run now.",
+    "description": "Shown after the permission is granted"
+  },
+  "popupGrantRefused": {
+    "message": "Without that permission Glossa cannot download a language model.",
+    "description": "Shown when the permission request is declined"
+  },
+  "popupDetectAutomatically": {
+    "message": "Detect automatically",
+    "description": "First entry of the page-language list"
+  },
+  "popupInvite": {
+    "message": "Click Translate to read this page in your language.",
+    "description": "Status line before anything has happened"
+  },
+  "popupUnsupportedPage": {
+    "message": "This page cannot be translated (browser or extension page).",
+    "description": "Status line on a page no extension may touch"
+  },
+  "popupUnsupportedCpu": {
+    "message": "This computer's processor lacks the SIMD instructions the engine needs, so Glossa cannot translate here.",
+    "description": "Status line on a machine whose processor cannot run the engine"
+  },
+  "popupModelReady": {
+    "message": "Model ready. Translation runs on this device.",
+    "description": "Status line when the model for the chosen pair is on disk"
+  },
+  "popupModelSize": {
+    "message": "$1 model is $2 once installed.",
+    "description": "Status line, $1 is a language name and $2 a size"
+  },
+  "popupPivot": {
+    "message": "Translates through English (two models, $1 on disk).",
+    "description": "Status line for a pair that goes through English, $1 is a size"
+  },
+  "popupNoRoute": {
+    "message": "No on-device model can translate $1 to $2 yet.",
+    "description": "Status line, $1 and $2 are language names"
+  },
+  "popupCatalogUnavailable": {
+    "message": "Model catalog unavailable: $1",
+    "description": "Status line, $1 is the underlying error"
+  },
+  "popupTranslatedBlocks": {
+    "message": "Translated $1 blocks on this device.",
+    "description": "Status line, $1 is a number of blocks"
+  },
+  "popupRestored": {
+    "message": "Original page restored.",
+    "description": "Status line after showing the original"
+  },
+  "popupRemembered": {
+    "message": "Using $1, the language you chose for this site.",
+    "description": "Status line, $1 is a language name the user picked for this site"
+  },
+  "popupNoTab": {
+    "message": "No active tab.",
+    "description": "Status line when the popup cannot find a tab to act on"
+  },
+  "popupStartingDownload": {
+    "message": "Starting download…",
+    "description": "Progress line"
+  },
+  "popupDownloading": {
+    "message": "Downloading $1: $2 of $3",
+    "description": "Progress line: $1 pair, $2 loaded, $3 total"
+  },
+  "popupVerifying": {
+    "message": "Verifying $1…",
+    "description": "Progress line, $1 is a file name"
+  },
+  "popupLoadingEngine": {
+    "message": "Loading $1 into the engine…",
+    "description": "Progress line, $1 is a language pair"
+  },
+  "popupDownloadFailed": {
+    "message": "Download failed",
+    "description": "Progress line when a download fails with no message"
+  },
+  "popupTranslatingProgress": {
+    "message": "Translated $1 of $2 blocks",
+    "description": "Progress line, $1 done of $2"
+  },
+  "popupPrivacyLine": {
+    "message": "Runs on this device. No page text leaves your browser.",
+    "description": "Footer"
+  },
+  "popupOpenOptions": {
+    "message": "Settings & languages",
+    "description": "Footer link"
+  },
+  "selectionOffer": {
+    "message": "Translate to $1",
+    "description": "Button next to a selection, $1 is a language code"
+  },
+  "selectionOfferTitle": {
+    "message": "Translate the selected text with Glossa",
+    "description": "Tooltip of the button next to a selection"
+  },
+  "popoverClose": {
+    "message": "Close",
+    "description": "Close button of the translation popover"
+  },
+  "popoverLabel": {
+    "message": "Glossa translation",
+    "description": "Accessible name of the translation popover"
+  },
+  "popoverTranslating": {
+    "message": "Translating…",
+    "description": "Popover text while the engine works"
+  },
+  "popoverNothingSelected": {
+    "message": "Nothing is selected",
+    "description": "Popover text"
+  },
+  "popoverNoLanguage": {
+    "message": "Could not detect the language of the selection.",
+    "description": "Popover text"
+  },
+  "popoverAlready": {
+    "message": "Already in $1.",
+    "description": "Popover text, $1 is a language code"
+  },
+  "popoverNoAnswer": {
+    "message": "The translation engine did not answer.",
+    "description": "Popover text"
+  },
+  "pageNoLanguage": {
+    "message": "Could not detect the page language",
+    "description": "Error reported to the popup"
+  },
+  "pageAlreadyTarget": {
+    "message": "The page is already in $1",
+    "description": "Error reported to the popup, $1 is a language code"
+  },
+  "pageEngineSilent": {
+    "message": "No answer from the translation engine",
+    "description": "Error reported to the popup"
+  },
+  "blockedBySiteRule": {
+    "message": "Glossa is turned off for $1. Change that on the options page.",
+    "description": "Why a page is not offered, $1 is a host name"
+  },
+  "blockedByKnownLanguage": {
+    "message": "You read $1, so this page is left alone.",
+    "description": "Why a page is not offered, $1 is a language name"
+  },
+  "optionsTitle": {
+    "message": "Glossa settings",
+    "description": "Options page title"
+  },
+  "optionsSubtitle": {
+    "message": "On-device page translation.",
+    "description": "Under the heading"
+  },
+  "optionsTranslationSection": {
+    "message": "Translation",
+    "description": "Section heading"
+  },
+  "optionsTargetLabel": {
+    "message": "Translate pages into",
+    "description": "Setting label"
+  },
+  "optionsShowLabel": {
+    "message": "Show translations",
+    "description": "Setting label"
+  },
+  "optionsModeBilingual": {
+    "message": "Below the original",
+    "description": "Display mode"
+  },
+  "optionsModeReplace": {
+    "message": "In place of the original",
+    "description": "Display mode"
+  },
+  "optionsHover": {
+    "message": "Show the original text on hover when replacing",
+    "description": "Checkbox"
+  },
+  "optionsSkipFields": {
+    "message": "Never translate inside editable fields",
+    "description": "Checkbox"
+  },
+  "optionsSelectionPopup": {
+    "message": "Offer a translation when text is selected (off by default, uses the context menu otherwise)",
+    "description": "Checkbox"
+  },
+  "optionsKnownSection": {
+    "message": "Languages you read",
+    "description": "Section heading"
+  },
+  "optionsKnownHint": {
+    "message": "Pages in these languages are never offered for translation.",
+    "description": "Under the heading"
+  },
+  "optionsAdd": {
+    "message": "Add",
+    "description": "Button"
+  },
+  "optionsRemove": {
+    "message": "Remove",
+    "description": "Button in a table row"
+  },
+  "optionsRulesSection": {
+    "message": "Site rules",
+    "description": "Section heading"
+  },
+  "optionsRulesHost": {
+    "message": "Host",
+    "description": "Table column"
+  },
+  "optionsRulesRule": {
+    "message": "Rule",
+    "description": "Table column"
+  },
+  "optionsRuleNever": {
+    "message": "Never",
+    "description": "Site rule"
+  },
+  "optionsRuleAlways": {
+    "message": "Always",
+    "description": "Site rule"
+  },
+  "optionsRuleNeverLong": {
+    "message": "Never translate",
+    "description": "Site rule in the table"
+  },
+  "optionsRuleAlwaysLong": {
+    "message": "Always translate",
+    "description": "Site rule in the table"
+  },
+  "optionsRuleWaiting": {
+    "message": "Always translate (waiting for access)",
+    "description": "Site rule that has no permission yet"
+  },
+  "optionsRuleWaitingTitle": {
+    "message": "Glossa has no permission to read $1, so this rule does nothing. Remove it and add it again to be asked.",
+    "description": "Tooltip on the row above, $1 is a host name"
+  },
+  "optionsRulesEmpty": {
+    "message": "No site rules yet.",
+    "description": "Empty table"
+  },
+  "optionsRuleHostPlaceholder": {
+    "message": "example.com",
+    "description": "Placeholder of the host field"
+  },
+  "optionsModelsSection": {
+    "message": "Language models",
+    "description": "Section heading"
+  },
+  "optionsModelsHint": {
+    "message": "Each model is downloaded once from Mozilla's catalog, checked against its published hash, and kept on this device. Nothing else is ever sent or received.",
+    "description": "Under the heading"
+  },
+  "optionsRefreshCatalog": {
+    "message": "Refresh catalog",
+    "description": "Button"
+  },
+  "optionsExperimental": {
+    "message": "Offer Mozilla's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk). Quality is untested and Firefox ships them to its nightly channel only.",
+    "description": "Checkbox"
+  },
+  "optionsModelsPair": {
+    "message": "Pair",
+    "description": "Table column"
+  },
+  "optionsModelsVersion": {
+    "message": "Version",
+    "description": "Table column"
+  },
+  "optionsModelsSize": {
+    "message": "Size",
+    "description": "Table column"
+  },
+  "optionsDownload": {
+    "message": "Download",
+    "description": "Button"
+  },
+  "optionsCancelDownload": {
+    "message": "Cancel download",
+    "description": "Button"
+  },
+  "optionsSourceHint": {
+    "message": "Model files come from Mozilla's attachment CDN, or from Mozilla's model bucket when the CDN refuses this browser.",
+    "description": "Explains where model files come from"
+  },
+  "optionsResetSource": {
+    "message": "Try the CDN again",
+    "description": "Button"
+  },
+  "optionsPrivacySection": {
+    "message": "Privacy",
+    "description": "Section heading"
+  },
+  "optionsPrivacyEngine": {
+    "message": "Translation runs inside your browser using the Bergamot engine that Firefox uses. Page text never leaves this device.",
+    "description": "Privacy bullet"
+  },
+  "optionsPrivacyPermission": {
+    "message": "The extension has no permission to read websites on its own. It only touches a page when you ask it to.",
+    "description": "Privacy bullet"
+  },
+  "optionsPrivacyNetwork": {
+    "message": "Network access is limited to three Mozilla-operated locations, used only to fetch the model catalog and model files:",
+    "description": "Privacy bullet, followed by the list of hosts"
+  },
+  "optionsPrivacyHashes": {
+    "message": "Every file is checked against the hash Mozilla publishes before it is used.",
+    "description": "Privacy bullet, after the host list"
+  },
+  "optionsPrivacyTelemetry": {
+    "message": "No account, no telemetry, no analytics, no crash reporting.",
+    "description": "Privacy bullet"
+  },
+  "optionsCatalogRefreshed": {
+    "message": "Catalog refreshed",
+    "description": "Toast"
+  },
+  "optionsCatalogRefreshFailed": {
+    "message": "Catalog refresh failed: $1",
+    "description": "Toast, $1 is the error"
+  },
+  "optionsPickTwo": {
+    "message": "Pick two different languages",
+    "description": "Toast"
+  },
+  "optionsPairReady": {
+    "message": "$1 → $2 ready",
+    "description": "Toast, $1 and $2 are language names"
+  },
+  "optionsEnterHost": {
+    "message": "Enter a host name first",
+    "description": "Toast"
+  },
+  "optionsNoAccessToast": {
+    "message": "Without access to $1, that rule cannot translate on its own",
+    "description": "Toast, $1 is a host name"
+  },
+  "optionsBadHostToast": {
+    "message": "$1 is not a host Glossa can ask for",
+    "description": "Toast, $1 is what the user typed"
+  },
+  "optionsDownloadCancelled": {
+    "message": "Download cancelled",
+    "description": "Toast"
+  },
+  "optionsSourceCdn": {
+    "message": "Next download will try Mozilla's CDN first",
+    "description": "Toast, which source the next download uses"
+  },
+  "optionsSourceBucket": {
+    "message": "Next download will try Mozilla's bucket first",
+    "description": "Toast, which source the next download uses"
+  },
+  "optionsDeleteModel": {
+    "message": "Delete",
+    "description": "Button in the models table"
+  },
+  "optionsSelectKnownLanguage": {
+    "message": "Language you read",
+    "description": "Accessible name of the languages-you-read select"
+  },
+  "optionsSelectRuleKind": {
+    "message": "What to do on this site",
+    "description": "Accessible name of the rule select"
+  },
+  "optionsSelectInstallFrom": {
+    "message": "Download from language",
+    "description": "Accessible name of the from-language select"
+  },
+  "optionsSelectInstallTo": {
+    "message": "Download to language",
+    "description": "Accessible name of the to-language select"
+  },
+  "optionsCatalogLine": {
+    "message": "Catalog: $1 source and $2 target languages, refreshed $3. Downloads come from $4.",
+    "description": "Options page"
+  },
+  "optionsCatalogJustNow": {
+    "message": "just now",
+    "description": "Options page"
+  },
+  "optionsCatalogHoursAgo": {
+    "message": "$1 h ago",
+    "description": "Options page"
+  },
+  "optionsCatalogUnavailableLine": {
+    "message": "Catalog unavailable: $1",
+    "description": "Options page"
+  },
+  "optionsCatalogNotFetched": {
+    "message": "Catalog not fetched yet.",
+    "description": "Options page"
+  },
+  "optionsModelsEmptyLine": {
+    "message": "No models downloaded yet. The first translation downloads what it needs.",
+    "description": "Options page"
+  },
+  "optionsDeleted": {
+    "message": "Deleted $1",
+    "description": "Options page"
+  },
+  "optionsSourceCdnName": {
+    "message": "Mozilla's CDN",
+    "description": "Options page"
+  },
+  "optionsSourceBucketName": {
+    "message": "Mozilla's model bucket",
+    "description": "Options page"
   }
 }

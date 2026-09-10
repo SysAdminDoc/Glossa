@@ -1,0 +1,374 @@
+{
+  "extensionName": {
+    "message": "Glossa"
+  },
+  "extensionDescription": {
+    "message": "ウェブページを自分の端末で翻訳します。クラウドもアカウントも利用状況の送信もありません。"
+  },
+  "actionTitle": {
+    "message": "このページを Glossa で翻訳"
+  },
+  "popupPageLanguage": {
+    "message": "ページの言語"
+  },
+  "popupTranslateTo": {
+    "message": "翻訳先"
+  },
+  "popupModeBilingual": {
+    "message": "原文の下"
+  },
+  "popupModeReplace": {
+    "message": "置き換える"
+  },
+  "popupModeGroup": {
+    "message": "表示モード"
+  },
+  "popupChecking": {
+    "message": "ページを確認中…"
+  },
+  "popupTranslate": {
+    "message": "ページを翻訳"
+  },
+  "popupShowOriginal": {
+    "message": "原文を表示"
+  },
+  "popupTranslating": {
+    "message": "翻訳中…"
+  },
+  "popupChooseLanguage": {
+    "message": "ページの言語を選んでください"
+  },
+  "popupAlreadyTarget": {
+    "message": "すでにこの言語です"
+  },
+  "popupNoModel": {
+    "message": "この組み合わせのモデルはありません"
+  },
+  "popupDownloadAndTranslate": {
+    "message": "$1 をダウンロードして翻訳"
+  },
+  "popupBlockedButton": {
+    "message": "このページでは無効です"
+  },
+  "popupUnsupportedButton": {
+    "message": "このコンピューターでは利用できません"
+  },
+  "popupGrantButton": {
+    "message": "モデルのダウンロードを許可"
+  },
+  "popupGrantFirst": {
+    "message": "先にモデルのダウンロードを許可してください"
+  },
+  "popupGrantExplanation": {
+    "message": "言語をダウンロードするには、Mozilla のモデル配信元へのアクセス許可が必要です。"
+  },
+  "popupGrantAllowed": {
+    "message": "アクセスが許可されました。ダウンロードできます。"
+  },
+  "popupGrantRefused": {
+    "message": "この許可がないと言語モデルをダウンロードできません。"
+  },
+  "popupDetectAutomatically": {
+    "message": "自動判定"
+  },
+  "popupInvite": {
+    "message": "「ページを翻訳」を押すと、このページを自分の言語で読めます。"
+  },
+  "popupUnsupportedPage": {
+    "message": "このページは翻訳できません（ブラウザーまたは拡張機能のページです）。"
+  },
+  "popupUnsupportedCpu": {
+    "message": "このコンピューターのプロセッサーには翻訳エンジンに必要な SIMD 命令がないため、Glossa は動作しません。"
+  },
+  "popupModelReady": {
+    "message": "モデルの準備ができました。翻訳はこの端末で行われます。"
+  },
+  "popupModelSize": {
+    "message": "$1 のモデルはインストール後 $2 です。"
+  },
+  "popupPivot": {
+    "message": "英語を経由して翻訳します（モデル 2 つ、$1）。"
+  },
+  "popupNoRoute": {
+    "message": "$1 から $2 への端末内モデルはまだありません。"
+  },
+  "popupCatalogUnavailable": {
+    "message": "モデルカタログを取得できません: $1"
+  },
+  "popupTranslatedBlocks": {
+    "message": "$1 個のブロックをこの端末で翻訳しました。"
+  },
+  "popupRestored": {
+    "message": "元のページに戻しました。"
+  },
+  "popupRemembered": {
+    "message": "このサイト用に選んだ言語 $1 を使います。"
+  },
+  "popupNoTab": {
+    "message": "アクティブなタブがありません。"
+  },
+  "popupStartingDownload": {
+    "message": "ダウンロードを開始しています…"
+  },
+  "popupDownloading": {
+    "message": "$1 をダウンロード中: $3 中 $2"
+  },
+  "popupVerifying": {
+    "message": "$1 を検証中…"
+  },
+  "popupLoadingEngine": {
+    "message": "$1 をエンジンに読み込み中…"
+  },
+  "popupDownloadFailed": {
+    "message": "ダウンロードに失敗しました"
+  },
+  "popupTranslatingProgress": {
+    "message": "$2 個中 $1 個のブロックを翻訳しました"
+  },
+  "popupPrivacyLine": {
+    "message": "この端末で動作します。ページの文章がブラウザーの外に出ることはありません。"
+  },
+  "popupOpenOptions": {
+    "message": "設定と言語"
+  },
+  "selectionOffer": {
+    "message": "$1 に翻訳"
+  },
+  "selectionOfferTitle": {
+    "message": "選択したテキストを Glossa で翻訳"
+  },
+  "popoverClose": {
+    "message": "閉じる"
+  },
+  "popoverLabel": {
+    "message": "Glossa の翻訳"
+  },
+  "popoverTranslating": {
+    "message": "翻訳中…"
+  },
+  "popoverNothingSelected": {
+    "message": "何も選択されていません"
+  },
+  "popoverNoLanguage": {
+    "message": "選択したテキストの言語を判別できませんでした。"
+  },
+  "popoverAlready": {
+    "message": "すでに $1 です。"
+  },
+  "popoverNoAnswer": {
+    "message": "翻訳エンジンから応答がありませんでした。"
+  },
+  "pageNoLanguage": {
+    "message": "ページの言語を判別できませんでした"
+  },
+  "pageAlreadyTarget": {
+    "message": "このページはすでに $1 です"
+  },
+  "pageEngineSilent": {
+    "message": "翻訳エンジンから応答がありません"
+  },
+  "blockedBySiteRule": {
+    "message": "$1 では Glossa は無効です。設定ページで変更できます。"
+  },
+  "blockedByKnownLanguage": {
+    "message": "$1 が読めるため、このページはそのままにします。"
+  },
+  "optionsTitle": {
+    "message": "Glossa の設定"
+  },
+  "optionsSubtitle": {
+    "message": "端末内でのページ翻訳。"
+  },
+  "optionsTranslationSection": {
+    "message": "翻訳"
+  },
+  "optionsTargetLabel": {
+    "message": "ページの翻訳先"
+  },
+  "optionsShowLabel": {
+    "message": "翻訳の表示"
+  },
+  "optionsModeBilingual": {
+    "message": "原文の下に表示"
+  },
+  "optionsModeReplace": {
+    "message": "原文と置き換える"
+  },
+  "optionsHover": {
+    "message": "置き換え時、カーソルを合わせると原文を表示"
+  },
+  "optionsSkipFields": {
+    "message": "編集できる欄の中は翻訳しない"
+  },
+  "optionsSelectionPopup": {
+    "message": "テキストを選択したときに翻訳を提案する（既定はオフ。オフのときは右クリックメニューから）"
+  },
+  "optionsKnownSection": {
+    "message": "読める言語"
+  },
+  "optionsKnownHint": {
+    "message": "これらの言語のページは翻訳を提案しません。"
+  },
+  "optionsAdd": {
+    "message": "追加"
+  },
+  "optionsRemove": {
+    "message": "削除"
+  },
+  "optionsRulesSection": {
+    "message": "サイトごとの設定"
+  },
+  "optionsRulesHost": {
+    "message": "ホスト"
+  },
+  "optionsRulesRule": {
+    "message": "動作"
+  },
+  "optionsRuleNever": {
+    "message": "翻訳しない"
+  },
+  "optionsRuleAlways": {
+    "message": "常に翻訳"
+  },
+  "optionsRuleNeverLong": {
+    "message": "翻訳しない"
+  },
+  "optionsRuleAlwaysLong": {
+    "message": "常に翻訳する"
+  },
+  "optionsRuleWaiting": {
+    "message": "常に翻訳する（アクセス許可待ち）"
+  },
+  "optionsRuleWaitingTitle": {
+    "message": "Glossa には $1 を読む許可がないため、この設定は機能しません。いったん削除して追加し直すと許可を求められます。"
+  },
+  "optionsRulesEmpty": {
+    "message": "サイトごとの設定はまだありません。"
+  },
+  "optionsRuleHostPlaceholder": {
+    "message": "example.com"
+  },
+  "optionsModelsSection": {
+    "message": "言語モデル"
+  },
+  "optionsModelsHint": {
+    "message": "各モデルは Mozilla のカタログから一度だけダウンロードし、公開されているハッシュで検証してこの端末に保存します。それ以外の送受信はありません。"
+  },
+  "optionsRefreshCatalog": {
+    "message": "カタログを更新"
+  },
+  "optionsExperimental": {
+    "message": "Mozilla の試験段階のモデル（アゼルバイジャン語、ベラルーシ語、ボスニア語、ノルウェー語、ニーノシュク）も表示する。品質は未検証で、Firefox では nightly 版にのみ配信されています。"
+  },
+  "optionsModelsPair": {
+    "message": "組み合わせ"
+  },
+  "optionsModelsVersion": {
+    "message": "バージョン"
+  },
+  "optionsModelsSize": {
+    "message": "サイズ"
+  },
+  "optionsDownload": {
+    "message": "ダウンロード"
+  },
+  "optionsCancelDownload": {
+    "message": "ダウンロードを中止"
+  },
+  "optionsSourceHint": {
+    "message": "モデルファイルは Mozilla の CDN から取得します。CDN がこのブラウザーを拒否する場合は Mozilla のモデル用バケットから取得します。"
+  },
+  "optionsResetSource": {
+    "message": "CDN を再試行"
+  },
+  "optionsPrivacySection": {
+    "message": "プライバシー"
+  },
+  "optionsPrivacyEngine": {
+    "message": "翻訳は Firefox が使うのと同じ Bergamot エンジンでブラウザー内で行われます。ページの文章がこの端末から出ることはありません。"
+  },
+  "optionsPrivacyPermission": {
+    "message": "この拡張機能は自分からウェブサイトを読む権限を持ちません。あなたが求めたときだけページに触れます。"
+  },
+  "optionsPrivacyNetwork": {
+    "message": "ネットワーク接続は Mozilla が運営する 3 か所だけで、モデルのカタログとファイルの取得にのみ使います:"
+  },
+  "optionsPrivacyHashes": {
+    "message": "各ファイルは使用前に Mozilla が公開しているハッシュと照合します。"
+  },
+  "optionsPrivacyTelemetry": {
+    "message": "アカウントも、利用状況の送信も、解析も、クラッシュ報告もありません。"
+  },
+  "optionsCatalogRefreshed": {
+    "message": "カタログを更新しました"
+  },
+  "optionsCatalogRefreshFailed": {
+    "message": "カタログを更新できませんでした: $1"
+  },
+  "optionsPickTwo": {
+    "message": "異なる 2 つの言語を選んでください"
+  },
+  "optionsPairReady": {
+    "message": "$1 → $2 の準備ができました"
+  },
+  "optionsEnterHost": {
+    "message": "先にホスト名を入力してください"
+  },
+  "optionsNoAccessToast": {
+    "message": "$1 へのアクセスがないと、その設定は自動では翻訳できません"
+  },
+  "optionsBadHostToast": {
+    "message": "$1 は Glossa が許可を求められるホストではありません"
+  },
+  "optionsDownloadCancelled": {
+    "message": "ダウンロードを中止しました"
+  },
+  "optionsSourceCdn": {
+    "message": "次のダウンロードはまず Mozilla の CDN を試します"
+  },
+  "optionsSourceBucket": {
+    "message": "次のダウンロードはまず Mozilla のバケットを試します"
+  },
+  "optionsDeleteModel": {
+    "message": "削除"
+  },
+  "optionsSelectKnownLanguage": {
+    "message": "読める言語"
+  },
+  "optionsSelectRuleKind": {
+    "message": "このサイトでの動作"
+  },
+  "optionsSelectInstallFrom": {
+    "message": "ダウンロード元の言語"
+  },
+  "optionsSelectInstallTo": {
+    "message": "ダウンロード先の言語"
+  },
+  "optionsCatalogLine": {
+    "message": "カタログ: 翻訳元 $1 言語、翻訳先 $2 言語、$3 に更新。ダウンロード元は $4。"
+  },
+  "optionsCatalogJustNow": {
+    "message": "たった今"
+  },
+  "optionsCatalogHoursAgo": {
+    "message": "$1 時間前"
+  },
+  "optionsCatalogUnavailableLine": {
+    "message": "カタログを取得できません: $1"
+  },
+  "optionsCatalogNotFetched": {
+    "message": "カタログはまだ取得していません。"
+  },
+  "optionsModelsEmptyLine": {
+    "message": "ダウンロード済みのモデルはありません。最初の翻訳で必要なものを取得します。"
+  },
+  "optionsDeleted": {
+    "message": "$1 を削除しました"
+  },
+  "optionsSourceCdnName": {
+    "message": "Mozilla の CDN"
+  },
+  "optionsSourceBucketName": {
+    "message": "Mozilla のモデル用バケット"
+  }
+}

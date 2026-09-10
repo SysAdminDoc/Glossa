@@ -1,4 +1,5 @@
 import { api } from "./api.ts";
+import { t } from "./i18n.ts";
 
 export type DisplayMode = "bilingual" | "replace";
 export type SiteRule = "always" | "never";
@@ -116,10 +117,10 @@ export function blockedReason(
 ): string | null {
   const host = hostOf(url);
   if (host && settings.siteRules[host] === "never") {
-    return `Glossa is turned off for ${host}. Change that on the options page.`;
+    return t("blockedBySiteRule", host);
   }
   if (detectedLanguage && settings.neverTranslateLanguages.includes(detectedLanguage)) {
-    return `You read ${languageName(detectedLanguage)}, so this page is left alone.`;
+    return t("blockedByKnownLanguage", languageName(detectedLanguage));
   }
   return null;
 }

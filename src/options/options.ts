@@ -1,4 +1,5 @@
 import { api } from "../shared/api.ts";
+import { localize, t } from "../shared/i18n.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type { ModelsListResponse, ProgressEvent } from "../shared/messages.ts";
@@ -89,7 +90,7 @@ function renderRules(): void {
     const cell = row.insertCell();
     cell.colSpan = 3;
     cell.className = "empty";
-    cell.textContent = "No site rules yet.";
+    cell.textContent = t("optionsRulesEmpty");
     return;
   }
   for (const host of hosts) {
@@ -97,18 +98,18 @@ function renderRules(): void {
     row.insertCell().textContent = host;
     const rule = settings.siteRules[host]!;
     const state = row.insertCell();
-    state.textContent = rule === "always" ? "Always translate" : "Never translate";
+    state.textContent = t(rule === "always" ? "optionsRuleAlwaysLong" : "optionsRuleNeverLong");
     void ruleIsArmed(host, rule).then((armed) => {
       if (armed) return;
-      state.textContent = "Always translate (waiting for access)";
-      state.title = `Glossa has no permission to read ${host}, so this rule does nothing. Remove it and add it again to be asked.`;
+      state.textContent = t("optionsRuleWaiting");
+      state.title = t("optionsRuleWaitingTitle", host);
       state.className = "warn";
     });
     const actions = row.insertCell();
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "btn small danger";
-    remove.textContent = "Remove";
+    remove.textContent = t("optionsRemove");
     remove.addEventListener("click", () => {
       const next = { ...settings.siteRules };
       delete next[host];
@@ -129,17 +130,25 @@ function renderModels(): void {
   if (models.catalogFetchedAt) {
     const age = Math.max(0, Date.now() - models.catalogFetchedAt);
     const hours = Math.round(age / 3_600_000);
-    const source = models.byteSource === "mozilla-gcs" ? "Mozilla's model registry bucket" : "Mozilla's Remote Settings CDN";
-    status.textContent = `Catalog: ${models.sources.length} source and ${models.targets.length} target languages, refreshed ${hours < 1 ? "just now" : `${hours} h ago`}. Downloads come from ${source}.`;
+    const source = t(models.byteSource === "mozilla-gcs" ? "optionsSourceBucketName" : "optionsSourceCdnName");
+    status.textContent = t(
+      "optionsCatalogLine",
+      String(models.sources.length),
+      String(models.targets.length),
+      hours < 1 ? t("optionsCatalogJustNow") : t("optionsCatalogHoursAgo", String(hours)),
+      source
+    );
   } else {
-    status.textContent = models.catalogError ? `Catalog unavailable: ${models.catalogError}` : "Catalog not fetched yet.";
+    status.textContent = models.catalogError
+      ? t("optionsCatalogUnavailableLine", models.catalogError)
+      : t("optionsCatalogNotFetched");
   }
   if (models.installed.length === 0) {
     const row = body.insertRow();
     const cell = row.insertCell();
     cell.colSpan = 4;
     cell.className = "empty";
-    cell.textContent = "No models downloaded yet. The first translation downloads what it needs.";
+    cell.textContent = t("optionsModelsEmptyLine");
   }
   for (const pair of models.installed.sort((a, b) => a.pairKey.localeCompare(b.pairKey))) {
     const row = body.insertRow();
@@ -150,11 +159,11 @@ function renderModels(): void {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "btn small danger";
-    remove.textContent = "Delete";
+    remove.textContent = t("optionsDeleteModel");
     remove.addEventListener("click", async () => {
       remove.disabled = true;
       await sendUi({ type: "glossa:models:delete", pairKey: pair.pairKey });
-      toast(`Deleted ${pair.pairKey}`, "ok");
+      toast(t("optionsDeleted", pair.pairKey), "ok");
       await refreshModels();
     });
     actions.append(remove);
@@ -218,6 +227,7 @@ api.runtime.onMessage.addListener((message: unknown) => {
 });
 
 async function init(): Promise<void> {
+  localize();
   $("version").textContent = `v${api.runtime.getManifest().version}`;
   settings = await loadSettings();
 
@@ -269,7 +279,7 @@ async function init(): Promise<void> {
     const input = $<HTMLInputElement>("rule-host");
     const host = normalizeHost(input.value);
     if (!host) {
-      toast("Enter a host name first", "error");
+      toast(t("optionsEnterHost"), "error");
       return;
     }
     const kind = $<HTMLSelectElement>("rule-kind").value as SiteRule;
@@ -279,10 +289,10 @@ async function init(): Promise<void> {
       api.permissions.request({ origins: [`*://${host}/*`] }).then(
         (granted) => {
           if (!granted) {
-            toast(`Without access to ${host}, that rule cannot translate on its own`, "error");
+            toast(t("optionsNoAccessToast", host), "error");
           }
         },
-        () => toast(`${host} is not a host Glossa can ask for`, "error")
+        () => toast(t("optionsBadHostToast", host), "error")
       );
     }
     void persist({ siteRules: { ...settings.siteRules, [host]: kind } }).then(() => {
@@ -305,7 +315,7 @@ async function init(): Promise<void> {
     button.disabled = true;
     try {
       const result = await sendUi<{ fetchedAt: number | null; error: string | null }>({ type: "glossa:catalog:refresh" });
-      toast(result.error ? `Catalog refresh failed: ${result.error}` : "Catalog refreshed", result.error ? "error" : "ok");
+      toast(result.error ? t("optionsCatalogRefreshFailed", result.error) : t("optionsCatalogRefreshed"), result.error ? "error" : "ok");
     } finally {
       button.disabled = false;
       await refreshModels();
@@ -318,12 +328,12 @@ async function init(): Promise<void> {
   $("cancel-download").addEventListener("click", async () => {
     if (!downloading) return;
     await sendUi({ type: "glossa:models:cancel", pairKey: downloading }).catch(() => undefined);
-    toast("Download cancelled");
+    toast(t("optionsDownloadCancelled"));
   });
 
   $("reset-source").addEventListener("click", async () => {
     const result = await sendUi<{ byteSource: string }>({ type: "glossa:models:reset-source" });
-    toast(`Next download will try ${result.byteSource === "mozilla-cdn" ? "Mozilla's CDN" : "Mozilla's bucket"} first`, "ok");
+    toast(t(result.byteSource === "mozilla-cdn" ? "optionsSourceCdn" : "optionsSourceBucket"), "ok");
     await refreshModels();
   });
 
@@ -331,7 +341,7 @@ async function init(): Promise<void> {
     const from = $<HTMLSelectElement>("install-from").value;
     const to = $<HTMLSelectElement>("install-to").value;
     if (!from || !to || from === to) {
-      toast("Pick two different languages", "error");
+      toast(t("optionsPickTwo"), "error");
       return;
     }
     const button = $<HTMLButtonElement>("install");
@@ -340,7 +350,7 @@ async function init(): Promise<void> {
     showProgress(0, "Starting download…");
     try {
       await sendUi({ type: "glossa:models:install", sourceLanguage: from, targetLanguage: to });
-      toast(`${languageName(from)} → ${languageName(to)} ready`, "ok");
+      toast(t("optionsPairReady", languageName(from), languageName(to)), "ok");
     } catch (error) {
       toast(error instanceof Error ? error.message : String(error), "error");
     } finally {

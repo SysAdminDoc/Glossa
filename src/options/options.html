@@ -3,99 +3,99 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Glossa settings</title>
+    <title data-i18n="optionsTitle">Glossa settings</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
     <header class="hero">
       <img src="icons/icon-48.png" alt="" width="36" height="36" />
       <div>
-        <h1>Glossa</h1>
-        <p class="tagline">On-device page translation. <span id="version"></span></p>
+        <h1 data-i18n="extensionName">Glossa</h1>
+        <p class="tagline"><span data-i18n="optionsSubtitle">On-device page translation.</span> <span id="version"></span></p>
       </div>
     </header>
 
     <main>
       <section class="panel">
-        <h2>Translation</h2>
+        <h2 data-i18n="optionsTranslationSection">Translation</h2>
         <div class="field">
-          <label for="target">Translate pages into</label>
+          <label for="target" data-i18n="optionsTargetLabel">Translate pages into</label>
           <select id="target"></select>
         </div>
         <div class="field">
-          <span class="field-label">Show translations</span>
+          <span class="field-label" data-i18n="optionsShowLabel">Show translations</span>
           <div class="segmented" role="group" aria-label="Display mode">
-            <button type="button" data-mode="bilingual" id="mode-bilingual">Below the original</button>
-            <button type="button" data-mode="replace" id="mode-replace">In place of the original</button>
+            <button type="button" data-mode="bilingual" id="mode-bilingual" data-i18n="optionsModeBilingual">Below the original</button>
+            <button type="button" data-mode="replace" id="mode-replace" data-i18n="optionsModeReplace">In place of the original</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="hover" /> Show the original text on hover when replacing</label>
-        <label class="check"><input type="checkbox" id="skip-form-fields" /> Never translate inside editable fields</label>
-        <label class="check"><input type="checkbox" id="selection-popup" /> Offer a translation when text is selected (off by default, uses the context menu otherwise)</label>
+        <label class="check"><input type="checkbox" id="hover" /> <span data-i18n="optionsHover">Show the original text on hover when replacing</span></label>
+        <label class="check"><input type="checkbox" id="skip-form-fields" /> <span data-i18n="optionsSkipFields">Never translate inside editable fields</span></label>
+        <label class="check"><input type="checkbox" id="selection-popup" /> <span data-i18n="optionsSelectionPopup">Offer a translation when text is selected (off by default, uses the context menu otherwise)</span></label>
       </section>
 
       <section class="panel">
-        <h2>Languages you read</h2>
-        <p class="hint">Pages in these languages are never offered for translation.</p>
+        <h2 data-i18n="optionsKnownSection">Languages you read</h2>
+        <p class="hint" data-i18n="optionsKnownHint">Pages in these languages are never offered for translation.</p>
         <div class="chips" id="never-chips"></div>
         <div class="inline-form">
-          <select id="never-add" aria-label="Language you read"></select>
-          <button type="button" class="btn" id="never-add-btn">Add</button>
+          <select id="never-add" aria-label="Language you read" data-i18n-attr="aria-label=optionsSelectKnownLanguage"></select>
+          <button type="button" class="btn" id="never-add-btn" data-i18n="optionsAdd">Add</button>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Site rules</h2>
+        <h2 data-i18n="optionsRulesSection">Site rules</h2>
         <p class="hint">"Never" stops Glossa from touching a site. "Always" translates it on every visit once the all-sites permission is granted.</p>
         <table class="table" id="rules">
-          <thead><tr><th>Host</th><th>Rule</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="optionsRulesHost">Host</th><th data-i18n="optionsRulesRule">Rule</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="inline-form">
-          <input type="text" id="rule-host" placeholder="example.com" />
-          <select id="rule-kind" aria-label="What to do on this site"><option value="never">Never</option><option value="always">Always</option></select>
-          <button type="button" class="btn" id="rule-add">Add</button>
+          <input type="text" id="rule-host" placeholder="example.com" data-i18n-attr="placeholder=optionsRuleHostPlaceholder" />
+          <select id="rule-kind" aria-label="What to do on this site" data-i18n-attr="aria-label=optionsSelectRuleKind"><option value="never" data-i18n="optionsRuleNever">Never</option><option value="always" data-i18n="optionsRuleAlways">Always</option></select>
+          <button type="button" class="btn" id="rule-add" data-i18n="optionsAdd">Add</button>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Language models</h2>
-        <p class="hint">Each model is downloaded once from Mozilla's catalog, checked against its published hash, and kept on this device. Nothing else is ever sent or received.</p>
+        <h2 data-i18n="optionsModelsSection">Language models</h2>
+        <p class="hint" data-i18n="optionsModelsHint">Each model is downloaded once from Mozilla's catalog, checked against its published hash, and kept on this device. Nothing else is ever sent or received.</p>
         <div class="catalog-line">
           <span id="catalog-status"></span>
-          <button type="button" class="btn small" id="catalog-refresh">Refresh catalog</button>
+          <button type="button" class="btn small" id="catalog-refresh" data-i18n="optionsRefreshCatalog">Refresh catalog</button>
         </div>
-        <label class="check"><input type="checkbox" id="experimental-models" /> Offer Mozilla's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk). Quality is untested and Firefox ships them to its nightly channel only.</label>
+        <label class="check"><input type="checkbox" id="experimental-models" /> <span data-i18n="optionsExperimental">Offer Mozilla's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk). Quality is untested and Firefox ships them to its nightly channel only.</span></label>
         <table class="table" id="models">
-          <thead><tr><th>Pair</th><th>Version</th><th>Size</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="optionsModelsPair">Pair</th><th data-i18n="optionsModelsVersion">Version</th><th data-i18n="optionsModelsSize">Size</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="inline-form">
-          <select id="install-from" aria-label="Download from language"></select>
+          <select id="install-from" aria-label="Download from language" data-i18n-attr="aria-label=optionsSelectInstallFrom"></select>
           <span class="arrow">→</span>
-          <select id="install-to" aria-label="Download to language"></select>
-          <button type="button" class="btn" id="install">Download</button>
+          <select id="install-to" aria-label="Download to language" data-i18n-attr="aria-label=optionsSelectInstallTo"></select>
+          <button type="button" class="btn" id="install" data-i18n="optionsDownload">Download</button>
         </div>
         <div class="progress" id="progress" hidden>
           <div class="bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="progress-text">
             <div class="fill" id="progress-fill"></div>
           </div>
           <div class="progress-text" id="progress-text"></div>
-          <button type="button" class="btn small" id="cancel-download">Cancel download</button>
+          <button type="button" class="btn small" id="cancel-download" data-i18n="optionsCancelDownload">Cancel download</button>
         </div>
         <p class="hint">
-          Model files come from Mozilla's attachment CDN, or from Mozilla's model bucket when the CDN
-          refuses this browser. <button type="button" class="btn small" id="reset-source">Try the CDN again</button>
+          <span data-i18n="optionsSourceHint">Model files come from Mozilla's attachment CDN, or from Mozilla's model bucket when the CDN refuses this browser.</span>
+          <button type="button" class="btn small" id="reset-source" data-i18n="optionsResetSource">Try the CDN again</button>
         </p>
       </section>
 
       <section class="panel">
-        <h2>Privacy</h2>
+        <h2 data-i18n="optionsPrivacySection">Privacy</h2>
         <ul class="plain">
-          <li>Translation runs inside your browser using the Bergamot engine that Firefox uses. Page text never leaves this device.</li>
-          <li>The extension has no permission to read websites on its own. It only touches a page when you ask it to.</li>
-          <li>Network access is limited to three Mozilla-operated locations, used only to fetch the model catalog and model files: <code>firefox.settings.services.mozilla.com</code>, <code>firefox-settings-attachments.cdn.mozilla.net</code>, and Mozilla's model bucket at <code>storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data</code>. Every file is checked against the hash Mozilla publishes before it is used.</li>
-          <li>No account, no telemetry, no analytics, no crash reporting.</li>
+          <li data-i18n="optionsPrivacyEngine">Translation runs inside your browser using the Bergamot engine that Firefox uses. Page text never leaves this device.</li>
+          <li data-i18n="optionsPrivacyPermission">The extension has no permission to read websites on its own. It only touches a page when you ask it to.</li>
+          <li><span data-i18n="optionsPrivacyNetwork">Network access is limited to three Mozilla-operated locations, used only to fetch the model catalog and model files:</span> <code>firefox.settings.services.mozilla.com</code>, <code>firefox-settings-attachments.cdn.mozilla.net</code>, and Mozilla's model bucket at <code>storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data</code>. <span data-i18n="optionsPrivacyHashes">Every file is checked against the hash Mozilla publishes before it is used.</span></li>
+          <li data-i18n="optionsPrivacyTelemetry">No account, no telemetry, no analytics, no crash reporting.</li>
         </ul>
       </section>
     </main>

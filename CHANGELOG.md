@@ -5,6 +5,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Added
+- Glossa speaks your language. The popup, the options page and everything it puts on a page are translated into Spanish, German, French, Japanese and Chinese, and follow the browser's own interface language. English is the fallback.
 - Text that is not in the page's body is translated too: the tab title, tooltips, image descriptions, placeholders, aria labels and the labels of a dropdown. A dropdown keeps submitting the value it submitted before, and everything goes back exactly as it was when you show the original.
 - A light-theme screenshot in the README, since both themes ship.
 - Every release now carries a source archive, and the packages are byte-reproducible from it: the same source and the same commands produce ZIPs with the same SHA-256 as the published ones. `npm run verify:source` checks that by unpacking the archive and rebuilding.
