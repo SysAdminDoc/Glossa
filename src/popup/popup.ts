@@ -284,7 +284,7 @@ async function onAction(): Promise<void> {
     if (page?.lastError) {
       setStatus(page.lastError, "error");
     } else if (page?.translated) {
-      setStatus(`Translated ${page.blocksDone} blocks on this device.`, "ok");
+      setStatus(t("popupTranslatedBlocks", String(page.blocksDone)), "ok");
     }
     await refreshRoute();
   } catch (error) {

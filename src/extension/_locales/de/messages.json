@@ -388,5 +388,8 @@
   },
   "fieldTranslated": {
     "message": "Feld übersetzt. Mit Strg+Z rückgängig machen, falls das nicht gewollt war."
+  },
+  "optionsCatalogLoading": {
+    "message": "Katalog wird geladen…"
   }
 }

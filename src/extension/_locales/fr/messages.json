@@ -388,5 +388,8 @@
   },
   "fieldTranslated": {
     "message": "Champ traduit. Annulez avec Ctrl+Z si ce n'était pas voulu."
+  },
+  "optionsCatalogLoading": {
+    "message": "Chargement du catalogue…"
   }
 }

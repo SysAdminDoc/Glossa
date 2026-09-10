@@ -388,5 +388,8 @@
   },
   "fieldTranslated": {
     "message": "Campo traducido. Deshaz con Ctrl+Z si no era lo que querías."
+  },
+  "optionsCatalogLoading": {
+    "message": "Cargando el catálogo…"
   }
 }

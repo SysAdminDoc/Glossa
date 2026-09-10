@@ -388,5 +388,8 @@
   },
   "fieldTranslated": {
     "message": "已翻译输入框。若不需要，可按 Ctrl+Z 撤销。"
+  },
+  "optionsCatalogLoading": {
+    "message": "正在加载目录…"
   }
 }

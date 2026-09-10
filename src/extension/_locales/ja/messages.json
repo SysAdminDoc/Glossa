@@ -388,5 +388,8 @@
   },
   "fieldTranslated": {
     "message": "入力欄を翻訳しました。取り消すには Ctrl+Z を押してください。"
+  },
+  "optionsCatalogLoading": {
+    "message": "カタログを読み込み中…"
   }
 }

@@ -124,7 +124,7 @@ function renderModels(): void {
   body.replaceChildren();
   const status = $("catalog-status");
   if (!models) {
-    status.textContent = "Loading catalog…";
+    status.textContent = t("optionsCatalogLoading");
     return;
   }
   if (models.catalogFetchedAt) {

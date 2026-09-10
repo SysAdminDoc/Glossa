@@ -518,5 +518,9 @@
   "fieldTranslated": {
     "message": "Field translated. Undo with Ctrl+Z if that was not what you wanted.",
     "description": "Context menu and field translation"
+  },
+  "optionsCatalogLoading": {
+    "message": "Loading catalog…",
+    "description": "Catalog line while it loads"
   }
 }
