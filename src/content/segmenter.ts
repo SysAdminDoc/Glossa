@@ -10,7 +10,11 @@ export const TRANSLATION_TAG = "GLOSSA-TRANSLATION";
 
 export type Segment =
   | { kind: "element"; element: Element; html: string; text: string; holds: Hold[]; lang: string | null }
-  | { kind: "text"; node: Text; text: string; lang: string | null };
+  | { kind: "text"; node: Text; text: string; lang: string | null }
+  // An attribute a user can read: a tooltip, a placeholder, the text an image stands in for.
+  | { kind: "attribute"; element: Element; attribute: string; text: string; lang: string | null }
+  // An element whose plain text is the whole of it: an <option>, or the document's <title>.
+  | { kind: "label"; element: Element; text: string; lang: string | null };
 
 // What a placeholder stands for: an inline element the page marked as untranslatable, or a run of
 // text inside a sentence (a URL, an address, a reference number) that has to come back unchanged.
@@ -69,8 +73,38 @@ export const PARAGRAPH_TAGS = new Set([
 
 const LETTER = /\p{L}/u;
 
+// What Firefox translates, and where. Anything not on this list is left alone: `value` on a text
+// input is what the user typed, `alt` on a spacer is empty, and `title` on a link to a file is
+// often a path. Taken from TRANSLATABLE_ATTRIBUTES in translations-document.sys.mjs.
+const ARIA_TEXT_ATTRIBUTES = [
+  "aria-label",
+  "aria-description",
+  "aria-placeholder",
+  "aria-roledescription",
+  "aria-valuetext",
+  "aria-braillelabel",
+  "aria-brailleroledescription",
+  "aria-colindextext",
+  "aria-rowindextext"
+];
+
+const TRANSLATABLE_ATTRIBUTES: Array<{ attribute: string; applies: (element: Element) => boolean }> = [
+  { attribute: "title", applies: () => true },
+  { attribute: "alt", applies: (element) => ["AREA", "IMG", "IMAGE", "INPUT"].includes(element.tagName) },
+  { attribute: "placeholder", applies: (element) => ["INPUT", "TEXTAREA"].includes(element.tagName) },
+  {
+    attribute: "value",
+    applies: (element) =>
+      element.tagName === "INPUT" && ["button", "reset", "submit"].includes((element.getAttribute("type") ?? "").toLowerCase())
+  },
+  ...ARIA_TEXT_ATTRIBUTES.map((attribute) => ({ attribute, applies: () => true }))
+];
+
 export interface SegmentOptions {
   skipFormFields: boolean;
+  // Attributes and labels are collected unless this is explicitly false. Used by the selection
+  // path, which is about the text a user highlighted and nothing around it.
+  attributes?: boolean;
   // Candidates passed over because they are not rendered yet (a `hidden` attribute, display:none,
   // a closed `<details>`). They are collected here so the observer can re-check exactly those
   // elements when a class or style changes instead of walking the page again.
@@ -80,6 +114,9 @@ export interface SegmentOptions {
 export function collectSegments(root: Node, options: SegmentOptions): Segment[] {
   const out: Segment[] = [];
   walk(root, out, options);
+  // Attributes are a separate pass over the whole subtree. The unit walk stops at the first block
+  // that is a unit, and the placeholder of an input inside that block still has to be found.
+  if (options.attributes !== false) collectReadableAttributes(root, out);
   return out;
 }
 
@@ -88,6 +125,9 @@ export function collectSegments(root: Node, options: SegmentOptions): Segment[] 
 export function collectFromNodes(nodes: Node[], options: SegmentOptions): Segment[] {
   const out: Segment[] = [];
   visit(nodes, out, options);
+  if (options.attributes !== false) {
+    for (const node of nodes) collectReadableAttributes(node, out);
+  }
   return out;
 }
 
@@ -130,6 +170,57 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
     if (holds.length > 0 && !LETTER.test(textOutsideHolds(html))) continue;
     out.push({ kind: "element", element, html, text, holds, lang: effectiveLang(element) });
   }
+}
+
+// Every element under this root that carries something a person reads. Elements the page marked as
+// untranslatable are skipped whole, and so is anything already translated.
+function collectReadableAttributes(root: Node, out: Segment[]): void {
+  const start = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : null;
+  const candidates: Element[] = [];
+  if (start) candidates.push(start);
+  const scope = start ?? (root as Document | DocumentFragment);
+  candidates.push(...Array.from(scope.querySelectorAll("*")));
+  for (const element of candidates) {
+    if (element.classList.contains(TRANSLATION_CLASS) || element.tagName === TRANSLATION_TAG) continue;
+    if (isProtected(element)) continue;
+    collectAttributes(element, out);
+    if (element.tagName !== "OPTION" && element.tagName !== "TITLE") continue;
+    const label = (element.textContent ?? "").trim();
+    if (!label || !LETTER.test(label)) continue;
+    if (element.hasAttribute(LABEL_MARKER)) continue;
+    out.push({ kind: "label", element, text: label, lang: effectiveLang(element) });
+  }
+}
+
+export const LABEL_MARKER = "data-glossa-label";
+
+function collectAttributes(element: Element, out: Segment[]): void {
+  for (const { attribute, applies } of TRANSLATABLE_ATTRIBUTES) {
+    if (!element.hasAttribute(attribute) || !applies(element)) continue;
+    const text = element.getAttribute(attribute)?.trim() ?? "";
+    // Nothing to say, or nothing that reads as language: a url, a token, a single letter.
+    if (text.length < 2 || !LETTER.test(text)) continue;
+    if (element.hasAttribute(attributeMarker(attribute))) continue;
+    out.push({ kind: "attribute", element, attribute, text, lang: effectiveLang(element) });
+  }
+}
+
+// Where the original value of a translated attribute is kept, so restoring needs no bookkeeping
+// beyond the page itself and a reload cannot leave a half-translated tooltip behind.
+export function attributeMarker(attribute: string): string {
+  return `data-glossa-was-${attribute.replace(/[^a-z0-9-]/gi, "-")}`;
+}
+
+// Anything the page marked as untranslatable, checked without the rest of the skip rules: an input
+// inside a `translate="no"` block still has a placeholder, and it still must not be touched.
+function isProtected(element: Element): boolean {
+  const html = element as HTMLElement;
+  if ("translate" in html) {
+    if (html.translate === false) return true;
+  } else if (element.closest('[translate="no" i]')) {
+    return true;
+  }
+  return Boolean(element.closest(".notranslate"));
 }
 
 // The language this unit is written in, as the page declares it. A `lang` deeper in the tree wins
@@ -323,12 +414,24 @@ function isMarkedText(node: Text): boolean {
 
 // Batch segments so each request carries a bounded amount of text. Viewport-first ordering makes
 // the visible part of the page change before the rest.
+// The element a segment lives in, whatever kind it is.
+export function segmentElement(segment: Segment): Element | null {
+  switch (segment.kind) {
+    case "element":
+    case "attribute":
+    case "label":
+      return segment.element;
+    case "text":
+      return segment.node.parentElement;
+  }
+}
+
 export function orderViewportFirst(segments: Segment[]): Segment[] {
   const viewportHeight = window.innerHeight || 800;
   const inView: Segment[] = [];
   const later: Segment[] = [];
   for (const segment of segments) {
-    const element = segment.kind === "element" ? segment.element : segment.node.parentElement;
+    const element = segmentElement(segment);
     if (!element) {
       later.push(segment);
       continue;
@@ -348,7 +451,7 @@ export function batchSegments(segments: Segment[], maxItems = 24, maxChars = 600
   let current: Segment[] = [];
   let chars = 0;
   for (const segment of segments) {
-    const length = segment.kind === "element" ? segment.html.length : segment.text.length;
+    const length = segmentLength(segment);
     if (current.length > 0 && (current.length >= maxItems || chars + length > maxChars)) {
       batches.push(current);
       current = [];
@@ -370,4 +473,9 @@ export function escapeHtml(text: string): string {
 
 export function segmentFragment(segment: Segment): string {
   return segment.kind === "element" ? segment.html : escapeHtml(segment.text);
+}
+
+// How much text a segment carries, for batching.
+export function segmentLength(segment: Segment): number {
+  return segment.kind === "element" ? segment.html.length : segment.text.length;
 }

@@ -523,3 +523,59 @@ test("bilingual mode leaves no numbering in the block it adds", () => {
   renderer.restoreAll();
   assert.equal(window.document.getElementById("p")!.querySelector("[data-glossa-id]"), null);
 });
+
+test("readable attributes and option labels are collected, and unreadable ones are not", () => {
+  const body = load(
+    `<p><img alt="Fachada de la biblioteca" src="x.gif" />` +
+      `<input type="search" placeholder="Buscar en el catálogo" aria-label="Buscar por título" value="texto del usuario" />` +
+      `<a href="#h" title="Consulta los horarios">Horarios</a>` +
+      `<select><option>Sala de lectura</option><option value="infantil">Sala infantil</option></select></p>`
+  );
+  const segments = collectSegments(body, options);
+  const found = segments
+    .filter((s) => s.kind === "attribute" || s.kind === "label")
+    .map((s) => (s.kind === "attribute" ? `${s.attribute}=${s.text}` : `label=${s.text}`));
+  assert.deepEqual(found, [
+    "alt=Fachada de la biblioteca",
+    "placeholder=Buscar en el catálogo",
+    "aria-label=Buscar por título",
+    "title=Consulta los horarios",
+    "label=Sala de lectura",
+    "label=Sala infantil"
+  ]);
+  // What the user typed into a search box is not ours to translate.
+  assert.ok(!found.some((entry) => entry.startsWith("value=")));
+});
+
+test("an attribute inside a translate=no block is left alone", () => {
+  const body = load(`<div translate="no"><img alt="Café Aurora, la marca" src="x.gif" /><a title="Marca registrada">x</a></div>`);
+  const segments = collectSegments(body, options);
+  assert.deepEqual(segments.filter((s) => s.kind === "attribute"), []);
+});
+
+test("a translated attribute is written back and restored, and an option keeps what it submits", () => {
+  const body = load(
+    `<p><input id="s" type="search" placeholder="Buscar en el catálogo" />` +
+      `<select id="sel"><option id="o">Sala de lectura</option></select></p>`
+  );
+  const segments = collectSegments(body, options);
+  const placeholder = segments.find((s) => s.kind === "attribute")!;
+  const label = segments.find((s) => s.kind === "label")!;
+  const renderer = new Renderer();
+  renderer.apply(placeholder, "Search the catalogue", { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" });
+  renderer.apply(label, "Reading room", { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" });
+
+  const input = window.document.getElementById("s")!;
+  const option = window.document.getElementById("o")! as unknown as { value: string; textContent: string };
+  assert.equal(input.getAttribute("placeholder"), "Search the catalogue");
+  assert.equal(input.getAttribute("data-glossa-was-placeholder"), "Buscar en el catálogo");
+  assert.equal(option.textContent, "Reading room");
+  // The form still submits what it submitted before the label was translated.
+  assert.equal(option.value, "Sala de lectura");
+
+  renderer.restoreAll();
+  assert.equal(input.getAttribute("placeholder"), "Buscar en el catálogo");
+  assert.equal(input.getAttribute("data-glossa-was-placeholder"), null);
+  assert.equal(option.textContent, "Sala de lectura");
+  assert.equal(window.document.getElementById("o")!.getAttribute("value"), null);
+});

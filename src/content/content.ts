@@ -223,6 +223,9 @@ async function translatePage(
     // Models can have been installed since the last run.
     controller.routes.clear();
     const segments = orderViewportFirst(collectSegments(document.body, segmentOptions(controller)));
+    // The tab's title is outside the body, and it is the first thing a reader sees.
+    const title = document.querySelector("head > title");
+    if (title) segments.unshift(...collectFromNodes([title], segmentOptions(controller)));
     controller.state.blocksTotal = segments.length;
     await translateByLanguage(controller, segments, source, command.targetLanguage, generation);
     if (generation !== controller.generation) return;
@@ -556,11 +559,11 @@ function withObserverPaused<T>(controller: Controller, written: Iterable<Segment
   const ours = new Set<Node>();
   for (const entry of written as Iterable<Segment | Node>) {
     if (isSegment(entry)) {
-      if (entry.kind === "element") {
-        ours.add(entry.element);
-      } else {
+      if (entry.kind === "text") {
         ours.add(entry.node);
         if (entry.node.parentNode) ours.add(entry.node.parentNode);
+      } else {
+        ours.add(entry.element);
       }
     } else {
       ours.add(entry);

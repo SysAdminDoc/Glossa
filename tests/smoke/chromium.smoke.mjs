@@ -138,6 +138,30 @@ try {
   const codeLine = await page.$eval("main p code", (element) => element.closest("p")?.querySelector("glossa-translation")?.textContent ?? "");
   assert(/run\s+npm install\s+at/.test(codeLine), `spacing around inline code was lost: "${codeLine}"`);
 
+  // Attributes a reader sees are translated too, and put back on restore. An option keeps what it
+  // submits: translating its label must not change the value the form sends.
+  const attrs = await page.evaluate(() => ({
+    title: document.title,
+    alt: document.getElementById("photo")?.getAttribute("alt") ?? "",
+    placeholder: document.getElementById("search")?.getAttribute("placeholder") ?? "",
+    ariaLabel: document.getElementById("search")?.getAttribute("aria-label") ?? "",
+    linkTitle: document.getElementById("tip")?.getAttribute("title") ?? "",
+    optionText: document.querySelector("#room option")?.textContent ?? "",
+    optionValue: document.querySelector("#room option")?.value ?? "",
+    typedValue: document.getElementById("search")?.value ?? ""
+  }));
+  console.info(`smoke: title "${attrs.title}", placeholder "${attrs.placeholder}", alt "${attrs.alt}"`);
+  assert(/library|page|test/i.test(attrs.title), `the document title was not translated: "${attrs.title}"`);
+  assert(/library|front/i.test(attrs.alt), `alt text was not translated: "${attrs.alt}"`);
+  assert(/search|catalog/i.test(attrs.placeholder), `placeholder was not translated: "${attrs.placeholder}"`);
+  assert(/search|title/i.test(attrs.ariaLabel), `aria-label was not translated: "${attrs.ariaLabel}"`);
+  assert(/hours|opening/i.test(attrs.linkTitle), `title attribute was not translated: "${attrs.linkTitle}"`);
+  assert(/room|reading/i.test(attrs.optionText), `option label was not translated: "${attrs.optionText}"`);
+  assert(
+    attrs.optionValue === "Sala de lectura",
+    `translating an option changed what the form submits: "${attrs.optionValue}"`
+  );
+
   // An inline wrapper holding blocks must be walked into, not sent whole: a grid sent as one unit
   // comes back duplicated in bilingual mode and the anchor count doubles.
   const cards = await page.$eval("#cards", (grid) => ({
@@ -259,6 +283,19 @@ try {
     anchors: document.querySelectorAll("#cards a").length
   }));
   assert(leftovers.anchors === 2, `restore left ${leftovers.anchors} card anchors instead of 2`);
+  const restoredAttrs = await page.evaluate(() => ({
+    title: document.title,
+    placeholder: document.getElementById("search")?.getAttribute("placeholder") ?? "",
+    optionText: document.querySelector("#room option")?.textContent ?? "",
+    markers: document.querySelectorAll("[data-glossa-was-placeholder], [data-glossa-was-title], [data-glossa-label]").length
+  }));
+  assert(/prueba/.test(restoredAttrs.title), `restore left the title translated: "${restoredAttrs.title}"`);
+  assert(
+    restoredAttrs.placeholder === "Buscar en el catálogo",
+    `restore left the placeholder translated: "${restoredAttrs.placeholder}"`
+  );
+  assert(restoredAttrs.optionText === "Sala de lectura", `restore left the option translated: "${restoredAttrs.optionText}"`);
+  assert(restoredAttrs.markers === 0, `restore left ${restoredAttrs.markers} attribute markers behind`);
   assert(leftovers.blocks === 0 && leftovers.units === 0, `restore left ${leftovers.blocks} blocks and ${leftovers.units} units`);
   assert(/consultar el catálogo en línea/.test(leftovers.intro), "restore did not bring the original paragraph back");
 

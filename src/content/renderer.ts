@@ -1,5 +1,7 @@
 import {
+  attributeMarker,
   clearIds,
+  LABEL_MARKER,
   HOLD_ATTRIBUTE,
   ID_ATTRIBUTE,
   PAD_ATTRIBUTE,
@@ -47,7 +49,23 @@ interface TextRecord {
   appended: Element | null;
 }
 
-type Record_ = ElementRecord | TextRecord;
+interface AttributeRecord {
+  kind: "attribute";
+  element: Element;
+  attribute: string;
+  original: string;
+}
+
+interface LabelRecord {
+  kind: "label";
+  element: Element;
+  original: string;
+  // An <option> with no value of its own submits its text, so translating the text would change
+  // what the form sends. The value is written out explicitly before that can happen.
+  addedValue: boolean;
+}
+
+type Record_ = ElementRecord | TextRecord | AttributeRecord | LabelRecord;
 
 const parser = new DOMParser();
 
@@ -123,6 +141,8 @@ export class Renderer {
       this.unmark(segment);
       return null;
     }
+    if (segment.kind === "attribute") return this.applyAttribute(segment, translatedHtml);
+    if (segment.kind === "label") return this.applyLabel(segment, translatedHtml);
     const nodes = parseFragment(translatedHtml, segment.kind === "element" ? segment.holds : []);
     if (segment.kind === "text") {
       return this.applyText(segment, nodes, options);
@@ -188,6 +208,39 @@ export class Renderer {
     return applied;
   }
 
+  // Attributes carry no markup, so the engine's answer is taken as text and nothing is parsed.
+  private applyAttribute(segment: Extract<Segment, { kind: "attribute" }>, translated: string): string | null {
+    const element = segment.element;
+    if (!element.isConnected) return null;
+    const text = plainText(translated).trim();
+    if (!text || text === segment.text) return null;
+    const marker = attributeMarker(segment.attribute);
+    if (element.hasAttribute(marker)) return null;
+    const original = element.getAttribute(segment.attribute) ?? "";
+    element.setAttribute(marker, original);
+    element.setAttribute(segment.attribute, text);
+    this.records.push({ kind: "attribute", element, attribute: segment.attribute, original });
+    return text;
+  }
+
+  private applyLabel(segment: Extract<Segment, { kind: "label" }>, translated: string): string | null {
+    const element = segment.element;
+    if (!element.isConnected) return null;
+    const text = plainText(translated).trim();
+    if (!text || text === segment.text) return null;
+    const original = element.textContent ?? "";
+    let addedValue = false;
+    if (element.tagName === "OPTION" && !element.hasAttribute("value")) {
+      // Pin what this option submits before its text changes underneath it.
+      element.setAttribute("value", original);
+      addedValue = true;
+    }
+    element.textContent = text;
+    element.setAttribute(LABEL_MARKER, "1");
+    this.records.push({ kind: "label", element, original, addedValue });
+    return text;
+  }
+
   private applyText(segment: Extract<Segment, { kind: "text" }>, nodes: Node[], options: RenderOptions): string | null {
     const node = segment.node;
     if (!node.isConnected) return null;
@@ -217,8 +270,22 @@ export class Renderer {
     let dropped = false;
     for (let index = this.records.length - 1; index >= 0; index--) {
       const record = this.records[index]!;
-      const owner = record.kind === "element" ? record.element : record.node.parentElement;
+      const owner = record.kind === "text" ? record.node.parentElement : record.element;
       if (owner !== target) continue;
+      if (record.kind === "attribute") {
+        // An attribute the page rewrote is the page's again: take the marker off and forget it.
+        record.element.removeAttribute(attributeMarker(record.attribute));
+        this.records.splice(index, 1);
+        dropped = true;
+        continue;
+      }
+      if (record.kind === "label") {
+        record.element.removeAttribute(LABEL_MARKER);
+        if (record.addedValue) record.element.removeAttribute("value");
+        this.records.splice(index, 1);
+        dropped = true;
+        continue;
+      }
       if (record.appended?.isConnected) record.appended.remove();
       if (record.kind === "element") {
         clearIds(record.element);
@@ -244,6 +311,20 @@ export class Renderer {
   restoreAll(): number {
     let restored = 0;
     for (const record of this.records.reverse()) {
+      if (record.kind === "attribute") {
+        if (record.original) record.element.setAttribute(record.attribute, record.original);
+        else record.element.removeAttribute(record.attribute);
+        record.element.removeAttribute(attributeMarker(record.attribute));
+        restored++;
+        continue;
+      }
+      if (record.kind === "label") {
+        record.element.textContent = record.original;
+        record.element.removeAttribute(LABEL_MARKER);
+        if (record.addedValue) record.element.removeAttribute("value");
+        restored++;
+        continue;
+      }
       if (record.kind === "text") {
         if (record.appended) {
           record.appended.remove();
@@ -342,6 +423,14 @@ function labelLanguage(element: Element, language: string): void {
 function hideDuplicateFromScreenReaders(block: Element): void {
   const focusable = block.querySelector("a[href], button, input, select, textarea, [tabindex], [contenteditable]");
   if (!focusable) block.setAttribute("aria-hidden", "true");
+}
+
+// The engine answers in HTML even for plain text, so an answer that came back with markup in it is
+// flattened rather than trusted.
+function plainText(html: string): string {
+  if (!/[<&]/.test(html)) return html;
+  const doc = parser.parseFromString(`<body>${html}</body>`, "text/html");
+  return doc.body.textContent ?? "";
 }
 
 function wantsBilingual(element: Element, text: string): boolean {

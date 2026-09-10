@@ -87,13 +87,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: the probe's iframe paragraph gets a bilingual block exactly once; a page with 50 empty iframes translates in the same time as without them.
   Complexity: M
 
-- [ ] P1 — G-27 — Translate attributes and `<option>` labels with Firefox's criteria map
-  Why: `title`, `placeholder`, `alt`, `aria-label`, `<option>` text and `document.title` stay in the source language; this is the oldest open request on the Bergamot extensions.
-  Evidence: local probe 2026-09-10 (`#inp`, `#img`, `#title-p`, document title); translatelocally #69, bergamot #314; Firefox `TRANSLATABLE_ATTRIBUTES` (L435: `alt` on AREA/IMAGE/IMG/INPUT, `placeholder` on INPUT/TEXTAREA, `title` everywhere, ten `aria-*`, `content` on `META[name=description|keywords]`, `value` only on `INPUT[type=button|reset]`), `<option>` explicit-value preservation (L6213-6222).
-  Touches: src/content/segmenter.ts (attribute segments), src/content/renderer.ts (write attributes, preserve `<option value>`, restore), src/shared/messages.ts, tests
-  Acceptance: the probe's placeholder, alt, title and document title are translated and restored; a `<select>` keeps its selected value and every option's original `value` after translation.
-  Complexity: M
-
 - [ ] P1 — G-29 — Viewport-first scheduling with priorities and a pause when the tab is hidden
   Why: at HEAD a6cce06 every unit is queued in one pass sorted once by bounding rect, so a long page blocks on off-screen text while translations pop in at scattered positions; background tabs keep the engine busy.
   Evidence: translatelocally #26 (scattered pop-in); Firefox four IntersectionObservers with `rootMargin` `0%` and `150% 50%` (L1164-1396), P0-P7 by scroll direction (L3662), `AntiStarvationStack(2, 1)` with one request in flight (L4692, L5039), `onHidePage()` releasing the engine (L5333); `content.ts` `orderViewportFirst`.
