@@ -54,6 +54,7 @@ Glossa is not in any store yet. Load it unpacked from a release ZIP or from a lo
 
 1. Download `glossa-firefox-vX.Y.Z.zip`.
 2. Open `about:debugging#/runtime/this-firefox`, click Load Temporary Add-on, and choose the ZIP. Temporary add-ons are removed when Firefox closes. A signed build for permanent installs is on the roadmap.
+3. Open `about:addons`, find Glossa, and on the Permissions tab allow access to the three Mozilla model hosts. Firefox treats host permissions as optional and a temporary add-on starts with none, so without this step model downloads fail. The popup will soon ask for this itself.
 
 ## Build from source
 
@@ -65,7 +66,7 @@ npm run engine:fetch    # downloads the 5 MB Bergamot WASM binary and verifies b
 npm run build           # writes dist/chrome, dist/firefox, and one ZIP per target
 ```
 
-`npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run screenshots` refreshes the images above the same way.
+`npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way.
 
 ## How it works
 

@@ -4,7 +4,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
 ## [0.1.0] - 2026-09-10
 
-First scaffold. Everything below works end to end in Chromium; Firefox loads and is wired the same way but has not yet been exercised by an automated test.
+First scaffold. Everything below works end to end in headless Chromium 153 and in Firefox 155, each driven through the real popup by an automated smoke test.
 
 ### Added
 - On-device translation with the Bergamot engine (the same Marian NMT WebAssembly build Firefox ships), vendored under an MPL-2.0 notice with a hash-pinned fetch step.
@@ -19,4 +19,4 @@ First scaffold. Everything below works end to end in Chromium; Firefox loads and
 - Two model byte sources with one hash authority. Mozilla's Remote Settings CDN refuses Chrome user agents with a 406, so Chromium browsers fall back to Mozilla's model registry bucket, whose files match the catalog hashes byte for byte.
 - Inline `translate="no"` and `.notranslate` elements inside a sentence are swapped for placeholders the engine copies verbatim and restored afterwards, and the whitespace Bergamot drops around inline code is put back.
 - Translations inside open shadow roots get their block styling through an adopted stylesheet.
-- Chrome MV3 (offscreen document hosts the engine) and Firefox MV3 (event page hosts it) builds from one source tree, plus a headless Chromium smoke test that drives the real popup.
+- Chrome MV3 (offscreen document hosts the engine) and Firefox MV3 (event page hosts it) builds from one source tree, plus headless smoke tests for both browsers that drive the real popup.

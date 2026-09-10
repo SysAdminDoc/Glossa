@@ -4,16 +4,9 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P0
 
-- [ ] G-01 — Firefox smoke test
-  Why: the Firefox build is wired (event page hosts the engine, no offscreen) but nothing has run it. `browser.scripting.executeScript` with activeTab, `i18n.detectLanguage`, and Cache storage from the background page all need one real pass.
-  Evidence: tests/smoke covers Chromium only; MDN lists `i18n.detectLanguage` for Firefox but the research pass marked it "verify before relying on it".
-  Touches: tests/smoke/firefox.smoke.mjs (new), src/background/background.ts, package.json
-  Acceptance: `npm run smoke:firefox` translates tests/fixtures/es.html through the popup in a headless Firefox launched by Playwright, with the same assertions as the Chromium smoke.
-  Complexity: M
-
 - [ ] G-02 — Explain and recover a missing model-host permission on Firefox
-  Why: Firefox MV3 treats `host_permissions` as optional. If a user declines them at install, every model download fails with a bare fetch error.
-  Evidence: MDN manifest `host_permissions` notes for Firefox 127+; src/engine/model-store.ts has no permission check.
+  Why: Firefox MV3 treats `host_permissions` as optional. A temporary add-on starts with none at all (verified 2026-09-10: the Firefox smoke had to grant them from the browser chrome), and a user can decline them at install. Without them every model download fails with a bare fetch error.
+  Evidence: MDN manifest `host_permissions` notes for Firefox 127+; tests/smoke/firefox.smoke.py grants origins through ExtensionPermissions; src/engine/model-store.ts has no permission check.
   Touches: src/engine/model-store.ts, src/popup/popup.ts, src/options/options.ts
   Acceptance: when `permissions.contains` for the two hosts is false, the popup shows a one-line reason and a button that calls `permissions.request` in the click handler; a download then succeeds without a reload.
   Complexity: S
@@ -96,7 +89,7 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
   Complexity: S
 
 - [ ] G-14 — Language detection with the fastText model Firefox ships
-  Why: `i18n.detectLanguage` is CLD3 on Chrome and unverified on Firefox. Mozilla publishes a 1 MB fastText WASM plus a language ID model in the same Remote Settings collection.
+  Why: `i18n.detectLanguage` is CLD3 on Chrome and CLD2 on Firefox (both detected the fixture correctly on 2026-09-10). Mozilla publishes a 1 MB fastText WASM plus a language ID model in the same Remote Settings collection, which would give one behaviour on both and cover more languages.
   Touches: src/engine (second worker or same worker), src/background/background.ts
   Acceptance: detection works identically on both browsers with no browser API involved.
   Complexity: M

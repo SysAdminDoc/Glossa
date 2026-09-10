@@ -23,6 +23,7 @@
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"tools/**/*.mjs\"",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "smoke": "node tools/build.mjs --smoke && node tests/smoke/chromium.smoke.mjs",
+    "smoke:firefox": "node tools/build.mjs --smoke && python tests/smoke/firefox.smoke.py",
     "screenshots": "node tools/build.mjs --smoke && node tools/screenshots.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
   },

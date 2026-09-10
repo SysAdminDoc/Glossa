@@ -44,6 +44,7 @@ Glossa has no tracker yet. The relevant reports live in competitor trackers and 
 - Chrome's offscreen document has no `chrome.storage`; only `runtime` and a few others. Cache API is available there and `Cache.put` refuses `chrome-extension:` keys.
 - Chrome 153 exposes a `browser` alias in extension pages, so `typeof browser` no longer identifies Firefox.
 - Bergamot's HTML mode copies `code`, `kbd`, `samp`, `var`, `math` verbatim (`inference/src/translator/html.h`, `ignoredTags`) but drops the whitespace around them, and has no notion of `translate="no"`.
+- Firefox 155: a temporary MV3 add-on starts with zero host permissions; `tabs.query({ url })` needs a host permission for the tab and its `url` is a match pattern (a port never matches); Firefox stores `https://storage.googleapis.com/moz-fx-.../*` as `https://storage.googleapis.com/*`, so the path narrowing in the manifest is documentation on Firefox and enforcement only on Chrome. Marionette refuses to navigate content to `moz-extension:` URLs; the smoke opens the popup tab from the chrome context with the system principal, which needs geckodriver's `--allow-system-access`.
 
 ## Security, Privacy, and Reliability
 
@@ -106,5 +107,5 @@ Community signal
 
 ## Open Questions
 
-- Does Firefox's `i18n.detectLanguage` return usable results on Firefox 128+ ESR, or does G-14 need to land before Firefox detection is trustworthy? Needs a live run (G-01).
 - Whether Brave's WASM SIMD path behaves like Chrome's for this engine, given Linguist's open Brave bug. Needs a Brave smoke run.
+- Whether a signed (non-temporary) Firefox install grants the manifest host permissions at install time on 128 ESR as well as 155. Needs the G-05 signed build.

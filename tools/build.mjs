@@ -15,7 +15,7 @@ const lock = JSON.parse(await readFile(path.join(root, "vendor", "bergamot", "en
 // cannot click the toolbar button, so activeTab never gets granted there. The shipped targets are
 // unchanged and the smoke target is never zipped.
 const SMOKE = process.argv.includes("--smoke");
-const TARGETS = SMOKE ? ["chrome", "firefox", "chrome-smoke"] : ["chrome", "firefox"];
+const TARGETS = SMOKE ? ["chrome", "firefox", "chrome-smoke", "firefox-smoke"] : ["chrome", "firefox"];
 const ICON_SIZES = [16, 32, 48, 128];
 // Fixed timestamp keeps the ZIPs byte-reproducible for a given source tree.
 const STORE_ZIP_DATE = new Date(Date.UTC(2026, 0, 1));
@@ -104,10 +104,10 @@ for (const target of TARGETS) {
     await copyFile(path.join(root, "src", "extension", "icons", `icon-${size}.png`), path.join(iconsDir, `icon-${size}.png`));
   }
 
-  const manifestTarget = target === "chrome-smoke" ? "chrome" : target;
+  const manifestTarget = target.replace(/-smoke$/, "");
   const manifest = JSON.parse(await readFile(path.join(root, "src", "extension", `manifest.${manifestTarget}.json`), "utf8"));
   manifest.version = pkg.version;
-  if (target === "chrome-smoke") {
+  if (target.endsWith("-smoke")) {
     manifest.host_permissions.push("http://127.0.0.1/*");
   }
   await writeFile(path.join(targetDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -133,8 +133,12 @@ for (const target of TARGETS) {
     `${JSON.stringify({ product: "Glossa", target, version: pkg.version, engine: lock.release, artifacts }, null, 2)}\n`
   );
 
-  if (target === "chrome-smoke") {
-    console.info(`build: ${target} -> dist/${target} (unpacked only)`);
+  if (target.endsWith("-smoke")) {
+    // Firefox's temporary-install API takes a ZIP; Chromium loads the directory.
+    if (target === "firefox-smoke") {
+      await packDirectoryAsStoreZip(targetDir, path.join(dist, `${target}.zip`));
+    }
+    console.info(`build: ${target} -> dist/${target} (test variant, not released)`);
     continue;
   }
   const zipPath = path.join(dist, `glossa-${target}-v${pkg.version}.zip`);

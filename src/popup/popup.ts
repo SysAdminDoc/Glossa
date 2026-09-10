@@ -272,9 +272,14 @@ async function init(): Promise<void> {
   // The popup normally acts on the active tab. When opened as a full page (the browser smoke test
   // does this, since nothing can click a toolbar button in automation) a tabId query parameter
   // names the tab instead.
-  const override = Number(new URLSearchParams(location.search).get("tabId"));
+  const params = new URLSearchParams(location.search);
+  const override = Number(params.get("tabId"));
+  const tabUrl = params.get("tabUrl");
   if (Number.isInteger(override) && override > 0) {
     tabId = override;
+  } else if (tabUrl) {
+    const [tab] = await api.tabs.query({ url: tabUrl });
+    tabId = tab?.id ?? null;
   } else {
     const [tab] = await api.tabs.query({ active: true, currentWindow: true });
     tabId = tab?.id ?? null;
