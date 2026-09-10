@@ -104,6 +104,51 @@ test("renderer restores protected inline elements from their placeholders", () =
   assert.equal(block.textContent, "The brand Café Aurora opens today with many new things.");
 });
 
+test("candidates that are not rendered yet are reported as deferred", () => {
+  const body = load(`<p id="now">Visible desde el principio.</p><p id="later" hidden>Aparece más tarde.</p>`);
+  const deferred = new Set<Element>();
+  const segments = collectSegments(body, { skipFormFields: true, deferred });
+  assert.equal(segments.length, 1);
+  assert.deepEqual(Array.from(deferred).map((element) => element.id), ["later"]);
+});
+
+test("reset drops a unit's record and its translation block so it can be translated again", () => {
+  const body = load(`<p id="p">Primera versión del texto de esta prueba.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, "First version of this test text.", {
+    displayMode: "bilingual",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(p.querySelectorAll("glossa-translation").length, 1);
+  assert.equal(renderer.reset(p as unknown as Element), true);
+  assert.equal(p.querySelector("glossa-translation"), null);
+  assert.equal(p.getAttribute("data-glossa-unit"), null);
+  // Nothing is left to undo, and the element is a candidate again.
+  assert.equal(renderer.restoreAll(), 0);
+  const again = collectSegments(body, options);
+  assert.equal(again.length, 1);
+});
+
+test("replace mode puts the page's own lang back on restore", () => {
+  const body = load(`<p id="p" lang="es">Texto en español que se traduce.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, "Spanish text being translated.", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(p.getAttribute("lang"), "en");
+  renderer.restoreAll();
+  assert.equal(p.getAttribute("lang"), "es");
+});
+
 test("blocks without letters are ignored", () => {
   const body = load(`<p>12345</p><p>...</p><p>ok!</p>`);
   const segments = collectSegments(body, options);

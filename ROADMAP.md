@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-19 — Observe attribute and text mutations and re-check hidden units
-  Why: revealing a `hidden` paragraph, opening `<details>`, editing a text node, or flipping `lang` after translation leaves the block untranslated or shows a stale translation under new text; a unit the page re-renders in place keeps `data-glossa-unit` and is never touched again.
-  Evidence: local probe 2026-09-10 (`#late`, `#edited`, `#langflip`, `#det` cases); `content.ts` `startObserver` passes `{ childList: true, subtree: true }` only; Firefox `MUTATION_OBSERVER_OPTIONS` uses `attributeFilter` plus `attributeOldValue` (L518) and its `isNodeHidden` ladder (L5997) re-evaluates on demand; Bugzilla 1855260.
-  Touches: src/content/content.ts (observer options, pause around own writes, 25 ms batching), src/content/renderer.ts (drop the unit record when its children are replaced), src/content/segmenter.ts
-  Acceptance: each of the four probe cases is translated within one second of the change; a unit whose text the page replaces is re-translated once and the old translation removed; the smoke asserts `#late`.
-  Complexity: M
-
 - [ ] P0 — G-20 — Never resubmit the engine's own output
   Why: an observer that sees its own inserted translation, or a page that copies translated text into a new node, feeds target-language text back into a source-language model; Firefox documents that this produces garbage.
   Evidence: Firefox `LRUCache` of output strings and `isAlreadyTranslated()` (L76, L268, checked at L3216 and L1910; 5,000 entries, 10 min expiry); linguist #598 and #544 (same-language mangling, short-string misdetection); Bugzilla 2048612.

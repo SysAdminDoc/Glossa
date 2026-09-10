@@ -18,6 +18,9 @@ interface ElementRecord {
   originalChildren: Node[];
   addedTitle: boolean;
   previousTitle: string | null;
+  // A page that labels its own elements keeps its attribute through translate and restore, so the
+  // value we found is put back rather than removed.
+  previousLang: string | null;
   appended: Element | null;
 }
 
@@ -113,7 +116,15 @@ export class Renderer {
       ensureShadowStyle(element);
       element.append(block);
       element.setAttribute(UNIT_ATTRIBUTE, "bilingual");
-      this.records.push({ kind: "element", element, originalChildren: [], addedTitle: false, previousTitle: null, appended: block });
+      this.records.push({
+        kind: "element",
+        element,
+        originalChildren: [],
+        addedTitle: false,
+        previousTitle: null,
+        previousLang: element.getAttribute("lang"),
+        appended: block
+      });
       return;
     }
     const originalChildren = Array.from(element.childNodes);
@@ -128,8 +139,9 @@ export class Renderer {
       }
     }
     element.setAttribute(UNIT_ATTRIBUTE, "replaced");
+    const previousLang = element.getAttribute("lang");
     element.setAttribute("lang", options.targetLanguage);
-    this.records.push({ kind: "element", element, originalChildren, addedTitle, previousTitle, appended: null });
+    this.records.push({ kind: "element", element, originalChildren, addedTitle, previousTitle, previousLang, appended: null });
   }
 
   private applyText(segment: Extract<Segment, { kind: "text" }>, nodes: Node[], options: RenderOptions): void {
@@ -150,6 +162,24 @@ export class Renderer {
     const originalData = node.data;
     node.data = translated;
     this.records.push({ kind: "text", node, originalData, appended: null });
+  }
+
+  // The page re-rendered a unit in place: its text changed, its children were replaced, or its
+  // `lang` flipped. The bookkeeping for it is stale, so drop it and take our own output with it.
+  // The caller re-collects the element afterwards, which translates it exactly once more.
+  reset(target: Element): boolean {
+    let dropped = false;
+    for (let index = this.records.length - 1; index >= 0; index--) {
+      const record = this.records[index]!;
+      const owner = record.kind === "element" ? record.element : record.node.parentElement;
+      if (owner !== target) continue;
+      if (record.appended?.isConnected) record.appended.remove();
+      if (record.kind === "element" && record.addedTitle) record.element.removeAttribute("title");
+      this.records.splice(index, 1);
+      dropped = true;
+    }
+    target.removeAttribute(UNIT_ATTRIBUTE);
+    return dropped;
   }
 
   restoreAll(): number {
@@ -173,7 +203,8 @@ export class Renderer {
         else if (record.previousTitle !== null) element.setAttribute("title", record.previousTitle);
       }
       element.removeAttribute(UNIT_ATTRIBUTE);
-      element.removeAttribute("lang");
+      if (record.previousLang === null) element.removeAttribute("lang");
+      else element.setAttribute("lang", record.previousLang);
       restored++;
     }
     this.records.length = 0;

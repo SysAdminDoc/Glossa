@@ -39,8 +39,13 @@ await rm(profileDir, { recursive: true, force: true });
 await mkdir(profileDir, { recursive: true });
 const { server, port } = await serveFixtures();
 const started = Date.now();
+// GLOSSA_CHROMIUM_PATH picks a specific Chromium binary. On a machine whose firewall denies
+// outbound by default, a freshly downloaded Playwright build has no allow rule yet and every model
+// request fails with ERR_NETWORK_ACCESS_DENIED; pointing at a build that does have one is the way
+// through without touching the test itself.
+const executablePath = process.env.GLOSSA_CHROMIUM_PATH;
 const context = await chromium.launchPersistentContext(profileDir, {
-  channel: "chromium",
+  ...(executablePath ? { executablePath } : { channel: "chromium" }),
   headless: true,
   args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]
 });
@@ -141,7 +146,9 @@ try {
   assert(/shadow/i.test(shadow.text), `shadow root text was not translated: "${shadow.text}"`);
   assert(shadow.display === "block", `shadow root translation is not styled as a block (display: ${shadow.display})`);
 
-  // Dynamic content: reveal the hidden paragraph and add a new one; the observer must catch both.
+  // Dynamic content. Four kinds of change at once: a node added, a `hidden` paragraph revealed, the
+  // text of a translated unit replaced in place, and a `<details>` panel opened. The observer has to
+  // catch all four, and the edited unit must end up with exactly one translation, not two.
   await page.evaluate(() => {
     const late = document.getElementById("late");
     late.hidden = false;
@@ -149,6 +156,8 @@ try {
     fresh.id = "dynamic";
     fresh.textContent = "Este párrafo se añadió después de la traducción.";
     document.querySelector("main").append(fresh);
+    document.getElementById("edited").firstChild.data = "Ahora este párrafo dice algo completamente distinto.";
+    document.getElementById("det").open = true;
   });
   await page.waitForFunction(
     () => document.querySelector("#dynamic glossa-translation")?.textContent?.length > 0,
@@ -158,6 +167,30 @@ try {
   const dynamic = await page.$eval("#dynamic glossa-translation", (element) => element.textContent);
   console.info(`smoke: dynamic paragraph: ${dynamic}`);
   assert(/paragraph|added/i.test(dynamic), "dynamic paragraph translation looks wrong");
+
+  await page.waitForFunction(() => document.querySelector("#late glossa-translation")?.textContent?.length > 0, null, {
+    timeout: 120_000
+  });
+
+  await page.waitForFunction(
+    () => /different|says/i.test(document.querySelector("#edited glossa-translation")?.textContent ?? ""),
+    null,
+    { timeout: 120_000 }
+  );
+  const edited = await page.$eval("#edited", (element) => ({
+    blocks: element.querySelectorAll("glossa-translation").length,
+    original: element.firstChild?.textContent ?? "",
+    translation: element.querySelector("glossa-translation")?.textContent ?? ""
+  }));
+  console.info(`smoke: edited paragraph: ${edited.translation}`);
+  assert(edited.blocks === 1, `edited paragraph carries ${edited.blocks} translation blocks`);
+  assert(/completamente distinto/.test(edited.original), "edited paragraph lost its new source text");
+
+  await page.waitForFunction(() => document.querySelector("#panel glossa-translation")?.textContent?.length > 0, null, {
+    timeout: 120_000
+  });
+  const panel = await page.$eval("#panel", (element) => element.querySelectorAll("glossa-translation").length);
+  assert(panel === 1, `opened details panel carries ${panel} translation blocks`);
 
   // Restore must leave no trace.
   await popup.click("#action");

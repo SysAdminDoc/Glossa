@@ -6,6 +6,10 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
 ### Fixed
 - Card grids and other link-wrapped blocks (`div > a > div`) are walked into instead of being sent to the engine as one unit, so bilingual mode no longer appends a second copy of every card.
+- Content revealed after the first pass is picked up: the observer now watches text edits and the attributes that decide whether a block is translatable (`hidden`, `open`, `lang`, `translate`, `aria-hidden`), and re-checks the blocks an earlier pass skipped when a class or style changes.
+- A block the page re-renders in place is translated again instead of keeping a stale translation forever, and the old translation goes with it.
+- Writes to the page are no longer seen as page changes by the extension's own observer, so translated text is never fed back to the engine.
+- Restore puts back a `lang` attribute the page set itself instead of deleting it.
 
 ## [0.1.0] - 2026-09-10
 

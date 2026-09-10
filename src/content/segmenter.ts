@@ -59,6 +59,10 @@ const LETTER = /\p{L}/u;
 
 export interface SegmentOptions {
   skipFormFields: boolean;
+  // Candidates passed over because they are not rendered yet (a `hidden` attribute, display:none,
+  // a closed `<details>`). They are collected here so the observer can re-check exactly those
+  // elements when a class or style changes instead of walking the page again.
+  deferred?: Set<Element>;
 }
 
 export function collectSegments(root: Node, options: SegmentOptions): Segment[] {
@@ -90,7 +94,10 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
     }
     if (child.nodeType !== Node.ELEMENT_NODE) continue;
     const element = child as Element;
-    if (shouldSkip(element, options)) continue;
+    if (shouldSkip(element, options)) {
+      if ((element as HTMLElement).hidden) options.deferred?.add(element);
+      continue;
+    }
 
     if (element.shadowRoot) {
       walk(element.shadowRoot, out, options);
@@ -101,7 +108,10 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
     }
     const text = element.textContent ?? "";
     if (!LETTER.test(text)) continue;
-    if (!isRenderable(element)) continue;
+    if (!isRenderable(element)) {
+      options.deferred?.add(element);
+      continue;
+    }
     const { html, holds } = serializeUnit(element);
     out.push({ kind: "element", element, html, text, holds });
   }
