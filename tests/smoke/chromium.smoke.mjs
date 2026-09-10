@@ -304,6 +304,24 @@ try {
   const afterRule = await page.evaluate(() => document.querySelectorAll("glossa-translation").length);
   assert(afterRule === 0, `a never host still carried ${afterRule} translations`);
 
+  // An "always" rule has to translate on its own, with no popup and no click. The smoke build holds
+  // a loopback host permission, which is what such a rule needs on a real site.
+  await worker.evaluate(async (host) => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, siteRules: { [host]: "always" } } });
+  }, "127.0.0.1");
+  const auto = await context.newPage();
+  await auto.goto(`http://127.0.0.1:${port}/es.html`, { waitUntil: "load" });
+  await auto.waitForFunction(
+    () => (document.querySelector("#intro glossa-translation")?.textContent ?? "").length > 0,
+    null,
+    { timeout: 120_000 }
+  );
+  const autoText = await auto.$eval("#intro glossa-translation", (block) => block.textContent ?? "");
+  console.info(`smoke: always-rule page translated itself: ${autoText.trim().slice(0, 80)}`);
+  assert(/library/i.test(autoText), `automatic translation looks wrong: "${autoText}"`);
+  await auto.close();
+
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a
   // guard on what is observable, not a proof of the whole picture. The proof is the manifest:

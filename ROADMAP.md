@@ -2,15 +2,6 @@
 
 Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) and from what the first scaffold left unfinished. Ordered by priority, then by root-cause fixes before polish.
 
-## P0
-
-- [ ] G-03 — Auto-translate for sites with an "always" rule
-  Why: the options page already collects per-host rules but nothing acts on "always". Users who set a rule expect the page to change on load.
-  Evidence: src/shared/settings.ts `siteRules`; research signal ranks per-site rules as table stakes.
-  Touches: src/background/background.ts (tabs.onUpdated + `permissions.contains("<all_urls>")` gate), src/options/options.ts (request the optional permission when the first "always" rule is added)
-  Acceptance: with the optional all-sites permission granted and a rule for a host, navigating to that host translates the page without a click; without the permission the options page explains what is missing.
-  Complexity: M
-
 ## P1
 
 - [ ] G-04 — Keep original inline elements in place instead of re-parsing translated HTML

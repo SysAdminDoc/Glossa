@@ -176,6 +176,8 @@ async function translatePage(
     // A second click while a page is translated switches nothing; restore first.
     return;
   }
+  // An automatic translation can arrive before the first detection has come back.
+  if (!command.sourceLanguage && !controller.state.detectedLanguage) await detect(controller);
   const source = command.sourceLanguage ?? controller.state.detectedLanguage;
   if (!source) {
     controller.state.lastError = "Could not detect the page language";

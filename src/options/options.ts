@@ -237,6 +237,18 @@ async function init(): Promise<void> {
       return;
     }
     const kind = $<HTMLSelectElement>("rule-kind").value as SiteRule;
+    // "Always" means Glossa reads that site on its own, which needs a host permission for it. The
+    // request has to be made from this click, and a refusal leaves the rule in place but inert.
+    if (kind === "always") {
+      api.permissions.request({ origins: [`*://${host}/*`] }).then(
+        (granted) => {
+          if (!granted) {
+            toast(`Without access to ${host}, that rule cannot translate on its own`, "error");
+          }
+        },
+        () => toast(`${host} is not a host Glossa can ask for`, "error")
+      );
+    }
     void persist({ siteRules: { ...settings.siteRules, [host]: kind } }).then(() => {
       input.value = "";
       renderRules();

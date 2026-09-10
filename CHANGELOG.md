@@ -2,6 +2,11 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Added
+- A site with an "always" rule translates itself when you open it, with no click. Glossa asks for access to that site when you add the rule, and the rule stays inert until you allow it.
+
 ## [0.2.1] - 2026-09-10
 
 ### Added

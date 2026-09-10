@@ -16,7 +16,7 @@ import {
   type TranslateResponse,
   type UiRequest
 } from "../shared/messages.ts";
-import { blockedReason, catalogMaxAgeMs, loadSettings } from "../shared/settings.ts";
+import { blockedReason, catalogMaxAgeMs, hostOf, loadSettings } from "../shared/settings.ts";
 import { languageName } from "../shared/languages.ts";
 import { EngineHost } from "../engine/engine-host.ts";
 
@@ -278,6 +278,36 @@ async function updateBadge(tabId: number, state: PageState): Promise<void> {
     // The tab may already be gone.
   }
 }
+
+// ---- automatic translation ----
+
+// A host with an "always" rule translates itself on load. Reading that page needs a host permission
+// for it, which is optional and granted from the options page, so nothing happens on a site the
+// user has not opted into. Detection runs first, so a page in a language they read is left alone.
+async function maybeAutoTranslate(tabId: number, url: string | null): Promise<void> {
+  if (!url || !/^https?:/.test(url)) return;
+  const settings = await loadSettings();
+  const host = hostOf(url);
+  if (!host || settings.siteRules[host] !== "always") return;
+  let allowed = false;
+  try {
+    // A match pattern carries no port, so the origin cannot be used as one: a page on
+    // http://127.0.0.1:8080 has to be asked about as http://127.0.0.1/*.
+    const parsed = new URL(url);
+    allowed = await api.permissions.contains({ origins: [`${parsed.protocol}//${parsed.hostname}/*`] });
+  } catch {
+    allowed = false;
+  }
+  if (!allowed) return;
+  const status = await pageStatus(tabId);
+  if (status.blocked || !status.page.injected || status.page.translated || status.page.translating) return;
+  await translatePage(tabId);
+}
+
+api.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  void maybeAutoTranslate(tabId, tab.url ?? null).catch(() => undefined);
+});
 
 // ---- context menus ----
 
