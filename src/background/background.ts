@@ -37,6 +37,7 @@ let creating: Promise<void> | null = null;
 async function ensureEngineHostDocument(): Promise<void> {
   CHROME_ONLY: {
     if (creating) return creating;
+    // getContexts below is the check that matters; `creating` only collapses concurrent callers.
     creating = (async () => {
       const contexts = await chrome.runtime.getContexts({
         contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
@@ -67,9 +68,12 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
   if (localEngine) {
     return (await localEngine.handle(full)) as T;
   }
-  await ensureEngineHostDocument();
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
+    // Inside the loop: the document can go away between attempts. It closes itself when the engine
+    // has been idle, and a request that arrives just as it does gets a closed port rather than an
+    // answer. Asking for it again here is what makes that recoverable.
+    await ensureEngineHostDocument();
     try {
       const response = (await api.runtime.sendMessage(full)) as EngineResponse | undefined;
       if (!response) throw new Error("The engine did not answer");
@@ -78,8 +82,10 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
     } catch (error) {
       lastError = error;
       const text = error instanceof Error ? error.message : String(error);
-      // The offscreen document may still be booting on the first call after creation.
-      if (!/Receiving end does not exist|did not answer/.test(text)) throw error;
+      // Booting, gone, or closing under us. Anything else is the engine's own answer and stands.
+      if (!/Receiving end does not exist|did not answer|message port closed|context invalidated/i.test(text)) {
+        throw error;
+      }
       await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
     }
   }
@@ -146,8 +152,10 @@ async function detectLanguage(request: DetectRequest): Promise<DetectResponse> {
     if (!best) return { language: fromHtml, confident: false };
     // Two independent signals agreeing is worth more than one confident detector: CLD is reliable
     // on long prose and wrong often enough on short or mixed pages.
+    // Two signals agreeing is worth more than one confident detector, but not when the detector is
+    // barely picking a side: 51 percent against 49 is not evidence, whatever the page declares.
     const agrees = fromHtml !== null && fromHtml === best.language;
-    if (agrees) return { language: best.language, confident: true };
+    if (agrees && best.percentage >= 50) return { language: best.language, confident: true };
     if (result.isReliable && best.percentage >= 70) {
       return { language: best.language, confident: true };
     }
@@ -317,7 +325,9 @@ async function maybeAutoTranslate(tabId: number, url: string | null): Promise<vo
   if (!allowed) return;
   const status = await pageStatus(tabId);
   if (status.blocked || !status.page.injected || status.page.translated || status.page.translating) return;
-  await translatePage(tabId);
+  // A language the user chose for this host by hand applies here too, and matters more here than in
+  // the popup: there is no popup in this path to correct a bad guess.
+  await translatePage(tabId, undefined, settings.sourceLanguages[host]);
 }
 
 api.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {

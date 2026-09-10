@@ -68,6 +68,18 @@ function renderNever(): void {
   }
 }
 
+// An "always" rule needs access to that site or it does nothing at all, and the permission can be
+// declined at the prompt or taken back later from the browser's own extension page. The table is
+// the only place that can say so.
+async function ruleIsArmed(host: string, rule: SiteRule): Promise<boolean> {
+  if (rule !== "always") return true;
+  try {
+    return await api.permissions.contains({ origins: [`*://${host}/*`] });
+  } catch {
+    return false;
+  }
+}
+
 function renderRules(): void {
   const body = $<HTMLTableElement>("rules").tBodies[0]!;
   body.replaceChildren();
@@ -83,7 +95,15 @@ function renderRules(): void {
   for (const host of hosts) {
     const row = body.insertRow();
     row.insertCell().textContent = host;
-    row.insertCell().textContent = settings.siteRules[host] === "always" ? "Always translate" : "Never translate";
+    const rule = settings.siteRules[host]!;
+    const state = row.insertCell();
+    state.textContent = rule === "always" ? "Always translate" : "Never translate";
+    void ruleIsArmed(host, rule).then((armed) => {
+      if (armed) return;
+      state.textContent = "Always translate (waiting for access)";
+      state.title = `Glossa has no permission to read ${host}, so this rule does nothing. Remove it and add it again to be asked.`;
+      state.className = "warn";
+    });
     const actions = row.insertCell();
     const remove = document.createElement("button");
     remove.type = "button";
@@ -233,9 +253,21 @@ async function init(): Promise<void> {
   });
   renderNever();
 
+  // What the browser will call this host when a page from it is open: punycode for a non-ASCII name,
+  // no port, no path. A rule stored under anything else can never match and looks active forever.
+  function normalizeHost(value: string): string {
+    const raw = value.trim().replace(/^[a-z]+:\/\//i, "").replace(/\/.*$/, "");
+    if (!raw) return "";
+    try {
+      return new URL(`https://${raw}`).hostname;
+    } catch {
+      return raw.toLowerCase().replace(/:\d+$/, "");
+    }
+  }
+
   $("rule-add").addEventListener("click", () => {
     const input = $<HTMLInputElement>("rule-host");
-    const host = input.value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const host = normalizeHost(input.value);
     if (!host) {
       toast("Enter a host name first", "error");
       return;

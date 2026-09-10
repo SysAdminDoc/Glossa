@@ -175,14 +175,19 @@ async function translatePage(
     // A second click while a page is translated switches nothing; restore first.
     return;
   }
+  // Claim the page before the first await. Detection can take a round trip, and a second command
+  // arriving inside that window would otherwise start a whole second pass over the same blocks.
+  controller.state.translating = true;
   // An automatic translation can arrive before the first detection has come back.
   if (!command.sourceLanguage && !controller.state.detectedLanguage) await detect(controller);
   const source = command.sourceLanguage ?? controller.state.detectedLanguage;
   if (!source) {
+    controller.state.translating = false;
     controller.state.lastError = "Could not detect the page language";
     return;
   }
   if (source === command.targetLanguage) {
+    controller.state.translating = false;
     controller.state.lastError = `The page is already in ${command.targetLanguage}`;
     return;
   }

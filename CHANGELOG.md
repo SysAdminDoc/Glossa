@@ -21,6 +21,12 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - Firefox: when the model hosts are not allowed, the popup says so and offers a button that asks for them. Downloads work straight after, with no reload. This is what you see if you switch those hosts off in `about:addons`.
 
 ### Fixed
+- The engine no longer shuts itself down in the middle of a translation. A first translation that spends more than fifteen seconds downloading and loading a model used to be killed by its own idle timer and left the extension unable to translate anything until the browser restarted.
+- Pages in Japanese, Chinese, Korean, Hindi, Thai and Arabic are detected again. Measuring "enough text to judge" in letters made every one of those scripts look like an empty page, which fell back to whatever the page's own `lang` said and, on a page built from an English template, blocked translation entirely.
+- A language chosen by hand no longer overrides a confident detection, so a host that serves several languages is not stuck on whichever one was chosen first, and picking "Detect automatically" clears the choice again.
+- An "always" site rule uses the language chosen for that site.
+- A site rule typed with a port or a non-ASCII name is stored the way the browser spells it, so it actually matches, and a rule that is waiting for site access says so in the table.
+- The second engine crash on a page is recovered like the first instead of abandoning the rest of the page.
 - The permission notice appeared in the popup for everyone, including people who had already allowed the model hosts. A stylesheet rule was overriding the attribute that hides it.
 
 ## [0.2.0] - 2026-09-10

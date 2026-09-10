@@ -409,6 +409,11 @@ try {
   assert(remembered === "es", `the manual language choice was not remembered (got "${remembered}")`);
   await numbersPopupAgain.close();
   await numbers.close();
+  // Every fixture shares this host, so the remembered choice cannot be left behind.
+  await worker.evaluate(async () => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, sourceLanguages: {} } });
+  });
 
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a

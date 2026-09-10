@@ -35,7 +35,7 @@ const ENGINE_IDLE_MS = 15_000;
 // A WebAssembly module whose body is `(module (func (result v128) (v128.const i32x4 0 0 0 0)))`.
 // It compiles only where SIMD is available, which is what the engine needs and what a pre-SSE4.1
 // desktop CPU, a 32-bit ARM phone, or a browser with its WASM optimiser switched off does not have.
-const SIMD_PROBE = new Uint8Array([
+export const SIMD_PROBE = new Uint8Array([
   0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7b, 0x03,
   0x02, 0x01, 0x00, 0x0a, 0x16, 0x01, 0x14, 0x00, 0xfd, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b
@@ -76,8 +76,11 @@ export class EngineHost {
   // brings the current value with it.
   private catalogMaxAgeMs = DEFAULT_CATALOG_MAX_AGE_MS;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  // Set when the worker dies so the next request starts a fresh one instead of failing forever.
-  private restarts = 0;
+  // How many requests are being served right now. The engine is never taken down while this is
+  // above zero: the first translation of a session downloads, verifies, decompresses and loads tens
+  // of megabytes, which takes far longer than the idle timeout, and tearing that down mid-flight
+  // used to leave the host permanently stuck.
+  private busy = 0;
 
   async handle(request: EngineRequest): Promise<unknown> {
     // Which catalog records count depends on the platform and on whether the user asked for the
@@ -89,6 +92,16 @@ export class EngineHost {
     if (typeof request.catalogMaxAgeMs === "number" && request.catalogMaxAgeMs > 0) {
       this.catalogMaxAgeMs = request.catalogMaxAgeMs;
     }
+    this.busy++;
+    try {
+      return await this.dispatch(request, environment);
+    } finally {
+      this.busy--;
+      this.keepAlive();
+    }
+  }
+
+  private async dispatch(request: EngineRequest, environment: CatalogEnvironment): Promise<unknown> {
     switch (request.type) {
       case "ping":
         return { alive: true, engineLoaded: this.worker !== null };
@@ -123,34 +136,41 @@ export class EngineHost {
     fragments: string[],
     environment?: CatalogEnvironment
   ) {
-    this.keepAlive();
     // One request at a time: Bergamot blocks the worker thread for the whole batch. A batch that
     // dies with the worker is tried once more on the restarted one; Bergamot aborts the whole
     // service on a parse error it cannot recover from, and one bad block should not end the page.
+    // The budget is per batch, not per host: the third block on a page deserves the same chance to
+    // recover as the first.
     const run = this.queue.then(async () => {
-      try {
-        const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
-        return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
-      } catch (error) {
-        if (!this.worker && this.restarts < MAX_RESTARTS) {
-          this.restarts++;
+      let restarts = 0;
+      for (;;) {
+        const workerBefore = this.worker;
+        try {
           const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
           return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
+        } catch (error) {
+          // Only a worker that actually died is worth restarting for. A missing model or an
+          // unsupported processor fails the same way however many times it is asked.
+          const workerDied = workerBefore !== null && this.worker === null;
+          if (!workerDied || restarts >= MAX_RESTARTS) throw error;
+          restarts++;
         }
-        throw error;
-      } finally {
-        this.keepAlive();
       }
     });
     this.queue = run.catch(() => undefined);
     return run as Promise<{ fragments: string[]; inferenceMs: number }>;
   }
 
-  // Hold the engine open while work is arriving, and let it go when it stops.
+  // Hold the engine open while work is arriving, and let it go when it stops. A timer that fires
+  // while something is still in flight arms itself again rather than pulling the floor out.
   private keepAlive(): void {
     if (this.idleTimer !== null) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
+      if (this.busy > 0) {
+        this.keepAlive();
+        return;
+      }
       void this.shutdown();
     }, ENGINE_IDLE_MS);
   }
@@ -166,8 +186,13 @@ export class EngineHost {
     this.worker = null;
     this.workerReady = null;
     this.loadedRoutes.clear();
+    // Anything still waiting on the worker has to be told, or its caller waits for an answer that
+    // can never come and the queue behind it never moves again.
+    const stopped = new Error("The translation engine was shut down");
+    for (const pending of this.pending.values()) pending.reject(stopped);
     this.pending.clear();
-    this.restarts = 0;
+    this.routeLoads.clear();
+    this.queue = Promise.resolve();
     // On Chrome the host runs inside an offscreen document that would otherwise live until the
     // browser exits. That document has no access to chrome.offscreen (only chrome.runtime), so it
     // closes itself: offscreen.ts passes window.close as this hook. Firefox needs none of it.

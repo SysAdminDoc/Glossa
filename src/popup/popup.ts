@@ -46,9 +46,16 @@ let pageHost: string | null = null;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
 
-function setStatus(text: string, tone: "" | "ok" | "warn" | "error" = ""): void {
+// Set once the engine reports it cannot run here. Nothing else may write over that: a status line
+// saying "model ready" under a button saying "not supported on this computer" is a contradiction,
+// and the reason the user cannot translate is the part they need.
+let statusLocked = false;
+
+function setStatus(text: string, tone: "" | "ok" | "warn" | "error" = "", lock = false): void {
+  if (statusLocked && !lock) return;
   statusLine.textContent = text;
   statusLine.className = `status ${tone}`.trim();
+  if (lock) statusLocked = true;
 }
 
 function fillLanguages(select: HTMLSelectElement, codes: string[], selected: string | null, includeUnknown: boolean): void {
@@ -213,14 +220,15 @@ async function loadPage(): Promise<void> {
   if (response.page.injected) {
     page = response.page;
     route = response.route;
-    // A language the user picked for this host beats a fresh guess.
+    // A language the user picked for this host beats a guess, but not a confident detection: a host
+    // that serves several languages would otherwise be stuck on whichever one was chosen first.
     const remembered = pageHost ? (await loadSettings()).sourceLanguages[pageHost] : undefined;
-    const preferred = remembered ?? page.detectedLanguage;
+    const preferred = page.confident ? (page.detectedLanguage ?? remembered) : (remembered ?? page.detectedLanguage);
     if (preferred && sourceSelect.value === "") {
       sourceSelect.value = preferred;
       if (sourceSelect.value !== preferred) sourceSelect.value = "";
     }
-    if (remembered && !page.confident) {
+    if (remembered && preferred === remembered && remembered !== page.detectedLanguage) {
       setStatus(`Using ${languageName(remembered)}, the language you chose for this site.`);
     }
     if (blocked) {
@@ -325,7 +333,8 @@ async function init(): Promise<void> {
     if (!engineSupported) {
       setStatus(
         "This computer's processor lacks the SIMD instructions the engine needs, so Glossa cannot translate here.",
-        "error"
+        "error",
+        true
       );
     }
     if (models.targets.length > 0) codes = Array.from(new Set([...models.sources, ...models.targets]));
@@ -367,10 +376,15 @@ async function init(): Promise<void> {
 
   sourceSelect.addEventListener("change", () => {
     // Remember the choice for this host: the detector will make the same mistake next time.
-    if (pageHost && sourceSelect.value) {
-      void loadSettings().then((current) =>
-        saveSettings({ sourceLanguages: { ...current.sourceLanguages, [pageHost as string]: sourceSelect.value } })
-      );
+    // Choosing "Detect automatically" is how that choice is taken back, so it clears the entry.
+    const host = pageHost;
+    if (host) {
+      void loadSettings().then((current) => {
+        const next = { ...current.sourceLanguages };
+        if (sourceSelect.value) next[host] = sourceSelect.value;
+        else delete next[host];
+        return saveSettings({ sourceLanguages: next });
+      });
     }
     void refreshRoute();
   });
