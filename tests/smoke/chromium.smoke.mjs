@@ -415,6 +415,59 @@ try {
     await chrome.storage.local.set({ settings: { ...stored.settings, sourceLanguages: {} } });
   });
 
+  // The selection offer is off by default, and stays off until the setting is on.
+  await page.evaluate(() => {
+    const target = document.getElementById("brand");
+    const range = document.createRange();
+    range.selectNodeContents(target.firstChild);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.waitForTimeout(600);
+  assert(
+    (await page.$(".glossa-selection-button")) === null,
+    "a selection offered a button while the setting was off"
+  );
+
+  await worker.evaluate(async () => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, selectionPopup: true } });
+  });
+  await page.evaluate(() => {
+    const target = document.getElementById("brand");
+    const range = document.createRange();
+    range.selectNodeContents(target.firstChild);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.waitForSelector(".glossa-selection-button", { timeout: 10_000 });
+  const offer = await page.$eval(".glossa-selection-button", (button) => {
+    const rect = button.getBoundingClientRect();
+    return { text: button.textContent ?? "", height: rect.height, parentIsRoot: button.parentElement === document.documentElement };
+  });
+  console.info(`smoke: selection offer reads "${offer.text}"`);
+  assert(offer.height >= 24, `the selection offer is ${offer.height} px tall`);
+  assert(offer.parentIsRoot, "the selection offer was inserted into the page's own content");
+  await page.click(".glossa-selection-button");
+  await page.waitForFunction(
+    () => {
+      const body = document.querySelector(".glossa-popover-body");
+      return body && body.textContent && !body.textContent.includes("…");
+    },
+    null,
+    { timeout: 120_000 }
+  );
+  const fromOffer = await page.$eval(".glossa-popover-body", (body) => body.textContent ?? "");
+  console.info(`smoke: the offer translated: ${fromOffer.trim().slice(0, 50)}`);
+  assert(fromOffer.trim().length > 0, "the selection offer produced nothing");
+  await page.keyboard.press("Escape");
+  await worker.evaluate(async () => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, selectionPopup: false } });
+  });
+
   // The selection popover floats over the page, so it has to behave: dismissible with Escape, a
   // close target big enough to hit, clear of the text it explains, and outside any editor.
   await page.evaluate(() => {

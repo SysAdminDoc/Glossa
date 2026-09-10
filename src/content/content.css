@@ -75,3 +75,25 @@ glossa-translation.glossa-t.glossa-inline {
 .glossa-popover-close:hover {
   background: #45475a;
 }
+
+/* The offer that appears next to a selection when that setting is on. Same 24 px minimum as the
+   popover's close control, and it never takes focus away from the selection it belongs to. */
+.glossa-selection-button {
+  position: fixed;
+  z-index: 2147483647;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid #585b70;
+  border-radius: 8px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font: 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.glossa-selection-button:hover {
+  border-color: #7c6cf2;
+}

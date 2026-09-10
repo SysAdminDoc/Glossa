@@ -1,5 +1,6 @@
 import { api } from "../shared/api.ts";
 import { normalizeLanguageTag } from "../shared/catalog.ts";
+import { loadSettings, SETTINGS_KEY, type Settings } from "../shared/settings.ts";
 import type {
   DetectRequest,
   DetectResponse,
@@ -28,6 +29,8 @@ import {
 
 const INJECT_FLAG = "glossaInjected";
 const OBSERVER_DEBOUNCE_MS = 250;
+// Long enough that dragging a selection does not flash a button at every character.
+const SELECTION_DEBOUNCE_MS = 250;
 
 // Attributes worth reacting to. `hidden`, `open`, `translate`, `lang` and `aria-hidden` change
 // whether a block should be translated at all; `class` and `style` only ever trigger a re-check of
@@ -60,6 +63,10 @@ interface Controller {
   // Per-language answer to "is there a model for this on disk", so a page with three quoted
   // languages asks once each.
   routes: Map<string, boolean>;
+  // The user's settings, read here because the selection button has to work before anything has
+  // been translated. Kept current through storage changes rather than needing a reload.
+  settings: Settings | null;
+  selectionTimer: number | null;
 }
 
 function boot(): void {
@@ -92,7 +99,9 @@ function boot(): void {
     source: null,
     target: null,
     skipFormFields: true,
-    routes: new Map()
+    routes: new Map(),
+    settings: null,
+    selectionTimer: null
   };
 
   api.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (value: unknown) => void) => {
@@ -107,6 +116,7 @@ function boot(): void {
 
   // Detect early so the popup can show the page language before anything is translated.
   void detect(controller);
+  void watchSelection(controller);
 }
 
 async function handleCommand(controller: Controller, command: PageCommand): Promise<PageState> {
@@ -582,6 +592,65 @@ function report(controller: Controller): void {
 }
 
 // ---- selection ----
+
+// Offering a translation for every selection is the most complained-about behaviour in this whole
+// category of extension, so it is off by default. When it is on, the offer is a button next to the
+// selection: nothing is sent anywhere until it is pressed.
+async function watchSelection(controller: Controller): Promise<void> {
+  try {
+    controller.settings = await loadSettings();
+  } catch {
+    return;
+  }
+  api.storage.onChanged.addListener((changes, area) => {
+    const stored = area === "local" ? changes[SETTINGS_KEY]?.newValue : undefined;
+    if (stored) controller.settings = stored as Settings;
+    if (controller.settings?.selectionPopup !== true) removeSelectionButton();
+  });
+  document.addEventListener("selectionchange", () => {
+    if (controller.selectionTimer !== null) window.clearTimeout(controller.selectionTimer);
+    controller.selectionTimer = window.setTimeout(() => {
+      controller.selectionTimer = null;
+      offerSelection(controller);
+    }, SELECTION_DEBOUNCE_MS);
+  });
+}
+
+const SELECTION_BUTTON_CLASS = "glossa-selection-button";
+
+function removeSelectionButton(): void {
+  document.querySelector(`.${SELECTION_BUTTON_CLASS}`)?.remove();
+}
+
+function offerSelection(controller: Controller): void {
+  const settings = controller.settings;
+  if (!settings?.selectionPopup) return;
+  removeSelectionButton();
+  const selection = window.getSelection();
+  const text = selection?.toString().trim() ?? "";
+  if (!selection || selection.rangeCount === 0 || text.length < 2) return;
+  const range = selection.getRangeAt(0);
+  // A selection inside Glossa's own popover is not something to offer a translation of.
+  if (isOurs(range.commonAncestorContainer)) return;
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = SELECTION_BUTTON_CLASS;
+  button.setAttribute("translate", "no");
+  button.textContent = `Translate to ${settings.targetLanguage.toUpperCase()}`;
+  button.title = "Translate the selected text with Glossa";
+  // Pressing the button must not take the selection away before it can be read.
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  button.addEventListener("click", () => {
+    removeSelectionButton();
+    void translateSelection(controller, settings.targetLanguage);
+  });
+  button.style.top = `${Math.min(window.innerHeight - 40, Math.max(8, rect.bottom + 6))}px`;
+  button.style.left = `${Math.min(window.innerWidth - 180, Math.max(8, rect.left))}px`;
+  document.documentElement.append(button);
+}
 
 async function translateSelection(controller: Controller, target: string): Promise<void> {
   const selection = window.getSelection();

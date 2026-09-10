@@ -20,13 +20,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
   Acceptance: an "Engine" setting with Bergamot as default; choosing Chrome built-in translates a page with no request to the Mozilla hosts; Firefox hides the option.
   Complexity: M
 
-- [ ] G-07 — Selection popup when the setting is on
-  Why: the setting exists and does nothing yet. It stays off by default because popups on every selection are the most cited irritant in competitor reviews.
-  Evidence: src/shared/settings.ts `selectionPopup`; research pass community section.
-  Touches: src/content/content.ts (selectionchange listener, small trigger button near the selection, reuses the popover)
-  Acceptance: with the setting on, selecting text on an injected page shows a small button; clicking it translates the selection in the popover; with the setting off nothing appears.
-  Complexity: S
-
 - [ ] G-08 — Input field translation
   Why: composing in your language and sending in theirs is a top-five request across trackers.
   Evidence: research pass; kiss-translator and immersive-translate both ship it.
