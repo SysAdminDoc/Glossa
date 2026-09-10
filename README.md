@@ -93,6 +93,8 @@ npm run build           # writes dist/chrome, dist/firefox, and one ZIP per targ
 
 `npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way. If your firewall blocks outbound traffic per binary, point the smoke at a Chromium build it does allow with `GLOSSA_CHROMIUM_PATH`.
 
+`npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
+
 `npm run bump 0.3.0` moves every version string and dates the changelog heading. `npm run release`
 builds the artifacts with their SHA-256 sidecars and a CRX; `npm run release:publish` also tags the
 commit and creates the GitHub release. The CRX signing key is generated into a gitignored

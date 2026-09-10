@@ -23,6 +23,7 @@
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "smoke": "node tools/build.mjs --smoke && node tests/smoke/chromium.smoke.mjs",
     "smoke:firefox": "node tools/build.mjs --smoke && python tests/smoke/firefox.smoke.py",
+    "smoke:a11y": "node tools/build.mjs --smoke && node tests/smoke/a11y.smoke.mjs",
     "screenshots": "node tools/build.mjs --smoke && node tools/screenshots.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "bump": "node tools/bump.mjs",
@@ -34,6 +35,7 @@
   },
   "devDependencies": {
     "@types/chrome": "0.2.9",
+    "axe-core": "^4.13.0",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",
     "globals": "17.11.0",

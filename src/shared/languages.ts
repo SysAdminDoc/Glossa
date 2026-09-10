@@ -62,6 +62,14 @@ const NAMES: Record<string, string> = {
   "zh-Hant": "Chinese (Traditional)"
 };
 
+// Languages in the catalog written right to left. A translation block that does not say so renders
+// its punctuation in the wrong place and reads wrongly to a screen reader (WCAG 1.3.1).
+const RTL = new Set(["ar", "fa", "he", "ur"]);
+
+export function isRtlLanguage(code: string): boolean {
+  return RTL.has(code.toLowerCase().split(/[-_]/)[0] ?? "");
+}
+
 export function languageName(code: string): string {
   return NAMES[code] ?? code;
 }

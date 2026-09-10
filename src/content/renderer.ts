@@ -10,6 +10,7 @@ import {
   type Hold,
   type Segment
 } from "./segmenter.ts";
+import { isRtlLanguage } from "../shared/languages.ts";
 import type { DisplayMode } from "../shared/settings.ts";
 
 // Applies translated fragments back to the page and remembers enough to undo it without a reload.
@@ -32,9 +33,10 @@ interface ElementRecord {
   reused: Array<{ element: Element; children: Node[] }>;
   addedTitle: boolean;
   previousTitle: string | null;
-  // A page that labels its own elements keeps its attribute through translate and restore, so the
-  // value we found is put back rather than removed.
+  // A page that labels its own elements keeps its attributes through translate and restore, so the
+  // values we found are put back rather than removed.
   previousLang: string | null;
+  previousDir: string | null;
   appended: Element | null;
 }
 
@@ -132,11 +134,12 @@ export class Renderer {
     if (bilingual) {
       const block = document.createElement(TRANSLATION_TAG.toLowerCase());
       block.className = TRANSLATION_CLASS;
-      block.setAttribute("lang", options.targetLanguage);
+      labelLanguage(block, options.targetLanguage);
       block.append(...nodes);
       // The original stays where it is in this mode, so the translation is a copy and the page's
       // numbering has no meaning inside it.
       clearIds(block);
+      hideDuplicateFromScreenReaders(block);
       ensureShadowStyle(element);
       element.append(block);
       element.setAttribute(UNIT_ATTRIBUTE, "bilingual");
@@ -148,6 +151,7 @@ export class Renderer {
         addedTitle: false,
         previousTitle: null,
         previousLang: element.getAttribute("lang"),
+        previousDir: element.getAttribute("dir"),
         appended: block
       });
       return applied;
@@ -168,8 +172,19 @@ export class Renderer {
     }
     element.setAttribute(UNIT_ATTRIBUTE, "replaced");
     const previousLang = element.getAttribute("lang");
-    element.setAttribute("lang", options.targetLanguage);
-    this.records.push({ kind: "element", element, originalChildren, reused, addedTitle, previousTitle, previousLang, appended: null });
+    const previousDir = element.getAttribute("dir");
+    labelLanguage(element, options.targetLanguage);
+    this.records.push({
+      kind: "element",
+      element,
+      originalChildren,
+      reused,
+      addedTitle,
+      previousTitle,
+      previousLang,
+      previousDir,
+      appended: null
+    });
     return applied;
   }
 
@@ -181,8 +196,9 @@ export class Renderer {
     if (bilingual) {
       const inline = document.createElement(TRANSLATION_TAG.toLowerCase());
       inline.className = `${TRANSLATION_CLASS} glossa-inline`;
-      inline.setAttribute("lang", options.targetLanguage);
+      labelLanguage(inline, options.targetLanguage);
       inline.textContent = translated;
+      hideDuplicateFromScreenReaders(inline);
       ensureShadowStyle(node);
       node.after(inline);
       this.records.push({ kind: "text", node, originalData: node.data, appended: inline });
@@ -212,6 +228,8 @@ export class Renderer {
         // for translation again.
         if (record.previousLang === null) record.element.removeAttribute("lang");
         else record.element.setAttribute("lang", record.previousLang);
+        if (record.previousDir === null) record.element.removeAttribute("dir");
+        else record.element.setAttribute("dir", record.previousDir);
       }
       this.records.splice(index, 1);
       dropped = true;
@@ -248,6 +266,8 @@ export class Renderer {
       element.removeAttribute(UNIT_ATTRIBUTE);
       if (record.previousLang === null) element.removeAttribute("lang");
       else element.setAttribute("lang", record.previousLang);
+      if (record.previousDir === null) element.removeAttribute("dir");
+      else element.setAttribute("dir", record.previousDir);
       restored++;
     }
     this.records.length = 0;
@@ -305,6 +325,23 @@ function mergeLiveElements(
   };
   visit(fragment);
   return { nodes: Array.from(fragment.childNodes), reused };
+}
+
+// Two languages in one document have to be distinguishable to anything reading it, which is what
+// WCAG 3.1.2 asks for, and a right-to-left translation inside a left-to-right page needs to say so
+// or its punctuation lands at the wrong end.
+function labelLanguage(element: Element, language: string): void {
+  element.setAttribute("lang", language);
+  element.setAttribute("dir", isRtlLanguage(language) ? "rtl" : "ltr");
+}
+
+// In bilingual mode the page says everything twice, and a screen reader reads it twice. The added
+// copy is the one to take out of the accessibility tree, but only when it holds nothing focusable:
+// aria-hidden does not remove anything from the tab order, so hiding a block with a link in it
+// leaves a focusable element that announces as nothing at all.
+function hideDuplicateFromScreenReaders(block: Element): void {
+  const focusable = block.querySelector("a[href], button, input, select, textarea, [tabindex], [contenteditable]");
+  if (!focusable) block.setAttribute("aria-hidden", "true");
 }
 
 function wantsBilingual(element: Element, text: string): boolean {

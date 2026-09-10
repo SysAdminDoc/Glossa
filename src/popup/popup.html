@@ -8,11 +8,11 @@
   <body>
     <header class="top">
       <img class="logo" src="icons/icon-32.png" alt="" width="20" height="20" />
-      <span class="brand">Glossa</span>
+      <h1 class="brand">Glossa</h1>
       <span class="version" id="version"></span>
     </header>
 
-    <section class="card" id="page-card">
+    <main class="card" id="page-card">
       <div class="row">
         <span class="label">Page language</span>
         <select id="source" class="select" aria-label="Page language"></select>
@@ -22,8 +22,8 @@
         <select id="target" class="select" aria-label="Target language"></select>
       </div>
       <div class="row modes" role="group" aria-label="Display mode">
-        <button type="button" class="mode" data-mode="bilingual" id="mode-bilingual">Below original</button>
-        <button type="button" class="mode" data-mode="replace" id="mode-replace">Replace</button>
+        <button type="button" class="mode" data-mode="bilingual" id="mode-bilingual" aria-pressed="true">Below original</button>
+        <button type="button" class="mode" data-mode="replace" id="mode-replace" aria-pressed="false">Replace</button>
       </div>
       <div class="row grant" id="grant-row" hidden>
         <p class="grant-text" id="grant-text">Glossa needs permission to reach Mozilla's model hosts before it can download a language.</p>
@@ -31,11 +31,13 @@
       </div>
       <button type="button" class="primary" id="action" disabled>Checking page…</button>
       <div class="progress" id="progress" hidden>
-        <div class="bar"><div class="fill" id="progress-fill"></div></div>
+        <div class="bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="progress-text">
+          <div class="fill" id="progress-fill"></div>
+        </div>
         <div class="progress-text" id="progress-text"></div>
       </div>
-      <p class="status" id="status"></p>
-    </section>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </main>
 
     <footer class="foot">
       <span class="privacy">Runs on this device. No page text leaves your browser.</span>

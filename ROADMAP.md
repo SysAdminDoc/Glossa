@@ -116,13 +116,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on a 500-paragraph fixture the visible paragraphs are translated before any off-screen one and scrolling re-prioritises; a hidden tab issues no engine calls until shown.
   Complexity: L
 
-- [ ] P1 — G-30 — Accessibility of bilingual output
-  Why: two languages in one document must be programmatically distinguishable (WCAG 3.1.2); inserted blocks carry `lang` but not `dir`; duplicated links inside translation blocks read twice to screen readers; the popup status and progress are not announced.
-  Evidence: WCAG 3.1.2 and 1.3.1; Bugzilla 1901177 (Gecko a11y cache ignores `lang` changes, so also set `dir` and keep tags minimal), 1902352 (announce first result, not completion); NVDA subtag handling; `popup.html` progress bar has no `role`, mode buttons no `aria-pressed`.
-  Touches: src/content/renderer.ts (`dir` from the target language, walk to `li`/`td` ancestors like Firefox L3310; `aria-hidden` only on translation blocks with no focusable descendants), src/popup/popup.html and popup.ts (`role="progressbar"` with `aria-valuenow`, `aria-live="polite"` on the status line, `aria-pressed` on mode buttons), tests (axe run on popup and options)
-  Acceptance: an axe pass on popup and options reports no violations; every `glossa-translation` element has `lang` and `dir`; a screen-reader transcript of the fixture does not read link text twice.
-  Complexity: M
-
 - [ ] P1 — G-31 — Selection popover meets WCAG hover and target rules and never lands inside an editor
   Why: the popover cannot be dismissed with Esc, its close target is under 24 px, it can cover the selection it explains, and it is appended to the document root without checking editors.
   Evidence: WCAG 1.4.13, 2.5.8, 2.4.11; linguist #344 (focus stolen from the selection); simple-translate #342 (popup saved into TinyMCE content); `content.ts` `showPopover`.

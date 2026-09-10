@@ -161,12 +161,16 @@ function showProgress(fraction: number | null, text: string): void {
   const box = $("progress");
   const fill = $("progress-fill");
   box.hidden = false;
+  const bar = $("progress-bar");
   if (fraction === null) {
     fill.classList.add("indeterminate");
     fill.style.width = "";
+    bar.removeAttribute("aria-valuenow");
   } else {
+    const percent = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
     fill.classList.remove("indeterminate");
-    fill.style.width = `${Math.round(fraction * 100)}%`;
+    fill.style.width = `${percent}%`;
+    bar.setAttribute("aria-valuenow", String(percent));
   }
   $("progress-text").textContent = text;
 }

@@ -23,6 +23,7 @@ const targetSelect = $<HTMLSelectElement>("target");
 const actionButton = $<HTMLButtonElement>("action");
 const statusLine = $<HTMLParagraphElement>("status");
 const progressBox = $<HTMLDivElement>("progress");
+const progressBar = $<HTMLDivElement>("progress-bar");
 const progressFill = $<HTMLDivElement>("progress-fill");
 const progressText = $<HTMLDivElement>("progress-text");
 const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".mode"));
@@ -75,7 +76,9 @@ function fillLanguages(select: HTMLSelectElement, codes: string[], selected: str
 function setMode(mode: DisplayMode): void {
   displayMode = mode;
   for (const button of modeButtons) {
-    button.classList.toggle("active", button.dataset["mode"] === mode);
+    const active = button.dataset["mode"] === mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
   }
 }
 
@@ -84,9 +87,12 @@ function showProgress(fraction: number | null, text: string): void {
   if (fraction === null) {
     progressFill.classList.add("indeterminate");
     progressFill.style.width = "";
+    progressBar.removeAttribute("aria-valuenow");
   } else {
+    const percent = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
     progressFill.classList.remove("indeterminate");
-    progressFill.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+    progressFill.style.width = `${percent}%`;
+    progressBar.setAttribute("aria-valuenow", String(percent));
   }
   progressText.textContent = text;
 }

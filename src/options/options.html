@@ -39,7 +39,7 @@
         <p class="hint">Pages in these languages are never offered for translation.</p>
         <div class="chips" id="never-chips"></div>
         <div class="inline-form">
-          <select id="never-add"></select>
+          <select id="never-add" aria-label="Language you read"></select>
           <button type="button" class="btn" id="never-add-btn">Add</button>
         </div>
       </section>
@@ -53,7 +53,7 @@
         </table>
         <div class="inline-form">
           <input type="text" id="rule-host" placeholder="example.com" />
-          <select id="rule-kind"><option value="never">Never</option><option value="always">Always</option></select>
+          <select id="rule-kind" aria-label="What to do on this site"><option value="never">Never</option><option value="always">Always</option></select>
           <button type="button" class="btn" id="rule-add">Add</button>
         </div>
       </section>
@@ -71,13 +71,15 @@
           <tbody></tbody>
         </table>
         <div class="inline-form">
-          <select id="install-from"></select>
+          <select id="install-from" aria-label="Download from language"></select>
           <span class="arrow">→</span>
-          <select id="install-to"></select>
+          <select id="install-to" aria-label="Download to language"></select>
           <button type="button" class="btn" id="install">Download</button>
         </div>
         <div class="progress" id="progress" hidden>
-          <div class="bar"><div class="fill" id="progress-fill"></div></div>
+          <div class="bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="progress-text">
+            <div class="fill" id="progress-fill"></div>
+          </div>
           <div class="progress-text" id="progress-text"></div>
           <button type="button" class="btn small" id="cancel-download">Cancel download</button>
         </div>
@@ -98,7 +100,7 @@
       </section>
     </main>
 
-    <div class="toast" id="toast" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <script src="options.js"></script>
   </body>
 </html>

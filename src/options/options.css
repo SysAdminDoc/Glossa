@@ -8,6 +8,7 @@
   --muted: #a6adc8;
   --accent: #7c6cf2;
   --accent-2: #b4befe;
+  --on-accent: #11111b;
   --ok: #a6e3a1;
   --warn: #f9e2af;
   --error: #f38ba8;
@@ -31,6 +32,7 @@
     --muted: #5c5f77;
     --accent: #6a5ae0;
     --accent-2: #4c3fc7;
+    --on-accent: #ffffff;
     --ok: #2f8f4e;
     --warn: #a56a00;
     --error: #c23b5e;
@@ -132,7 +134,9 @@ select, input[type="text"] {
 
 .segmented button.active {
   background: var(--accent);
-  color: #11111b;
+  /* Dark ink on the dark theme's lighter accent, white on the light theme's deeper one. Either way
+     round the pair falls below 4.5:1, which is what an axe run reports. */
+  color: var(--on-accent);
 }
 
 .check {
