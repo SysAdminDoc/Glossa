@@ -275,21 +275,7 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on the 500-paragraph fixture the first visible sentence renders before the batch completes, measured in the smoke.
   Complexity: M
 
-- [ ] P2 — G-44 — README honesty: speed and quality gaps, hardware floor
-  Why: users comparing with Firefox's built-in translator will find Glossa slower (no `mozIntGemm`, no threads) and comparing with Google will find it less accurate; neither is mentioned.
-  Evidence: `WasmFeatures.cpp` `IsPrivilegedContext`; Bugzilla 1673477; Mozilla eval DB means; bergamot #418 SIMD requirement.
-  Touches: README.md ("What to expect" section), docs/store texts from G-35
-  Acceptance: README states the SSE4.1 or arm64 requirement, the expected slowdown versus Firefox built-in, and the average quality gap with a link to Mozilla's dashboard.
-  Complexity: S
-
 ### P3
-
-- [ ] P3 — G-48 — Remove or write the missing catalog snapshot tool
-  Why: `package.json` has a `catalog:snapshot` script pointing at `tools/snapshot-catalog.mjs`, which does not exist, so the script fails for anyone who runs it. Either write the tool (a dated catalog snapshot would make the filter-expression tests reproducible offline) or drop the script.
-  Evidence: noticed 2026-09-10 while adding the `filter_expression` gate; `ls tools/` has no such file.
-  Touches: package.json, tools/
-  Acceptance: `npm run catalog:snapshot` either produces a snapshot file or the script is gone.
-  Complexity: S
 
 - [ ] P3 — G-45 — Main-content-first mode
   Why: Immersive Translate's most praised behaviour is translating the article body and leaving chrome alone; Readability.js is MPL-licensed and already shipped by Firefox and trialled by Chrome.

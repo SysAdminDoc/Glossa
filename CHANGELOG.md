@@ -2,7 +2,7 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
-## [Unreleased]
+## [0.2.0] - 2026-09-10
 
 ### Added
 - An option to offer Mozilla's prerelease language models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk), off by default because Firefox ships them to its nightly channel only.

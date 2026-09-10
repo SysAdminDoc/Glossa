@@ -7,7 +7,7 @@
 <p align="center">Translate web pages on your own device. No cloud, no account, no telemetry.</p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-7c6cf2" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-7c6cf2" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a6e3a1" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Chrome%20%7C%20Firefox-89b4fa" />
   <img alt="Engine" src="https://img.shields.io/badge/engine-Bergamot%20(MPL--2.0)-f9e2af" />
@@ -33,28 +33,53 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 
 - Translates a whole page, keeping the original in place and showing the translation under each block. A replace mode is one click away, with the original as a hover tooltip.
 - Detects the page language locally. You can override it.
-- Keeps inline links and formatting inside sentences, and leaves code blocks, brand names marked `translate="no"`, and form fields alone.
-- Follows content that arrives later, so infinite scroll and single-page apps get translated too. Open shadow roots are included.
+- Keeps inline links and formatting inside sentences, and leaves code blocks, brand names marked `translate="no"`, and form fields alone. Web addresses, email addresses and reference numbers come back exactly as they went in.
+- Follows content that arrives later, so infinite scroll and single-page apps get translated too. It notices revealed panels, text the page rewrites in place, and open shadow roots.
+- Handles a page written in more than one language. A quoted paragraph that declares its own `lang` is translated with that language's model, or left alone if you do not have it.
 - Restores the original page without a reload.
 - Translates a selection from the context menu.
+- Per-site rules. Turn Glossa off for a host and it will not even look at its pages. List the languages you read and those pages are never offered.
 - Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
 
 Coverage follows Firefox's catalog: about 60 languages, all pivoting through English. A Spanish to French translation therefore runs two models.
 
 ## Install
 
-Glossa is not in any store yet. Load it unpacked from a release ZIP or from a local build.
+Glossa is not in any store yet. Load it unpacked from a release ZIP or from a local build. Every
+release asset ships a `.sha256` sidecar, so you can check a download before you trust it.
 
-**Chrome, Edge, Brave, and other Chromium browsers**
+**Chrome, Edge, Brave, and other Chromium browsers** (Chrome 116 or newer)
 
 1. Download `glossa-chrome-vX.Y.Z.zip` from the [releases page](https://github.com/SysAdminDoc/Glossa/releases) and extract it to a folder you will keep. The browser loads the extension from that folder on every start.
 2. Open `chrome://extensions`, turn on Developer mode, click Load unpacked, and pick the folder.
 
-**Firefox**
+A `.crx` is attached as well, for anyone who would rather keep one file. Chromium refuses to install
+a self-signed CRX downloaded from the web, so the ZIP is the path that works.
+
+**Firefox** (Firefox 142 or newer)
 
 1. Download `glossa-firefox-vX.Y.Z.zip`.
 2. Open `about:debugging#/runtime/this-firefox`, click Load Temporary Add-on, and choose the ZIP. Temporary add-ons are removed when Firefox closes. A signed build for permanent installs is on the roadmap.
-3. Open `about:addons`, find Glossa, and on the Permissions tab allow access to the three Mozilla model hosts. Firefox treats host permissions as optional and a temporary add-on starts with none, so without this step model downloads fail. The popup will soon ask for this itself.
+3. Open the Glossa popup. Firefox treats host permissions as optional and a temporary add-on starts with none at all, so the popup shows an "Allow model downloads" button the first time. One click and downloads work, with no reload.
+
+## What to expect
+
+Two honest comparisons, because you will notice both.
+
+**Speed.** Glossa is slower than Firefox's own built-in translator on the same machine, and it always
+will be. Firefox runs the engine's matrix multiplication through `WebAssembly.mozIntGemm`, which is
+only available to privileged browser code, and it can use threads. An extension gets neither, so
+Glossa runs a single-threaded SIMD build. Expect a long article to take a few seconds rather than
+under one.
+
+**Quality.** These are Mozilla's models, and on Mozilla's own evaluation they average about 4 COMET22
+points below Google Translate across the 105 released pairs, and never come out ahead. Most pairs are
+close enough that you will not care. The weakest are English to Marathi, Hindi, Arabic, Telugu and
+Thai, and Marathi to English, where the gap is 7 to 9 points. Mozilla publishes the numbers at
+[mozilla.github.io/translations/final-evals](https://mozilla.github.io/translations/final-evals/).
+
+**Hardware.** The engine needs WebAssembly SIMD: any x86 CPU with SSE4.1 (Intel from 2008, AMD from
+2011) or a 64-bit ARM machine. It never shipped for 32-bit ARM, so old Android phones cannot run it.
 
 ## Build from source
 
@@ -66,7 +91,12 @@ npm run engine:fetch    # downloads the 5 MB Bergamot WASM binary and verifies b
 npm run build           # writes dist/chrome, dist/firefox, and one ZIP per target
 ```
 
-`npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way.
+`npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way. If your firewall blocks outbound traffic per binary, point the smoke at a Chromium build it does allow with `GLOSSA_CHROMIUM_PATH`.
+
+`npm run bump 0.3.0` moves every version string and dates the changelog heading. `npm run release`
+builds the artifacts with their SHA-256 sidecars and a CRX; `npm run release:publish` also tags the
+commit and creates the GitHub release. The CRX signing key is generated into a gitignored
+`glossa.pem` on first use, and keeping that file is what keeps the extension id stable.
 
 ## How it works
 

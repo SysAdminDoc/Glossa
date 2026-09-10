@@ -1,6 +1,6 @@
 {
   "name": "glossa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Private, on-device web page translation for Chrome and Firefox. No cloud, no account, no telemetry.",
@@ -16,7 +16,6 @@
   },
   "scripts": {
     "engine:fetch": "node tools/fetch-engine.mjs",
-    "catalog:snapshot": "node tools/snapshot-catalog.mjs",
     "icons": "node tools/icons.mjs",
     "build": "node tools/build.mjs",
     "typecheck": "tsc --noEmit",
@@ -25,7 +24,10 @@
     "smoke": "node tools/build.mjs --smoke && node tests/smoke/chromium.smoke.mjs",
     "smoke:firefox": "node tools/build.mjs --smoke && python tests/smoke/firefox.smoke.py",
     "screenshots": "node tools/build.mjs --smoke && node tools/screenshots.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "bump": "node tools/bump.mjs",
+    "release": "node tools/release.mjs",
+    "release:publish": "node tools/release.mjs --publish"
   },
   "dependencies": {
     "fzstd": "0.1.1"
