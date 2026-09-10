@@ -80,6 +80,8 @@ interface FetchPlan {
 }
 
 let plan: FetchPlan = { calls: [] };
+// When set, any request to Mozilla's attachment CDN answers with this status instead of bytes.
+let refuseCdnWith: number | null = null;
 
 globals.fetch = async (url: string, init?: { signal?: AbortSignal; headers?: Record<string, string> }) => {
   const range = init?.headers?.["range"];
@@ -88,6 +90,9 @@ globals.fetch = async (url: string, init?: { signal?: AbortSignal; headers?: Rec
     const error = new Error("aborted");
     error.name = "AbortError";
     throw error;
+  }
+  if (refuseCdnWith !== null && url.includes("firefox-settings-attachments")) {
+    return new FakeResponse(new Uint8Array(), refuseCdnWith);
   }
   if (url.includes("db/models.json")) {
     return new FakeResponse(
@@ -146,6 +151,14 @@ function pair() {
     version: "3.0",
     records: { model: record("model", "m1"), vocab: record("vocab", "v1") }
   };
+}
+
+// A store that has not been told anything about the CDN yet, so it tries the CDN first the way a
+// fresh install does.
+function freshStoreTryingCdn() {
+  caches_.clear();
+  plan = { calls: [] };
+  return new ModelStore();
 }
 
 function freshStore() {
@@ -219,4 +232,32 @@ test("resetting the byte source sends the next download back to the CDN", async 
   assert.equal(await store.activeSource(), "mozilla-gcs");
   await store.resetSource();
   assert.equal(await store.activeSource(), "mozilla-cdn");
+});
+
+test("a CDN that refuses this browser sends the download to the bucket, once", async () => {
+  const store = freshStoreTryingCdn();
+  // What Mozilla's attachment CDN answers to any user agent containing "Chrome".
+  refuseCdnWith = 406;
+  try {
+    await store.ensurePair(pair() as never, () => undefined);
+    const cdnCalls = plan.calls.filter((call) => call.url.includes("firefox-settings-attachments"));
+    const bucketCalls = plan.calls.filter((call) => call.url.includes("model.bin.gz") || call.url.includes("vocab.bin.gz"));
+    assert.equal(cdnCalls.length, 1, `the CDN was asked ${cdnCalls.length} times after refusing`);
+    assert.equal(bucketCalls.length, 2, "both files should have come from the bucket");
+    assert.equal(await store.activeSource(), "mozilla-gcs", "the refusal was not remembered");
+    assert.equal(await store.isPairInstalled(pair() as never), true);
+  } finally {
+    refuseCdnWith = null;
+  }
+});
+
+test("a CDN failure that is not a refusal is reported rather than silently rerouted", async () => {
+  const store = freshStoreTryingCdn();
+  refuseCdnWith = 500;
+  try {
+    await assert.rejects(store.ensurePair(pair() as never, () => undefined), /50\d/);
+    assert.equal(await store.activeSource(), "mozilla-cdn", "a server error was mistaken for a refusal");
+  } finally {
+    refuseCdnWith = null;
+  }
 });

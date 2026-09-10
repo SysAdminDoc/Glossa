@@ -28,6 +28,9 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
   <img src="docs/screenshots/popup-before.png" width="300" alt="The popup before translating, showing the download size" />
   <img src="docs/screenshots/popup-after.png" width="300" alt="The popup after translating" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/popup-light.png" width="300" alt="The popup in the light theme" />
+</p>
 
 ## What it does
 
@@ -93,7 +96,7 @@ npm run build           # writes dist/chrome, dist/firefox, and one ZIP per targ
 
 `npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way. If your firewall blocks outbound traffic per binary, point the smoke at a Chromium build it does allow with `GLOSSA_CHROMIUM_PATH`.
 
-`npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
+`npm run verify:release` runs everything: the checks above, both browser smokes and the axe pass. `GLOSSA_SMOKE_PIVOT=1` adds a Spanish to French run, which goes through English and downloads a second model. `npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
 
 `npm run bump 0.3.0` moves every version string and dates the changelog heading. `npm run release`
 builds the artifacts with their SHA-256 sidecars and a CRX; `npm run release:publish` also tags the

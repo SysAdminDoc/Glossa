@@ -26,6 +26,7 @@
     "smoke:a11y": "node tools/build.mjs --smoke && node tests/smoke/a11y.smoke.mjs",
     "screenshots": "node tools/build.mjs --smoke && node tools/screenshots.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "verify:release": "npm run verify && npm run smoke && npm run smoke:a11y && npm run smoke:firefox",
     "source:archive": "node tools/source-archive.mjs",
     "verify:source": "node tools/build.mjs && node tools/source-archive.mjs && node tools/verify-source.mjs",
     "bump": "node tools/bump.mjs",

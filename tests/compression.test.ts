@@ -13,7 +13,17 @@ test("decompressZstd round-trips a frame through the JS fallback", async () => {
   const output = await decompressZstd(compressed, original.byteLength);
   assert.equal(output.byteLength, original.byteLength);
   assert.deepEqual(Buffer.from(output).subarray(0, 24), Buffer.from(original).subarray(0, 24));
-  assert.equal(zstdBackend(), "fzstd");
+  // Which backend ran depends on the runtime, not on us: `DecompressionStream("zstd")` is not in
+  // the WHATWG standard, so Node and the browsers may add or drop it under this test at any time.
+  // Assert the agreement between the probe and the backend rather than a fixed answer.
+  let nativeZstd = false;
+  try {
+    new DecompressionStream("zstd" as CompressionFormat);
+    nativeZstd = true;
+  } catch {
+    nativeZstd = false;
+  }
+  assert.equal(zstdBackend(), nativeZstd ? "native" : "fzstd");
 });
 
 test("decompressZstd rejects a corrupt frame instead of returning garbage", async () => {

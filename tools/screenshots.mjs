@@ -72,12 +72,25 @@ try {
   await page.bringToFront();
   await page.screenshot({ path: path.join(outDir, "page-bilingual.png"), fullPage: false });
 
+  // The light theme is a media query, so it needs a page that says it prefers light. Both themes
+  // ship, and a screenshot of only one of them hides half of what a reader gets.
+  const light = await context.newPage();
+  await light.emulateMedia({ colorScheme: "light" });
+  await light.setViewportSize({ width: 344, height: 420 });
+  await light.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
+  await light.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
+  await light.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
+    timeout: 60_000
+  });
+  await light.screenshot({ path: path.join(outDir, "popup-light.png") });
+  await light.close();
+
   const options = await context.newPage();
   await options.setViewportSize({ width: 900, height: 1250 });
   await options.goto(`chrome-extension://${extensionId}/options.html`);
   await options.waitForFunction(() => (document.getElementById("catalog-status")?.textContent ?? "").includes("Catalog"), null, { timeout: 60_000 });
   await options.screenshot({ path: path.join(outDir, "options.png"), fullPage: true });
-  console.info(`screenshots: wrote 4 files to ${path.relative(root, outDir)}`);
+  console.info(`screenshots: wrote 5 files to ${path.relative(root, outDir)}`);
 } finally {
   await context.close();
   server.close();

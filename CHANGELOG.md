@@ -6,6 +6,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
 ### Added
 - Text that is not in the page's body is translated too: the tab title, tooltips, image descriptions, placeholders, aria labels and the labels of a dropdown. A dropdown keeps submitting the value it submitted before, and everything goes back exactly as it was when you show the original.
+- A light-theme screenshot in the README, since both themes ship.
 - Every release now carries a source archive, and the packages are byte-reproducible from it: the same source and the same commands produce ZIPs with the same SHA-256 as the published ones. `npm run verify:source` checks that by unpacking the archive and rebuilding.
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 

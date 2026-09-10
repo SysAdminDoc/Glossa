@@ -101,13 +101,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: switching the browser UI language to Spanish renders the popup and options in Spanish; a build with a missing key fails.
   Complexity: M
 
-- [ ] P1 — G-37 — Unit and smoke coverage for the engine path and the probe cases
-  Why: the model store's 406 fallback, hash-mismatch rejection and partial-download handling have no tests; the smoke never asserts the hidden reveal, a pivot route, replace mode, or Firefox; the compression test's `fzstd` assertion inverts once Node adds zstd to `DecompressionStream`.
-  Evidence: tests/ directory listing 2026-09-10; `tests/compression.test.ts` line asserting `zstdBackend() === "fzstd"`; local probe cases.
-  Touches: tests/model-store.test.ts (fake `fetch` and `caches`), tests/engine-host.test.ts (fake Worker), tests/smoke/chromium.smoke.mjs (probe fixture, es→fr pivot, replace mode, light-theme screenshot), package.json (`verify:release` runs both smokes), tests/compression.test.ts (assert against `"zstd" in` a DecompressionStream probe)
-  Acceptance: `npm run verify` covers the 406 fallback with a fake server; `npm run verify:release` runs both browser smokes and the probe fixture; the compression test passes regardless of native zstd support.
-  Complexity: M
-
 ### P2
 
 - [ ] P2 — G-38 — Normalise text before submission: soft hyphens, curly quotes, CJK punctuation spacing, edge whitespace

@@ -565,6 +565,47 @@ try {
   await page.waitForFunction(() => document.querySelector(".glossa-popover") === null, null, { timeout: 5_000 });
   console.info("smoke: Escape closed the popover");
 
+  // A pair with no direct model goes through English, which means two models and two passes inside
+  // the engine. It costs another model download, so it runs when asked for rather than every time.
+  if (process.env.GLOSSA_SMOKE_PIVOT === "1") {
+    // No site rule, or the new tab translates itself to English before the pivot test can ask for
+    // French.
+    await worker.evaluate(async () => {
+      const stored = await chrome.storage.local.get("settings");
+      await chrome.storage.local.set({ settings: { ...stored.settings, siteRules: {} } });
+    });
+    const pivotPage = await context.newPage();
+    await pivotPage.goto(`http://127.0.0.1:${port}/es.html`, { waitUntil: "load" });
+    // Several tabs share this URL by now, and query returns all of them: the new one is last.
+    const pivotTabId = await worker.evaluate(async (url) => {
+      const tabs = await chrome.tabs.query({ url });
+      return tabs[tabs.length - 1]?.id ?? null;
+    }, `http://127.0.0.1:${port}/es.html`);
+    assert(pivotTabId, "the pivot tab was not found");
+    const pivotPopup = await context.newPage();
+    await pivotPopup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${pivotTabId}`);
+    await pivotPopup.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
+    await pivotPopup.selectOption("#target", "fr");
+    await pivotPopup.waitForFunction(
+      () => /Download|Translate page/.test(document.getElementById("action")?.textContent ?? ""),
+      null,
+      { timeout: 60_000 }
+    );
+    const pivotLabel = await pivotPopup.$eval("#action", (button) => button.textContent);
+    const pivotStatus = await pivotPopup.$eval("#status", (element) => element.textContent ?? "");
+    console.info(`smoke: es->fr reads "${pivotLabel}" (${pivotStatus})`);
+    assert(/through English/i.test(pivotStatus), `the pivot route was not announced: "${pivotStatus}"`);
+    await pivotPopup.click("#action");
+    await pivotPopup.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
+      timeout: 600_000
+    });
+    const french = await pivotPage.$eval("#intro glossa-translation", (block) => block.textContent ?? "");
+    console.info(`smoke: es->fr intro: ${french.trim().slice(0, 80)}`);
+    assert(/biblioth|ouvert/i.test(french), `the pivot translation does not look French: "${french}"`);
+    await pivotPopup.close();
+    await pivotPage.close();
+  }
+
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a
   // guard on what is observable, not a proof of the whole picture. The proof is the manifest:
