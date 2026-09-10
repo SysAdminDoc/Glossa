@@ -35,7 +35,10 @@ export type PageCommand =
   | { type: "glossa:page-command"; command: "translate"; targetLanguage: string; displayMode: DisplayMode; showOriginalOnHover: boolean; skipFormFields: boolean; sourceLanguage?: string }
   | { type: "glossa:page-command"; command: "restore" }
   | { type: "glossa:page-command"; command: "status" }
-  | { type: "glossa:page-command"; command: "translate-selection"; targetLanguage: string };
+  | { type: "glossa:page-command"; command: "translate-selection"; targetLanguage: string }
+  // Composing in one language and sending in another: the field the user right-clicked in is
+  // translated in place, and the browser's own undo puts it back.
+  | { type: "glossa:page-command"; command: "translate-field"; targetLanguage: string };
 
 export interface PageState {
   injected: true;
@@ -78,6 +81,10 @@ export interface TranslateSelectionRequest {
   type: "glossa:translate-selection";
   tabId: number;
 }
+export interface TranslateFieldRequest {
+  type: "glossa:translate-field";
+  tabId: number;
+}
 
 export interface ModelsListRequest {
   type: "glossa:models:list";
@@ -115,6 +122,7 @@ export type UiRequest =
   | TranslatePageRequest
   | RestorePageRequest
   | TranslateSelectionRequest
+  | TranslateFieldRequest
   | ModelsListRequest
   | ModelsInstallRequest
   | ModelsDeleteRequest

@@ -134,6 +134,9 @@ async function handleCommand(controller: Controller, command: PageCommand): Prom
     case "translate-selection":
       await translateSelection(controller, command.targetLanguage);
       return controller.state;
+    case "translate-field":
+      await translateField(controller, command.targetLanguage);
+      return controller.state;
   }
 }
 
@@ -595,6 +598,109 @@ function report(controller: Controller): void {
   api.runtime.sendMessage({ type: "glossa:page-state", state: controller.state }).catch(() => undefined);
 }
 
+// ---- editable fields ----
+
+// The field the user last opened a context menu in. `document.activeElement` is not reliable here:
+// a right-click does not always move focus, and by the time the menu command arrives the focus may
+// have moved on.
+let lastEditable: HTMLElement | null = null;
+
+document.addEventListener(
+  "contextmenu",
+  (event) => {
+    const target = event.target as HTMLElement | null;
+    lastEditable = target && isEditable(target) ? target : null;
+  },
+  true
+);
+
+function isEditable(element: HTMLElement): boolean {
+  if (element instanceof HTMLTextAreaElement) return !element.readOnly && !element.disabled;
+  if (element instanceof HTMLInputElement) {
+    const type = (element.getAttribute("type") ?? "text").toLowerCase();
+    return !element.readOnly && !element.disabled && ["text", "search", "email", "url", "tel", ""].includes(type);
+  }
+  return element.isContentEditable;
+}
+
+function fieldText(element: HTMLElement): string {
+  if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) return element.value;
+  return element.innerText ?? element.textContent ?? "";
+}
+
+// Written through the editor's own input machinery where possible, so the page's framework sees the
+// change and the browser's undo history keeps what was there before.
+function writeField(element: HTMLElement, text: string): void {
+  element.focus();
+  if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+    element.select();
+    if (!document.execCommand("insertText", false, text)) {
+      element.value = text;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return;
+  }
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  if (!document.execCommand("insertText", false, text)) {
+    element.textContent = text;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+async function translateField(controller: Controller, target: string): Promise<void> {
+  const element = lastEditable && lastEditable.isConnected ? lastEditable : null;
+  if (!element) {
+    showPopover(t("fieldNotFound"), null, true);
+    return;
+  }
+  const rect = element.getBoundingClientRect();
+  const text = fieldText(element).trim();
+  if (!text) {
+    showPopover(t("fieldEmpty"), rect, true);
+    return;
+  }
+  const detectRequest: DetectRequest = {
+    type: "glossa:detect",
+    sample: text.slice(0, 2000),
+    htmlLang: document.documentElement.getAttribute("lang")
+  };
+  const detected = (await api.runtime.sendMessage(detectRequest)) as DetectResponse | undefined;
+  const source = detected?.language ?? controller.state.detectedLanguage;
+  if (!source) {
+    showPopover(t("popoverNoLanguage"), rect, true);
+    return;
+  }
+  if (source === target) {
+    showPopover(t("popoverAlready", target), rect, true);
+    return;
+  }
+  showPopover(t("popoverTranslating"), rect, false);
+  const request: TranslateRequest = {
+    type: "glossa:translate",
+    sourceLanguage: source,
+    targetLanguage: target,
+    // Paragraph by paragraph, so a long message keeps its shape.
+    fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
+  };
+  const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
+  if (!response || !response.ok) {
+    showPopover(response?.error ?? t("popoverNoAnswer"), rect, true);
+    return;
+  }
+  const parsed = new DOMParser().parseFromString(`<body>${response.fragments.join("\n\n")}</body>`, "text/html");
+  writeField(element, parsed.body.textContent ?? "");
+  showPopover(t("fieldTranslated"), rect, false);
+}
+
+function escapeForEngine(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // ---- selection ----
 
 // Offering a translation for every selection is the most complained-about behaviour in this whole
@@ -680,7 +786,7 @@ async function translateSelection(controller: Controller, target: string): Promi
     type: "glossa:translate",
     sourceLanguage: source,
     targetLanguage: target,
-    fragments: text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
+    fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
   if (!response || !response.ok) {

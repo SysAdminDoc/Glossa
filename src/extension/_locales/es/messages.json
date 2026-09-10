@@ -370,5 +370,23 @@
   },
   "optionsSourceBucketName": {
     "message": "el bucket de modelos de Mozilla"
+  },
+  "menuTranslatePage": {
+    "message": "Traducir esta página con Glossa"
+  },
+  "menuTranslateSelection": {
+    "message": "Traducir la selección con Glossa"
+  },
+  "menuTranslateField": {
+    "message": "Traducir este campo a $1"
+  },
+  "fieldEmpty": {
+    "message": "No hay nada que traducir en ese campo"
+  },
+  "fieldNotFound": {
+    "message": "Haz clic derecho dentro del campo que quieres traducir"
+  },
+  "fieldTranslated": {
+    "message": "Campo traducido. Deshaz con Ctrl+Z si no era lo que querías."
   }
 }

@@ -494,5 +494,29 @@
   "optionsSourceBucketName": {
     "message": "Mozilla's model bucket",
     "description": "Options page"
+  },
+  "menuTranslatePage": {
+    "message": "Translate this page with Glossa",
+    "description": "Context menu and field translation"
+  },
+  "menuTranslateSelection": {
+    "message": "Translate selection with Glossa",
+    "description": "Context menu and field translation"
+  },
+  "menuTranslateField": {
+    "message": "Translate this field to $1",
+    "description": "Context menu and field translation"
+  },
+  "fieldEmpty": {
+    "message": "There is nothing in that field to translate",
+    "description": "Context menu and field translation"
+  },
+  "fieldNotFound": {
+    "message": "Right-click inside the field you want translated",
+    "description": "Context menu and field translation"
+  },
+  "fieldTranslated": {
+    "message": "Field translated. Undo with Ctrl+Z if that was not what you wanted.",
+    "description": "Context menu and field translation"
   }
 }

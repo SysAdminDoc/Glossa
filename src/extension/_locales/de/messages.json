@@ -370,5 +370,23 @@
   },
   "optionsSourceBucketName": {
     "message": "Mozillas Modell-Bucket"
+  },
+  "menuTranslatePage": {
+    "message": "Diese Seite mit Glossa übersetzen"
+  },
+  "menuTranslateSelection": {
+    "message": "Auswahl mit Glossa übersetzen"
+  },
+  "menuTranslateField": {
+    "message": "Dieses Feld nach $1 übersetzen"
+  },
+  "fieldEmpty": {
+    "message": "In diesem Feld steht nichts zum Übersetzen"
+  },
+  "fieldNotFound": {
+    "message": "Klicke mit der rechten Maustaste in das Feld, das übersetzt werden soll"
+  },
+  "fieldTranslated": {
+    "message": "Feld übersetzt. Mit Strg+Z rückgängig machen, falls das nicht gewollt war."
   }
 }

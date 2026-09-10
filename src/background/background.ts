@@ -18,6 +18,7 @@ import {
 } from "../shared/messages.ts";
 import { blockedReason, catalogMaxAgeMs, hostOf, loadSettings } from "../shared/settings.ts";
 import { languageName } from "../shared/languages.ts";
+import { t } from "../shared/i18n.ts";
 import { EngineHost } from "../engine/engine-host.ts";
 
 // Background: routes messages between the content script, the UI pages, and the engine. On Chrome
@@ -26,6 +27,7 @@ import { EngineHost } from "../engine/engine-host.ts";
 
 const MENU_TRANSLATE_PAGE = "glossa-translate-page";
 const MENU_TRANSLATE_SELECTION = "glossa-translate-selection";
+const MENU_TRANSLATE_FIELD = "glossa-translate-field";
 const localEngine: EngineHost | null = hasOffscreenApi ? null : new EngineHost();
 let creating: Promise<void> | null = null;
 
@@ -237,6 +239,15 @@ async function handleUiRequest(request: UiRequest): Promise<unknown> {
         targetLanguage: settings.targetLanguage
       });
     }
+    case "glossa:translate-field": {
+      const settings = await loadSettings();
+      await ensureContentScript(request.tabId);
+      return sendToTab(request.tabId, {
+        type: "glossa:page-command",
+        command: "translate-field",
+        targetLanguage: settings.targetLanguage
+      });
+    }
     case "glossa:models:list":
       return engineCall({ type: "models-list" });
     case "glossa:models:install":
@@ -337,26 +348,36 @@ api.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // ---- context menus ----
 
-function installMenus(): void {
+async function installMenus(): Promise<void> {
+  const settings = await loadSettings();
   api.contextMenus.removeAll(() => {
     api.contextMenus.create({
       id: MENU_TRANSLATE_PAGE,
-      title: "Translate this page with Glossa",
+      title: t("menuTranslatePage"),
       contexts: ["page", "frame", "link", "image"]
     });
     api.contextMenus.create({
       id: MENU_TRANSLATE_SELECTION,
-      title: "Translate selection with Glossa",
+      title: t("menuTranslateSelection"),
       contexts: ["selection"]
+    });
+    api.contextMenus.create({
+      id: MENU_TRANSLATE_FIELD,
+      title: t("menuTranslateField", languageName(settings.targetLanguage)),
+      contexts: ["editable"]
     });
   });
 }
 
 api.runtime.onInstalled.addListener(() => {
-  installMenus();
+  void installMenus();
 });
 api.runtime.onStartup.addListener(() => {
-  installMenus();
+  void installMenus();
+});
+// The field entry names the language, so it has to be rebuilt when that setting changes.
+api.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes["settings"]) void installMenus();
 });
 
 api.contextMenus.onClicked.addListener((info, tab) => {
@@ -366,5 +387,7 @@ api.contextMenus.onClicked.addListener((info, tab) => {
     void translatePage(tabId);
   } else if (info.menuItemId === MENU_TRANSLATE_SELECTION) {
     void handleUiRequest({ type: "glossa:translate-selection", tabId });
+  } else if (info.menuItemId === MENU_TRANSLATE_FIELD) {
+    void handleUiRequest({ type: "glossa:translate-field", tabId });
   }
 });

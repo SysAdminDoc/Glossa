@@ -370,5 +370,23 @@
   },
   "optionsSourceBucketName": {
     "message": "Mozilla のモデル用バケット"
+  },
+  "menuTranslatePage": {
+    "message": "このページを Glossa で翻訳"
+  },
+  "menuTranslateSelection": {
+    "message": "選択範囲を Glossa で翻訳"
+  },
+  "menuTranslateField": {
+    "message": "この入力欄を $1 に翻訳"
+  },
+  "fieldEmpty": {
+    "message": "その入力欄には翻訳する文字がありません"
+  },
+  "fieldNotFound": {
+    "message": "翻訳したい入力欄の中で右クリックしてください"
+  },
+  "fieldTranslated": {
+    "message": "入力欄を翻訳しました。取り消すには Ctrl+Z を押してください。"
   }
 }

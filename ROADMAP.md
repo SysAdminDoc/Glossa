@@ -12,13 +12,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
   Acceptance: an "Engine" setting with Bergamot as default; choosing Chrome built-in translates a page with no request to the Mozilla hosts; Firefox hides the option.
   Complexity: M
 
-- [ ] G-08 — Input field translation
-  Why: composing in your language and sending in theirs is a top-five request across trackers.
-  Evidence: research pass; kiss-translator and immersive-translate both ship it.
-  Touches: src/content/ (context menu on editable targets, replace the field value), src/background/background.ts (menu entry with `editable` context)
-  Acceptance: right-clicking inside a textarea offers "Translate this field to <language>", and the field content is replaced with the translation.
-  Complexity: S
-
 - [ ] G-09 — Mirror the model catalog and files to the project's own release host
   Why: on Chromium browsers the model bytes come from a Mozilla bucket on Google Cloud Storage because the Remote Settings CDN refuses Chrome user agents (RESEARCH.md findings). Privacy-community users check the network tab, and the HN reaction to Firefox Translations hosting models on Google's infrastructure is the precedent. A self-hosted mirror also survives a catalog move (the v1 collection is already deprecated).
   Evidence: live 406 from `firefox-settings-attachments.cdn.mozilla.net` with a Chrome UA on 2026-09-10; HN thread 33792447.

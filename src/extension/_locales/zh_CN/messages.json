@@ -370,5 +370,23 @@
   },
   "optionsSourceBucketName": {
     "message": "Mozilla 的模型存储桶"
+  },
+  "menuTranslatePage": {
+    "message": "用 Glossa 翻译此页面"
+  },
+  "menuTranslateSelection": {
+    "message": "用 Glossa 翻译选中内容"
+  },
+  "menuTranslateField": {
+    "message": "将此输入框翻译成 $1"
+  },
+  "fieldEmpty": {
+    "message": "该输入框中没有可翻译的内容"
+  },
+  "fieldNotFound": {
+    "message": "请在要翻译的输入框内点右键"
+  },
+  "fieldTranslated": {
+    "message": "已翻译输入框。若不需要，可按 Ctrl+Z 撤销。"
   }
 }

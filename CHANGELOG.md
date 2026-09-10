@@ -5,6 +5,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Added
+- Write in your language and send in theirs: right-click inside a text box and Glossa translates what you have written, in place. The browser's own undo puts your text back.
 - Glossa speaks your language. The popup, the options page and everything it puts on a page are translated into Spanish, German, French, Japanese and Chinese, and follow the browser's own interface language. English is the fallback.
 - Text that is not in the page's body is translated too: the tab title, tooltips, image descriptions, placeholders, aria labels and the labels of a dropdown. A dropdown keeps submitting the value it submitted before, and everything goes back exactly as it was when you show the original.
 - A light-theme screenshot in the README, since both themes ship.

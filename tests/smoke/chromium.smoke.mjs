@@ -452,6 +452,27 @@ try {
     await chrome.storage.local.set({ settings: { ...stored.settings, sourceLanguages: {} } });
   });
 
+  // Composing in one language and sending in another: the field the user right-clicked in is
+  // translated in place. The context menu itself cannot be driven from automation, so the command
+  // it sends is sent directly, after a real right-click has told the page which field is meant.
+  await page.dispatchEvent("#message", "contextmenu");
+  await worker.evaluate(async (id) => {
+    await chrome.tabs.sendMessage(id, {
+      type: "glossa:page-command",
+      command: "translate-field",
+      targetLanguage: "en"
+    });
+  }, tabId);
+  await page.waitForFunction(
+    () => !/^Hola/.test(document.getElementById("message")?.value ?? ""),
+    null,
+    { timeout: 120_000 }
+  );
+  const field = await page.$eval("#message", (element) => element.value);
+  console.info(`smoke: the field now reads: ${field}`);
+  assert(/reading room|book|room/i.test(field), `the field was not translated: "${field}"`);
+  await page.keyboard.press("Escape");
+
   // The selection offer is off by default, and stays off until the setting is on.
   await page.evaluate(() => {
     const target = document.getElementById("brand");

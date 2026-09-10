@@ -40,7 +40,7 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 - Follows content that arrives later, so infinite scroll and single-page apps get translated too. It notices revealed panels, text the page rewrites in place, and open shadow roots.
 - Handles a page written in more than one language. A quoted paragraph that declares its own `lang` is translated with that language's model, or left alone if you do not have it.
 - Restores the original page without a reload.
-- Translates a selection from the context menu.
+- Translates a selection from the context menu, and translates what you have typed into a text box from the same menu.
 - Per-site rules. Turn Glossa off for a host and it will not even look at its pages. List the languages you read and those pages are never offered.
 - Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
 
