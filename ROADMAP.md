@@ -73,13 +73,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P1
 
-- [ ] P1 — G-29 — Viewport-first scheduling with priorities and a pause when the tab is hidden
-  Why: at HEAD a6cce06 every unit is queued in one pass sorted once by bounding rect, so a long page blocks on off-screen text while translations pop in at scattered positions; background tabs keep the engine busy.
-  Evidence: translatelocally #26 (scattered pop-in); Firefox four IntersectionObservers with `rootMargin` `0%` and `150% 50%` (L1164-1396), P0-P7 by scroll direction (L3662), `AntiStarvationStack(2, 1)` with one request in flight (L4692, L5039), `onHidePage()` releasing the engine (L5333); `content.ts` `orderViewportFirst`.
-  Touches: src/content/content.ts (IntersectionObserver-driven queue, `visibilitychange` pause), src/content/segmenter.ts
-  Acceptance: on a 500-paragraph fixture the visible paragraphs are translated before any off-screen one and scrolling re-prioritises; a hidden tab issues no engine calls until shown.
-  Complexity: L
-
 ### P2
 
 - [ ] P2 — G-38 — Normalise text before submission: soft hyphens, curly quotes, CJK punctuation spacing, edge whitespace

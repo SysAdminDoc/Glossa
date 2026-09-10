@@ -412,8 +412,6 @@ function isMarkedText(node: Text): boolean {
   return Boolean(next && next.nodeType === Node.ELEMENT_NODE && (next as Element).tagName === TRANSLATION_TAG);
 }
 
-// Batch segments so each request carries a bounded amount of text. Viewport-first ordering makes
-// the visible part of the page change before the rest.
 // The element a segment lives in, whatever kind it is.
 export function segmentElement(segment: Segment): Element | null {
   switch (segment.kind) {
@@ -426,42 +424,9 @@ export function segmentElement(segment: Segment): Element | null {
   }
 }
 
-export function orderViewportFirst(segments: Segment[]): Segment[] {
-  const viewportHeight = window.innerHeight || 800;
-  const inView: Segment[] = [];
-  const later: Segment[] = [];
-  for (const segment of segments) {
-    const element = segmentElement(segment);
-    if (!element) {
-      later.push(segment);
-      continue;
-    }
-    const rect = element.getBoundingClientRect();
-    if (rect.bottom >= 0 && rect.top <= viewportHeight) {
-      inView.push(segment);
-    } else {
-      later.push(segment);
-    }
-  }
-  return inView.concat(later);
-}
-
-export function batchSegments(segments: Segment[], maxItems = 24, maxChars = 6000): Segment[][] {
-  const batches: Segment[][] = [];
-  let current: Segment[] = [];
-  let chars = 0;
-  for (const segment of segments) {
-    const length = segmentLength(segment);
-    if (current.length > 0 && (current.length >= maxItems || chars + length > maxChars)) {
-      batches.push(current);
-      current = [];
-      chars = 0;
-    }
-    current.push(segment);
-    chars += length;
-  }
-  if (current.length > 0) batches.push(current);
-  return batches;
+// How much text a segment carries, for batching.
+export function segmentLength(segment: Segment): number {
+  return segment.kind === "element" ? segment.html.length : segment.text.length;
 }
 
 export function escapeHtml(text: string): string {
@@ -475,7 +440,3 @@ export function segmentFragment(segment: Segment): string {
   return segment.kind === "element" ? segment.html : escapeHtml(segment.text);
 }
 
-// How much text a segment carries, for batching.
-export function segmentLength(segment: Segment): number {
-  return segment.kind === "element" ? segment.html.length : segment.text.length;
-}

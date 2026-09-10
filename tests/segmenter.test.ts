@@ -16,7 +16,7 @@ globals.HTMLElement = window.HTMLElement;
 globals.DOMParser = window.DOMParser;
 globals.NodeFilter = window.NodeFilter;
 
-const { batchSegments, collectFromNodes, collectSegments, escapeHtml, segmentFragment } = await import("../src/content/segmenter.ts");
+const { collectFromNodes, collectSegments, escapeHtml, segmentFragment } = await import("../src/content/segmenter.ts");
 const { Renderer } = await import("../src/content/renderer.ts");
 
 function load(html: string) {
@@ -366,15 +366,6 @@ test("collectFromNodes treats the given nodes themselves as candidates", () => {
   window.document.body.append(fresh);
   const segments = collectFromNodes([fresh as unknown as Node], options);
   assert.equal(segments.length, 1);
-});
-
-test("batches respect item and character limits", () => {
-  const body = load(Array.from({ length: 30 }, (_, i) => `<p>Párrafo número ${i} con algo de texto.</p>`).join(""));
-  const segments = collectSegments(body, options);
-  const batches = batchSegments(segments, 8, 100_000);
-  assert.deepEqual(batches.map((b) => b.length), [8, 8, 8, 6]);
-  const tight = batchSegments(segments, 100, 80);
-  assert.ok(tight.every((b) => b.length <= 2), "80-char budget allows at most two short paragraphs");
 });
 
 test("text segments are escaped before they reach the engine", () => {

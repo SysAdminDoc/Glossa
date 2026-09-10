@@ -13,12 +13,11 @@ import type {
 } from "../shared/messages.ts";
 import { buildSample } from "./detect-sample.ts";
 import { OutputCache } from "./output-cache.ts";
+import { createScheduler, whenVisible } from "./scheduler.ts";
 import { Renderer, type RenderOptions } from "./renderer.ts";
 import {
-  batchSegments,
   collectFromNodes,
   collectSegments,
-  orderViewportFirst,
   segmentFragment,
   UNIT_ATTRIBUTE,
   type Segment
@@ -32,6 +31,10 @@ const INJECT_FLAG = "glossaInjected";
 const OBSERVER_DEBOUNCE_MS = 250;
 // Long enough that dragging a selection does not flash a button at every character.
 const SELECTION_DEBOUNCE_MS = 250;
+// One request carries at most this much: enough to keep the engine busy, small enough that the
+// first blocks appear quickly.
+const BATCH_MAX_ITEMS = 24;
+const BATCH_MAX_CHARS = 6000;
 
 // Attributes worth reacting to. `hidden`, `open`, `translate`, `lang` and `aria-hidden` change
 // whether a block should be translated at all; `class` and `style` only ever trigger a re-check of
@@ -226,7 +229,7 @@ async function translatePage(
     controller.pageLanguage = normalizeLanguageTag(document.documentElement.getAttribute("lang"));
     // Models can have been installed since the last run.
     controller.routes.clear();
-    const segments = orderViewportFirst(collectSegments(document.body, segmentOptions(controller)));
+    const segments = collectSegments(document.body, segmentOptions(controller));
     // The tab's title is outside the body, and it is the first thing a reader sees.
     const title = document.querySelector("head > title");
     if (title) segments.unshift(...collectFromNodes([title], segmentOptions(controller)));
@@ -320,11 +323,16 @@ async function translateSegments(
     for (const segment of fresh) controller.renderer.markPending(segment);
   });
 
-  const batches = batchSegments(fresh);
-  for (let index = 0; index < batches.length; index++) {
-    const batch = batches[index]!;
+  const scheduler = createScheduler(fresh);
+  for (;;) {
+    // A tab in the background is not worth the engine's time, and holding it there keeps the models
+    // in memory for a reader who is not reading.
+    await whenVisible();
+    const batch = scheduler.next(BATCH_MAX_ITEMS, BATCH_MAX_CHARS);
+    if (batch.length === 0) break;
     if (generation !== controller.generation) {
-      unmarkAll(controller, batches.slice(index));
+      unmarkAll(controller, [batch, scheduler.next(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)]);
+      scheduler.stop();
       return;
     }
     const request: TranslateRequest = {
@@ -340,14 +348,16 @@ async function translateSegments(
       response = { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
     if (generation !== controller.generation) {
-      unmarkAll(controller, batches.slice(index));
+      unmarkAll(controller, [batch, scheduler.next(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)]);
+      scheduler.stop();
       return;
     }
     if (!response || !response.ok) {
       controller.state.lastError = response?.error ?? t("pageEngineSilent");
       // A failing engine fails for every batch, so stop. Every block still carrying a marker has to
       // lose it, or it counts as handled and no later run will ever pick it up again.
-      unmarkAll(controller, batches.slice(index));
+      unmarkAll(controller, [batch, scheduler.next(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)]);
+      scheduler.stop();
       report(controller);
       return;
     }
@@ -364,6 +374,7 @@ async function translateSegments(
     controller.state.blocksDone += batch.length;
     report(controller);
   }
+  scheduler.stop();
 }
 
 function unmarkAll(controller: Controller, batches: Segment[][]): void {

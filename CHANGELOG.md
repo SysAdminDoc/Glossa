@@ -5,6 +5,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Added
+- The part of the page you are looking at is translated first, and it keeps up as you scroll: what comes into view moves to the front of the queue. A tab in the background stops asking the engine for anything until you come back to it.
 - Text inside a frame on the same site is translated too, exactly once, and the block count in the popup covers every frame. A page carrying fifty empty frames costs nothing extra (measured: 510 ms against 3.2 s for a page with real text in it).
 - Write in your language and send in theirs: right-click inside a text box and Glossa translates what you have written, in place. The browser's own undo puts your text back.
 - Glossa speaks your language. The popup, the options page and everything it puts on a page are translated into Spanish, German, French, Japanese and Chinese, and follow the browser's own interface language. English is the fallback.
