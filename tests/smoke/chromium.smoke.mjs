@@ -192,6 +192,31 @@ try {
   const panel = await page.$eval("#panel", (element) => element.querySelectorAll("glossa-translation").length);
   assert(panel === 1, `opened details panel carries ${panel} translation blocks`);
 
+  // The engine must never be handed its own output. Insert a copy of a finished translation next to
+  // a fresh Spanish paragraph: the Spanish one is the positive control that proves the observer ran
+  // at all, and the copy must come out with no translation block under it.
+  await page.evaluate(() => {
+    const main = document.querySelector("main");
+    const echo = document.createElement("p");
+    echo.id = "echo";
+    echo.textContent = document.querySelector("#intro glossa-translation").textContent;
+    const control = document.createElement("p");
+    control.id = "control";
+    control.textContent = "Este párrafo de control está escrito en español y debe traducirse.";
+    main.append(echo, control);
+  });
+  await page.waitForFunction(
+    () => document.querySelector("#control glossa-translation")?.textContent?.length > 0,
+    null,
+    { timeout: 120_000 }
+  );
+  const echoed = await page.$eval("#echo", (element) => ({
+    blocks: element.querySelectorAll("glossa-translation").length,
+    unit: element.getAttribute("data-glossa-unit")
+  }));
+  assert(echoed.blocks === 0, `a copy of our own translation was translated again (${echoed.blocks} blocks)`);
+  assert(echoed.unit === null, `a copy of our own translation was marked as a unit (${echoed.unit})`);
+
   // Restore must leave no trace.
   await popup.click("#action");
   await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Translate page", null, {

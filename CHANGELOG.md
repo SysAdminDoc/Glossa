@@ -10,6 +10,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - A block the page re-renders in place is translated again instead of keeping a stale translation forever, and the old translation goes with it.
 - Writes to the page are no longer seen as page changes by the extension's own observer, so translated text is never fed back to the engine.
 - Restore puts back a `lang` attribute the page set itself instead of deleting it.
+- The engine is never handed its own output. Text it produced on the page is remembered for ten minutes, so a page that copies a finished translation into a new element does not get that text translated a second time.
 
 ## [0.1.0] - 2026-09-10
 

@@ -1,5 +1,6 @@
 import { api } from "../shared/api.ts";
 import type { DetectRequest, DetectResponse, PageCommand, PageState, TranslateRequest, TranslateResponse } from "../shared/messages.ts";
+import { OutputCache } from "./output-cache.ts";
 import { Renderer, type RenderOptions } from "./renderer.ts";
 import {
   batchSegments,
@@ -36,6 +37,8 @@ interface Controller {
   pending: Set<Node>;
   stale: Set<Element>;
   deferred: Set<Element>;
+  // Everything the engine has already written on this page, so it is never sent back in.
+  output: OutputCache;
 }
 
 function boot(): void {
@@ -62,7 +65,8 @@ function boot(): void {
     generation: 0,
     pending: new Set(),
     stale: new Set(),
-    deferred: new Set()
+    deferred: new Set(),
+    output: new OutputCache()
   };
 
   api.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (value: unknown) => void) => {
@@ -192,10 +196,15 @@ async function translateSegments(
   target: string,
   generation: number
 ): Promise<void> {
+  // Text the engine produced earlier on this page is not source text, whatever the page does with
+  // it afterwards. Drop those segments before anything is marked or sent.
+  const fresh = segments.filter((segment) => !controller.output.has(segment.text));
+  const echoed = segments.length - fresh.length;
+  if (echoed > 0) controller.state.blocksTotal -= echoed;
   withObserverPaused(controller, () => {
-    for (const segment of segments) controller.renderer.markPending(segment);
+    for (const segment of fresh) controller.renderer.markPending(segment);
   });
-  for (const batch of batchSegments(segments)) {
+  for (const batch of batchSegments(fresh)) {
     if (generation !== controller.generation) {
       withObserverPaused(controller, () => {
         for (const segment of batch) controller.renderer.unmark(segment);
@@ -232,7 +241,8 @@ async function translateSegments(
     withObserverPaused(controller, () => {
       batch.forEach((segment, index) => {
         const translated = response.fragments[index] ?? "";
-        controller.renderer.apply(segment, translated, controller.options!);
+        const applied = controller.renderer.apply(segment, translated, controller.options!);
+        if (applied) controller.output.remember(applied);
       });
     });
     controller.state.blocksDone += batch.length;
@@ -244,6 +254,7 @@ function restore(controller: Controller): void {
   controller.generation++;
   stopObserver(controller);
   controller.deferred.clear();
+  controller.output.clear();
   controller.renderer.restoreAll();
   controller.state.translated = false;
   controller.state.translating = false;

@@ -95,18 +95,20 @@ export class Renderer {
     }
   }
 
-  apply(segment: Segment, translatedHtml: string, options: RenderOptions): void {
+  // Returns the plain text it wrote, which the caller remembers so the engine is never handed its
+  // own output back. Null means nothing was applied.
+  apply(segment: Segment, translatedHtml: string, options: RenderOptions): string | null {
     if (!translatedHtml.trim()) {
       this.unmark(segment);
-      return;
+      return null;
     }
     const nodes = parseFragment(translatedHtml, segment.kind === "element" ? segment.holds : []);
     if (segment.kind === "text") {
-      this.applyText(segment, nodes, options);
-      return;
+      return this.applyText(segment, nodes, options);
     }
     const element = segment.element;
-    if (!element.isConnected) return;
+    if (!element.isConnected) return null;
+    const applied = nodes.map((node) => node.textContent ?? "").join("");
     const bilingual = options.displayMode === "bilingual" && wantsBilingual(element, segment.text);
     if (bilingual) {
       const block = document.createElement(TRANSLATION_TAG.toLowerCase());
@@ -125,7 +127,7 @@ export class Renderer {
         previousLang: element.getAttribute("lang"),
         appended: block
       });
-      return;
+      return applied;
     }
     const originalChildren = Array.from(element.childNodes);
     const previousTitle = element.getAttribute("title");
@@ -142,11 +144,12 @@ export class Renderer {
     const previousLang = element.getAttribute("lang");
     element.setAttribute("lang", options.targetLanguage);
     this.records.push({ kind: "element", element, originalChildren, addedTitle, previousTitle, previousLang, appended: null });
+    return applied;
   }
 
-  private applyText(segment: Extract<Segment, { kind: "text" }>, nodes: Node[], options: RenderOptions): void {
+  private applyText(segment: Extract<Segment, { kind: "text" }>, nodes: Node[], options: RenderOptions): string | null {
     const node = segment.node;
-    if (!node.isConnected) return;
+    if (!node.isConnected) return null;
     const translated = nodes.map((n) => n.textContent ?? "").join("");
     const bilingual = options.displayMode === "bilingual" && segment.text.trim().length >= 40;
     if (bilingual) {
@@ -157,11 +160,12 @@ export class Renderer {
       ensureShadowStyle(node);
       node.after(inline);
       this.records.push({ kind: "text", node, originalData: node.data, appended: inline });
-      return;
+      return translated;
     }
     const originalData = node.data;
     node.data = translated;
     this.records.push({ kind: "text", node, originalData, appended: null });
+    return translated;
   }
 
   // The page re-rendered a unit in place: its text changed, its children were replaced, or its

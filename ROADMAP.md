@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-20 — Never resubmit the engine's own output
-  Why: an observer that sees its own inserted translation, or a page that copies translated text into a new node, feeds target-language text back into a source-language model; Firefox documents that this produces garbage.
-  Evidence: Firefox `LRUCache` of output strings and `isAlreadyTranslated()` (L76, L268, checked at L3216 and L1910; 5,000 entries, 10 min expiry); linguist #598 and #544 (same-language mangling, short-string misdetection); Bugzilla 2048612.
-  Touches: src/content/content.ts (output cache keyed by normalised text, same-language short-circuit, minimum text length), src/content/renderer.ts
-  Acceptance: a node inserted with the exact text of a previous translation is not sent to the engine; a page already in the target language reports "already in this language" from the popup without a single engine call.
-  Complexity: M
-
 - [ ] P0 — G-21 — Protect URLs, emails, and bare numbers inside units
   Why: the engine inserted a space into a URL (`ruta? x=1`) and translated an email domain (`ejemplo` to `example`); bare digits can come back doubled.
   Evidence: local probe 2026-09-10 (`#mixed` case); mozilla/translations #600 (`5 5`); bergamot-translator #419 (punctuation-only garbage).
