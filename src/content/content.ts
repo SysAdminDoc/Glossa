@@ -9,6 +9,7 @@ import type {
   TranslateRequest,
   TranslateResponse
 } from "../shared/messages.ts";
+import { buildSample } from "./detect-sample.ts";
 import { OutputCache } from "./output-cache.ts";
 import { Renderer, type RenderOptions } from "./renderer.ts";
 import {
@@ -155,17 +156,15 @@ function sampleText(root: Element, limit = 4000): string {
       return /\p{L}/u.test((node as Text).data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
     }
   });
-  const parts: string[] = [];
-  let length = 0;
-  while (length < limit) {
+  const lines: string[] = [];
+  let budget = limit * 4;
+  while (budget > 0) {
     const node = walker.nextNode() as Text | null;
     if (!node) break;
-    const text = node.data.replace(/\s+/g, " ").trim();
-    if (!text) continue;
-    parts.push(text);
-    length += text.length + 1;
+    lines.push(node.data);
+    budget -= node.data.length + 1;
   }
-  return parts.join(" ").slice(0, limit);
+  return buildSample(lines, limit);
 }
 
 async function translatePage(

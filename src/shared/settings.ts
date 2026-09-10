@@ -20,6 +20,9 @@ export interface Settings {
   skipFormFields: boolean;
   // Refresh the model catalog at most this often. The catalog is the only periodic network call.
   catalogRefreshHours: number;
+  // A source language the user picked by hand for a host, remembered so they do not pick it again
+  // on every visit. Detection is a guess; this is not.
+  sourceLanguages: Record<string, string>;
   // Offer the catalog's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk).
   // Mozilla gates them to its nightly channel, so they are off by default here too.
   experimentalModels: boolean;
@@ -39,6 +42,7 @@ export function defaultSettings(uiLanguage?: string): Settings {
     neverTranslateLanguages: [target],
     skipFormFields: true,
     catalogRefreshHours: 24,
+    sourceLanguages: {},
     experimentalModels: false
   };
 }
@@ -77,6 +81,13 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
     out.neverTranslateLanguages = input.neverTranslateLanguages.filter(
       (value): value is string => typeof value === "string" && value.length > 0
     );
+  }
+  if (input.sourceLanguages && typeof input.sourceLanguages === "object") {
+    const chosen: Record<string, string> = {};
+    for (const [host, code] of Object.entries(input.sourceLanguages as Record<string, unknown>)) {
+      if (host && typeof code === "string" && code) chosen[host] = code;
+    }
+    out.sourceLanguages = chosen;
   }
   if (input.siteRules && typeof input.siteRules === "object") {
     const rules: Record<string, SiteRule> = {};

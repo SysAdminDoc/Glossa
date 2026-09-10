@@ -132,17 +132,27 @@ async function translatePage(tabId: number, targetOverride?: string, sourceOverr
 
 async function detectLanguage(request: DetectRequest): Promise<DetectResponse> {
   const fromHtml = normalizeLanguageTag(request.htmlLang);
+  // An empty sample means the page holds no prose to judge. Guessing from a handful of characters
+  // is where most wrong verdicts come from, so say nothing and let the user choose.
+  if (!request.sample.trim()) {
+    return { language: fromHtml, confident: false };
+  }
   try {
     const result = await api.i18n.detectLanguage(request.sample);
     const best = result.languages
       .map((entry) => ({ language: normalizeLanguageTag(entry.language), percentage: entry.percentage }))
       .filter((entry): entry is { language: string; percentage: number } => entry.language !== null)
       .sort((a, b) => b.percentage - a.percentage)[0];
-    if (best && (result.isReliable || best.percentage >= 70)) {
+    if (!best) return { language: fromHtml, confident: false };
+    // Two independent signals agreeing is worth more than one confident detector: CLD is reliable
+    // on long prose and wrong often enough on short or mixed pages.
+    const agrees = fromHtml !== null && fromHtml === best.language;
+    if (agrees) return { language: best.language, confident: true };
+    if (result.isReliable && best.percentage >= 70) {
       return { language: best.language, confident: true };
     }
-    if (fromHtml) return { language: fromHtml, confident: false };
-    if (best) return { language: best.language, confident: false };
+    // Unsure: offer the page's own declaration if it has one, and mark it as a guess either way.
+    return { language: fromHtml ?? best.language, confident: false };
   } catch {
     // Detection is best effort; the html lang attribute is the fallback.
   }

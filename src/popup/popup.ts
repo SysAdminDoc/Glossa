@@ -9,7 +9,7 @@ import type {
   ProgressEvent,
   RouteStatus
 } from "../shared/messages.ts";
-import { loadSettings, saveSettings, type DisplayMode } from "../shared/settings.ts";
+import { hostOf, loadSettings, saveSettings, type DisplayMode } from "../shared/settings.ts";
 import { sendUi } from "../shared/ui-client.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -40,6 +40,8 @@ let blocked: string | null = null;
 let modelHostsGranted = true;
 // False only on a machine whose processor cannot run the engine, where nothing else matters.
 let engineSupported = true;
+// The host of the tab the popup is acting on, so a manual language choice can be remembered for it.
+let pageHost: string | null = null;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
 
@@ -201,12 +203,19 @@ async function loadPage(): Promise<void> {
   const response = await sendUi<PageStatusResponse>({ type: "glossa:page-status", tabId });
   blocked = response.blocked;
   if (blocked) setStatus(blocked, "warn");
+  pageHost = hostOf(response.page.url);
   if (response.page.injected) {
     page = response.page;
     route = response.route;
-    if (page.detectedLanguage && sourceSelect.value === "") {
-      sourceSelect.value = page.detectedLanguage;
-      if (sourceSelect.value !== page.detectedLanguage) sourceSelect.value = "";
+    // A language the user picked for this host beats a fresh guess.
+    const remembered = pageHost ? (await loadSettings()).sourceLanguages[pageHost] : undefined;
+    const preferred = remembered ?? page.detectedLanguage;
+    if (preferred && sourceSelect.value === "") {
+      sourceSelect.value = preferred;
+      if (sourceSelect.value !== preferred) sourceSelect.value = "";
+    }
+    if (remembered && !page.confident) {
+      setStatus(`Using ${languageName(remembered)}, the language you chose for this site.`);
     }
     if (blocked) {
       // Already shown above; a stale page error must not replace it.
@@ -350,7 +359,15 @@ async function init(): Promise<void> {
     setStatus(error instanceof Error ? error.message : String(error), "error");
   }
 
-  sourceSelect.addEventListener("change", () => void refreshRoute());
+  sourceSelect.addEventListener("change", () => {
+    // Remember the choice for this host: the detector will make the same mistake next time.
+    if (pageHost && sourceSelect.value) {
+      void loadSettings().then((current) =>
+        saveSettings({ sourceLanguages: { ...current.sourceLanguages, [pageHost as string]: sourceSelect.value } })
+      );
+    }
+    void refreshRoute();
+  });
   targetSelect.addEventListener("change", () => {
     void saveSettings({ targetLanguage: targetSelect.value });
     void refreshRoute();

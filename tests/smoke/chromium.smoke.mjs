@@ -322,6 +322,47 @@ try {
   assert(/library/i.test(autoText), `automatic translation looks wrong: "${autoText}"`);
   await auto.close();
 
+  // A page with no prose must be reported as undetectable rather than guessed at. This is where
+  // most wrong verdicts come from: a wall of numbers, dates and urls that CLD will happily label.
+  const numbers = await context.newPage();
+  await numbers.goto(`http://127.0.0.1:${port}/numbers.html`, { waitUntil: "load" });
+  const numbersTabId = await worker.evaluate(async (url) => {
+    const [tab] = await chrome.tabs.query({ url });
+    return tab?.id ?? null;
+  }, `http://127.0.0.1:${port}/numbers.html`);
+  const numbersPopup = await context.newPage();
+  await numbersPopup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${numbersTabId}`);
+  await numbersPopup.waitForFunction(
+    () => (document.getElementById("action")?.textContent ?? "") !== "Checking page…",
+    null,
+    { timeout: 60_000 }
+  );
+  const numbersLabel = await numbersPopup.$eval("#action", (button) => button.textContent);
+  const numbersSource = await numbersPopup.$eval("#source", (select) => select.value);
+  console.info(`smoke: a page of numbers reads "${numbersLabel}" with source "${numbersSource}"`);
+  assert(numbersSource === "", `a page of numbers was detected as "${numbersSource}"`);
+  assert(
+    numbersLabel === "Choose the page language",
+    `a page of numbers was offered for translation ("${numbersLabel}")`
+  );
+  // Choosing a language by hand is a decision, not a guess: it has to be remembered for the host.
+  await numbersPopup.selectOption("#source", "es");
+  await numbersPopup.waitForTimeout(500);
+  await numbersPopup.close();
+
+  const numbersPopupAgain = await context.newPage();
+  await numbersPopupAgain.goto(`chrome-extension://${extensionId}/popup.html?tabId=${numbersTabId}`);
+  await numbersPopupAgain.waitForFunction(
+    () => (document.getElementById("source")?.value ?? "") !== "",
+    null,
+    { timeout: 30_000 }
+  );
+  const remembered = await numbersPopupAgain.$eval("#source", (select) => select.value);
+  console.info(`smoke: the popup reopened with source "${remembered}"`);
+  assert(remembered === "es", `the manual language choice was not remembered (got "${remembered}")`);
+  await numbersPopupAgain.close();
+  await numbers.close();
+
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a
   // guard on what is observable, not a proof of the whole picture. The proof is the manifest:

@@ -77,13 +77,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
   Acceptance: an idle timer unloads models after a configurable period and the measured peak on the fixture set is documented in README.
   Complexity: S
 
-- [ ] G-14 — Language detection guardrails
-  Research note 2026-09-10: the fastText premise was wrong. Firefox dropped fastText for in-tree CLD2 (Bugzilla 1861516) and `browser.i18n.detectLanguage` is CLD2 on Firefox, CLD on Chrome; the `translations-identification-models` record is a 2023 leftover. Rewritten as guardrails; see G-32 for the concrete item. This entry is retained only so the id is not reused.
-  Why: superseded by G-32.
-  Touches: none
-  Acceptance: closed when G-32 lands.
-  Complexity: S
-
 ## P3
 
 - [ ] G-15 — Optional self-hosted LibreTranslate endpoint
@@ -143,13 +136,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Evidence: WCAG 1.4.13, 2.5.8, 2.4.11; linguist #344 (focus stolen from the selection); simple-translate #342 (popup saved into TinyMCE content); `content.ts` `showPopover`.
   Touches: src/content/content.ts `showPopover`, src/content/content.css
   Acceptance: Esc closes the popover; the close control measures at least 24 by 24 CSS px; the popover is positioned outside the selection rect; on a `contenteditable` page the popover is a sibling of the editor, never inside it, and the editor's `innerHTML` is unchanged afterwards.
-  Complexity: S
-
-- [ ] P1 — G-32 — Language detection guardrails
-  Why: mis-detection is the highest-volume live complaint against Firefox Translations; Glossa samples the whole body including navigation, trusts a 70 percent CLD verdict, and offers translation for numeric or URL-only pages.
-  Evidence: Bugzilla meta 2069562 (five new reports the week before 2026-09-10, including a JSON page of numbers offered as Norwegian); TWP #632 and #935 (no manual override, script switch not re-detected); linguist #544 (sub-10-character misdetection); `background.ts` `detectLanguage`, `content.ts` `sampleText`.
-  Touches: src/content/content.ts (sample from candidate units only, minimum 200 letters, drop lines that are mostly digits or URLs), src/background/background.ts (require `isReliable` or agreement with `<html lang>`; otherwise report "unsure" and let the popup ask), src/popup/popup.ts (remember the chosen source per host in settings)
-  Acceptance: a page of JSON numbers is reported as undetectable, not offered; the fixture is still detected as Spanish; a manual source choice for a host is preselected on the next visit.
   Complexity: S
 
 - [ ] P1 — G-33 — Model download manager: cancel, retry, resume, single flight, storage check
