@@ -244,6 +244,14 @@ async function init(): Promise<void> {
   });
   renderRules();
 
+  const experimental = $<HTMLInputElement>("experimental-models");
+  experimental.checked = settings.experimentalModels;
+  experimental.addEventListener("change", async () => {
+    await persist({ experimentalModels: experimental.checked });
+    // The language lists and every route depend on which records the catalog gate lets through.
+    await refreshModels();
+  });
+
   $("catalog-refresh").addEventListener("click", async () => {
     const button = $<HTMLButtonElement>("catalog-refresh");
     button.disabled = true;

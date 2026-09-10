@@ -142,14 +142,22 @@ export interface ModelsListResponse {
   byteSource: "mozilla-cdn" | "mozilla-gcs";
 }
 
+// The engine host has no access to storage on Chrome (an offscreen document gets no
+// chrome.storage), so every request carries the one setting that changes which catalog records are
+// usable. The background reads it and stamps it on.
+interface EngineEnvelope {
+  target: typeof ENGINE_TARGET;
+  experimental?: boolean;
+}
+
 export type EngineRequest =
-  | { target: typeof ENGINE_TARGET; type: "translate"; sourceLanguage: string; targetLanguage: string; fragments: string[] }
-  | { target: typeof ENGINE_TARGET; type: "ensure-route"; sourceLanguage: string; targetLanguage: string }
-  | { target: typeof ENGINE_TARGET; type: "route-status"; sourceLanguage: string; targetLanguage: string }
-  | { target: typeof ENGINE_TARGET; type: "models-list" }
-  | { target: typeof ENGINE_TARGET; type: "models-delete"; pairKey: string }
-  | { target: typeof ENGINE_TARGET; type: "catalog-refresh" }
-  | { target: typeof ENGINE_TARGET; type: "ping" };
+  | (EngineEnvelope & { type: "translate"; sourceLanguage: string; targetLanguage: string; fragments: string[] })
+  | (EngineEnvelope & { type: "ensure-route"; sourceLanguage: string; targetLanguage: string })
+  | (EngineEnvelope & { type: "route-status"; sourceLanguage: string; targetLanguage: string })
+  | (EngineEnvelope & { type: "models-list" })
+  | (EngineEnvelope & { type: "models-delete"; pairKey: string })
+  | (EngineEnvelope & { type: "catalog-refresh" })
+  | (EngineEnvelope & { type: "ping" });
 
 // Omit does not distribute over a union; this one does.
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  catalogEnvironment,
   compareVersions,
+  isRecordUsable,
   languageCoverage,
+  matchesEnvironment,
   normalizeLanguageTag,
   parseVersion,
   planRoute,
@@ -11,6 +14,7 @@ import {
   selectPairFiles,
   type ModelRecord
 } from "../src/shared/catalog.ts";
+import { knownLanguageCodes, languageName } from "../src/shared/languages.ts";
 
 let counter = 0;
 function record(overrides: Partial<ModelRecord> & Pick<ModelRecord, "fileType" | "sourceLanguage" | "targetLanguage">): ModelRecord {
@@ -133,4 +137,74 @@ test("normalizeLanguageTag maps page tags to catalog codes", () => {
   assert.equal(normalizeLanguageTag(""), null);
   assert.equal(normalizeLanguageTag(null), null);
   assert.equal(normalizeLanguageTag("x-default"), null);
+});
+
+// ---- filter_expression gates (live shapes as of 2026-09-10) ----
+
+const DESKTOP = { os: "desktop", channel: "release" } as const;
+const ANDROID = { os: "android", channel: "release" } as const;
+const NIGHTLY = { os: "desktop", channel: "nightly" } as const;
+
+const ANDROID_ONLY = "env.appinfo.OS == 'Android'";
+const DESKTOP_ONLY = "env.appinfo.OS != 'Android'";
+const PRERELEASE_ONLY = "env.channel == 'default' || env.channel == 'nightly'";
+
+function splitPair(source: string, target: string): ModelRecord[] {
+  // What the catalog actually holds for ja->en, ko->en, zh-Hans->en, en->ko and en->ru: a desktop
+  // build at 3.0 and a higher-versioned Android build that would otherwise win on version alone.
+  return [
+    record({ fileType: "model", sourceLanguage: source, targetLanguage: target, version: "3.0", architecture: "base", filter_expression: DESKTOP_ONLY }),
+    record({ fileType: "vocab", sourceLanguage: source, targetLanguage: target, version: "3.0", filter_expression: DESKTOP_ONLY }),
+    record({ fileType: "model", sourceLanguage: source, targetLanguage: target, version: "3.1", architecture: "base-memory", filter_expression: ANDROID_ONLY }),
+    record({ fileType: "vocab", sourceLanguage: source, targetLanguage: target, version: "3.1", filter_expression: ANDROID_ONLY })
+  ];
+}
+
+test("an unknown filter expression makes a record unusable", () => {
+  assert.equal(matchesEnvironment(undefined, DESKTOP), true);
+  assert.equal(matchesEnvironment("   ", DESKTOP), true);
+  assert.equal(matchesEnvironment("env.version|versionCompare('140') >= 0", DESKTOP), false);
+  const gated = record({ fileType: "model", sourceLanguage: "es", targetLanguage: "en", filter_expression: "env.os == 'Haiku'" });
+  assert.equal(isRecordUsable(gated, DESKTOP), false);
+});
+
+test("desktop gets the base build and Android gets base-memory for a split pair", () => {
+  const records = splitPair("ja", "en");
+  const desktop = selectPairFiles(records, "ja", "en", DESKTOP);
+  assert.equal(desktop?.version, "3.0");
+  assert.equal(desktop?.records.model?.architecture, "base");
+  const android = selectPairFiles(records, "ja", "en", ANDROID);
+  assert.equal(android?.version, "3.1");
+  assert.equal(android?.records.model?.architecture, "base-memory");
+});
+
+test("prerelease-gated pairs stay hidden until experimental models are on", () => {
+  const records = [
+    record({ fileType: "model", sourceLanguage: "nn", targetLanguage: "en", version: "3.0a1", filter_expression: PRERELEASE_ONLY }),
+    record({ fileType: "vocab", sourceLanguage: "nn", targetLanguage: "en", version: "3.0a1", filter_expression: PRERELEASE_ONLY })
+  ];
+  assert.equal(selectPairFiles(records, "nn", "en", DESKTOP), null);
+  assert.equal(planRoute(records, "nn", "en", DESKTOP), null);
+  assert.equal(languageCoverage(records, DESKTOP).sources.includes("nn"), false);
+  assert.equal(selectPairFiles(records, "nn", "en", NIGHTLY)?.version, "3.0a1");
+  assert.equal(languageCoverage(records, NIGHTLY).sources.includes("nn"), true);
+});
+
+test("the environment comes from the user agent and the experimental setting", () => {
+  const phone = "Mozilla/5.0 (Android 15; Mobile; rv:155.0) Gecko/155.0 Firefox/155.0";
+  const desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153.0.0.0 Safari/537.36";
+  assert.deepEqual(catalogEnvironment(phone, false), { os: "android", channel: "release" });
+  assert.deepEqual(catalogEnvironment(desktop, false), { os: "desktop", channel: "release" });
+  assert.deepEqual(catalogEnvironment(desktop, true), { os: "desktop", channel: "nightly" });
+});
+
+test("every language the catalog can route has a display name", () => {
+  // The 56 model languages in translations-models-v2 on 2026-09-10, including the prerelease ones.
+  const catalogLanguages = (
+    "af ar az be bg bn bs ca cs da de el en es et eu fa fi fr gl gu he hi hr hu id is it ja kn ko " +
+    "lt lv ml mr ms nb nl nn pl pt ro ru sk sl sq sr sv ta te th tr uk ur vi zh-Hans zh-Hant"
+  ).split(" ");
+  const known = new Set(knownLanguageCodes());
+  const missing = catalogLanguages.filter((code) => !known.has(code) || languageName(code) === code);
+  assert.deepEqual(missing, []);
 });

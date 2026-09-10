@@ -51,7 +51,10 @@ async function ensureOffscreen(): Promise<void> {
 }
 
 async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">): Promise<T> {
-  const full = { target: ENGINE_TARGET, ...request } as EngineRequest;
+  // The engine host cannot read settings on Chrome, so the one setting that changes which catalog
+  // records are usable rides along with the request.
+  const settings = await loadSettings();
+  const full = { target: ENGINE_TARGET, experimental: settings.experimentalModels, ...request } as EngineRequest;
   if (localEngine) {
     return (await localEngine.handle(full)) as T;
   }

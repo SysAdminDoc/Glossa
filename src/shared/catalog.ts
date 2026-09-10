@@ -88,8 +88,45 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export function isRecordUsable(record: ModelRecord): boolean {
+// Remote Settings gates some records with a JEXL filter expression that Firefox evaluates against
+// its own environment. Three expressions are in use (checked against the live collection on
+// 2026-09-10): two split a pair into a desktop `base` build and an Android `base-memory` build, and
+// one keeps prerelease pairs (az, be, bs, nb, nn at 3.0a1) on the nightly channel. Ignoring them
+// means a desktop browser loading the Android build and offering prereleases as if they shipped.
+export interface CatalogEnvironment {
+  os: "desktop" | "android";
+  // "release" is every normal install. "nightly" is what the experimental-models setting asks for,
+  // and it is the only way the prerelease-gated pairs become visible.
+  channel: "release" | "nightly";
+}
+
+export const DEFAULT_ENVIRONMENT: CatalogEnvironment = { os: "desktop", channel: "release" };
+
+const KNOWN_FILTERS = new Map<string, (environment: CatalogEnvironment) => boolean>([
+  ["env.appinfo.OS == 'Android'", (environment) => environment.os === "android"],
+  ["env.appinfo.OS != 'Android'", (environment) => environment.os !== "android"],
+  ["env.channel == 'default' || env.channel == 'nightly'", (environment) => environment.channel === "nightly"]
+]);
+
+// A full JEXL evaluator would be a liability in an extension, and an expression nobody has read is
+// a gate nobody understands, so anything outside the known set makes the record unusable.
+export function matchesEnvironment(expression: string | undefined, environment: CatalogEnvironment): boolean {
+  const trimmed = expression?.trim();
+  if (!trimmed) return true;
+  const test = KNOWN_FILTERS.get(trimmed);
+  return test ? test(environment) : false;
+}
+
+export function catalogEnvironment(userAgent: string, experimental: boolean): CatalogEnvironment {
+  return {
+    os: /\bandroid\b/i.test(userAgent) ? "android" : "desktop",
+    channel: experimental ? "nightly" : "release"
+  };
+}
+
+export function isRecordUsable(record: ModelRecord, environment: CatalogEnvironment = DEFAULT_ENVIRONMENT): boolean {
   if (!record.sourceLanguage || !record.targetLanguage || !record.attachment) return false;
+  if (!matchesEnvironment(record.filter_expression, environment)) return false;
   const parsed = parseVersion(record.version);
   return parsed.major === MODEL_MAJOR_VERSION;
 }
@@ -101,11 +138,12 @@ export function isRecordUsable(record: ModelRecord): boolean {
 export function selectPairFiles(
   records: ModelRecord[],
   sourceLanguage: string,
-  targetLanguage: string
+  targetLanguage: string,
+  environment: CatalogEnvironment = DEFAULT_ENVIRONMENT
 ): PairFiles | null {
   const candidates = records.filter(
     (record) =>
-      isRecordUsable(record) &&
+      isRecordUsable(record, environment) &&
       record.sourceLanguage === sourceLanguage &&
       record.targetLanguage === targetLanguage
   );
@@ -141,14 +179,15 @@ export function selectPairFiles(
 export function planRoute(
   records: ModelRecord[],
   sourceLanguage: string,
-  targetLanguage: string
+  targetLanguage: string,
+  environment: CatalogEnvironment = DEFAULT_ENVIRONMENT
 ): PairFiles[] | null {
   if (sourceLanguage === targetLanguage) return [];
-  const direct = selectPairFiles(records, sourceLanguage, targetLanguage);
+  const direct = selectPairFiles(records, sourceLanguage, targetLanguage, environment);
   if (direct) return [direct];
   if (sourceLanguage === PIVOT_LANGUAGE || targetLanguage === PIVOT_LANGUAGE) return null;
-  const toPivot = selectPairFiles(records, sourceLanguage, PIVOT_LANGUAGE);
-  const fromPivot = selectPairFiles(records, PIVOT_LANGUAGE, targetLanguage);
+  const toPivot = selectPairFiles(records, sourceLanguage, PIVOT_LANGUAGE, environment);
+  const fromPivot = selectPairFiles(records, PIVOT_LANGUAGE, targetLanguage, environment);
   if (!toPivot || !fromPivot) return null;
   return [toPivot, fromPivot];
 }
@@ -180,11 +219,14 @@ export interface LanguageCoverage {
   targets: string[];
 }
 
-export function languageCoverage(records: ModelRecord[]): LanguageCoverage {
+export function languageCoverage(
+  records: ModelRecord[],
+  environment: CatalogEnvironment = DEFAULT_ENVIRONMENT
+): LanguageCoverage {
   const sources = new Set<string>();
   const targets = new Set<string>();
   for (const record of records) {
-    if (!isRecordUsable(record) || record.fileType !== "model") continue;
+    if (!isRecordUsable(record, environment) || record.fileType !== "model") continue;
     sources.add(record.sourceLanguage);
     targets.add(record.targetLanguage);
   }

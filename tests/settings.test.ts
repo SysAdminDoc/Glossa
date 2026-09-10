@@ -12,6 +12,8 @@ test("defaults follow the UI language and never translate it", () => {
   assert.deepEqual(settings.neverTranslateLanguages, ["de"]);
   assert.equal(settings.displayMode, "bilingual");
   assert.equal(settings.selectionPopup, false);
+  // Mozilla gates its prerelease models to nightly; Glossa does not offer them by default either.
+  assert.equal(settings.experimentalModels, false);
   assert.equal(defaultSettings("zh-TW").targetLanguage, "zh-Hant");
   assert.equal(defaultSettings(undefined).targetLanguage, "en");
 });

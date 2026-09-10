@@ -20,6 +20,9 @@ export interface Settings {
   skipFormFields: boolean;
   // Refresh the model catalog at most this often. The catalog is the only periodic network call.
   catalogRefreshHours: number;
+  // Offer the catalog's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk).
+  // Mozilla gates them to its nightly channel, so they are off by default here too.
+  experimentalModels: boolean;
 }
 
 export const SETTINGS_KEY = "settings";
@@ -35,7 +38,8 @@ export function defaultSettings(uiLanguage?: string): Settings {
     siteRules: {},
     neverTranslateLanguages: [target],
     skipFormFields: true,
-    catalogRefreshHours: 24
+    catalogRefreshHours: 24,
+    experimentalModels: false
   };
 }
 
@@ -65,6 +69,7 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   if (typeof input.showOriginalOnHover === "boolean") out.showOriginalOnHover = input.showOriginalOnHover;
   if (typeof input.selectionPopup === "boolean") out.selectionPopup = input.selectionPopup;
   if (typeof input.skipFormFields === "boolean") out.skipFormFields = input.skipFormFields;
+  if (typeof input.experimentalModels === "boolean") out.experimentalModels = input.experimentalModels;
   if (typeof input.catalogRefreshHours === "number" && input.catalogRefreshHours >= 1) {
     out.catalogRefreshHours = Math.min(input.catalogRefreshHours, 24 * 30);
   }

@@ -40,6 +40,7 @@ const NAMES: Record<string, string> = {
   ms: "Malay",
   nb: "Norwegian Bokmål",
   nl: "Dutch",
+  nn: "Norwegian Nynorsk",
   pl: "Polish",
   pt: "Portuguese",
   ro: "Romanian",

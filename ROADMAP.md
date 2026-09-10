@@ -145,13 +145,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: `web-ext lint` reports 0 warnings; the Firefox bundle contains no `offscreen` string; the Chrome build is unchanged.
   Complexity: S
 
-- [ ] P0 — G-25 — Evaluate catalog `filter_expression` against a fixed environment
-  Why: desktop currently picks the Android `base-memory` 3.1 record over the desktop `base` 3.0 record for en→ko, en→ru, ja→en, ko→en and zh-Hans→en, offers nightly-only 3.0a1 pairs (az, be, bs, nb, nn), and shows `nn`, `az`, `be` as bare codes.
-  Evidence: live `translations-models-v2` records 2026-09-10 (`env.appinfo.OS == 'Android'`, `env.channel == 'default' || 'nightly'`); `TranslationsParent.sys.mjs` version ladder L764-791; `src/shared/catalog.ts` stores `filter_expression` unused; `src/shared/languages.ts` lacks the three codes.
-  Touches: src/shared/catalog.ts (`isRecordUsable` takes an environment `{ os: "desktop" | "android", channel: "release" }`; a tiny evaluator for the two expression shapes in use, rejecting unknown expressions), src/shared/languages.ts, tests/catalog.test.ts
-  Acceptance: unit tests show desktop selects `base` for ja→en and Android selects `base-memory`; prerelease-gated pairs are hidden unless a "show experimental models" setting is on; every catalog language has a display name.
-  Complexity: M
-
 ### P1
 
 - [ ] P1 — G-26 — Translate same-origin iframes without double injection
@@ -297,6 +290,13 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Complexity: S
 
 ### P3
+
+- [ ] P3 — G-48 — Remove or write the missing catalog snapshot tool
+  Why: `package.json` has a `catalog:snapshot` script pointing at `tools/snapshot-catalog.mjs`, which does not exist, so the script fails for anyone who runs it. Either write the tool (a dated catalog snapshot would make the filter-expression tests reproducible offline) or drop the script.
+  Evidence: noticed 2026-09-10 while adding the `filter_expression` gate; `ls tools/` has no such file.
+  Touches: package.json, tools/
+  Acceptance: `npm run catalog:snapshot` either produces a snapshot file or the script is gone.
+  Complexity: S
 
 - [ ] P3 — G-45 — Main-content-first mode
   Why: Immersive Translate's most praised behaviour is translating the article body and leaving chrome alone; Readability.js is MPL-licensed and already shipped by Firefox and trialled by Chrome.

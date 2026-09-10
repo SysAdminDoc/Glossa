@@ -1,10 +1,12 @@
 import { api } from "../shared/api.ts";
 import {
+  catalogEnvironment,
   languageCoverage,
   pairKey,
   planRoute,
   routeBytes,
   routeDownloadBytes,
+  type CatalogEnvironment,
   type ModelFileType,
   type ModelRecord,
   type PairFiles
@@ -39,17 +41,23 @@ export class EngineHost {
   private queue: Promise<unknown> = Promise.resolve();
 
   async handle(request: EngineRequest): Promise<unknown> {
+    // Which catalog records count depends on the platform and on whether the user asked for the
+    // prerelease models, and the request is the only place that answer can come from here.
+    const environment = catalogEnvironment(
+      typeof navigator === "undefined" ? "" : navigator.userAgent,
+      request.experimental === true
+    );
     switch (request.type) {
       case "ping":
         return { alive: true, engineLoaded: this.worker !== null };
       case "translate":
-        return this.translate(request.sourceLanguage, request.targetLanguage, request.fragments);
+        return this.translate(request.sourceLanguage, request.targetLanguage, request.fragments, environment);
       case "ensure-route":
-        return { routeKey: await this.ensureRoute(request.sourceLanguage, request.targetLanguage) };
+        return { routeKey: await this.ensureRoute(request.sourceLanguage, request.targetLanguage, environment) };
       case "route-status":
-        return this.routeStatus(request.sourceLanguage, request.targetLanguage);
+        return this.routeStatus(request.sourceLanguage, request.targetLanguage, environment);
       case "models-list":
-        return this.modelsList();
+        return this.modelsList(environment);
       case "models-delete":
         return { deleted: await this.deletePair(request.pairKey) };
       case "catalog-refresh": {
@@ -59,8 +67,13 @@ export class EngineHost {
     }
   }
 
-  async translate(sourceLanguage: string, targetLanguage: string, fragments: string[]) {
-    const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage);
+  async translate(
+    sourceLanguage: string,
+    targetLanguage: string,
+    fragments: string[],
+    environment?: CatalogEnvironment
+  ) {
+    const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
     // One request at a time: Bergamot blocks the worker thread for the whole batch.
     const run = this.queue.then(() =>
       this.call({ type: "translate", id: 0, routeKey, fragments, html: true })
@@ -69,7 +82,11 @@ export class EngineHost {
     return run as Promise<{ fragments: string[]; inferenceMs: number }>;
   }
 
-  async routeStatus(sourceLanguage: string, targetLanguage: string): Promise<RouteStatus> {
+  async routeStatus(
+    sourceLanguage: string,
+    targetLanguage: string,
+    environment?: CatalogEnvironment
+  ): Promise<RouteStatus> {
     const catalog = await this.store.getCatalog({ maxAgeMs: CATALOG_MAX_AGE_MS });
     const base: RouteStatus = {
       sourceLanguage,
@@ -81,7 +98,7 @@ export class EngineHost {
       catalogError: this.store.catalogError
     };
     if (!catalog) return base;
-    const route = planRoute(catalog.records, sourceLanguage, targetLanguage);
+    const route = planRoute(catalog.records, sourceLanguage, targetLanguage, environment);
     if (!route) return base;
     const hops: NonNullable<RouteStatus["hops"]> = [];
     let downloadBytes = 0;
@@ -99,9 +116,9 @@ export class EngineHost {
     return { ...base, hops, installed: hops.every((hop) => hop.installed), downloadBytes };
   }
 
-  async modelsList(): Promise<ModelsListResponse> {
+  async modelsList(environment?: CatalogEnvironment): Promise<ModelsListResponse> {
     const catalog = await this.store.getCatalog({ maxAgeMs: CATALOG_MAX_AGE_MS });
-    const coverage = catalog ? languageCoverage(catalog.records) : { sources: [], targets: [] };
+    const coverage = catalog ? languageCoverage(catalog.records, environment) : { sources: [], targets: [] };
     return {
       installed: await this.store.listInstalled(),
       sources: coverage.sources,
@@ -125,7 +142,11 @@ export class EngineHost {
   }
 
   // Resolve a language pair to a loaded worker route, downloading and loading on demand.
-  async ensureRoute(sourceLanguage: string, targetLanguage: string): Promise<string> {
+  async ensureRoute(
+    sourceLanguage: string,
+    targetLanguage: string,
+    environment?: CatalogEnvironment
+  ): Promise<string> {
     if (sourceLanguage === targetLanguage) {
       throw new Error("Source and target language are the same");
     }
@@ -133,7 +154,7 @@ export class EngineHost {
     if (!catalog) {
       throw new Error(this.store.catalogError ?? "The model catalog could not be loaded");
     }
-    const route = planRoute(catalog.records, sourceLanguage, targetLanguage);
+    const route = planRoute(catalog.records, sourceLanguage, targetLanguage, environment);
     if (!route) {
       throw new Error(`No model is available for ${sourceLanguage} to ${targetLanguage}`);
     }
