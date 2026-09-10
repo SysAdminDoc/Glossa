@@ -38,6 +38,8 @@ let blocked: string | null = null;
 // Firefox hands out `host_permissions` as optional ones, and a temporary install gets none at all,
 // so a download can fail with nothing but a network error to show for it.
 let modelHostsGranted = true;
+// False only on a machine whose processor cannot run the engine, where nothing else matters.
+let engineSupported = true;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
 
@@ -100,6 +102,11 @@ function render(): void {
   actionButton.classList.remove("secondary");
 
   grantRow.hidden = modelHostsGranted;
+  if (!engineSupported) {
+    actionButton.textContent = "Not supported on this computer";
+    actionButton.disabled = true;
+    return;
+  }
   if (blocked && !page?.translated) {
     actionButton.textContent = "Turned off for this page";
     actionButton.disabled = true;
@@ -299,6 +306,13 @@ async function init(): Promise<void> {
   let codes = knownLanguageCodes();
   try {
     const models = await sendUi<ModelsListResponse>({ type: "glossa:models:list" });
+    engineSupported = models.engineSupported !== false;
+    if (!engineSupported) {
+      setStatus(
+        "This computer's processor lacks the SIMD instructions the engine needs, so Glossa cannot translate here.",
+        "error"
+      );
+    }
     if (models.targets.length > 0) codes = Array.from(new Set([...models.sources, ...models.targets]));
     if (models.catalogError && models.targets.length === 0) {
       setStatus(`Model catalog unavailable: ${models.catalogError}`, "error");

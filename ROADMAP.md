@@ -72,7 +72,7 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 - [ ] G-13 — Memory ceiling and route eviction tuning
   Why: two loaded routes plus the WASM heap can pass 300 MB. There is no telemetry, so the ceiling has to be measured locally.
-  Research note 2026-09-10: Firefox uses a 15 s idle timeout per engine (`translations-engine.sys.mjs` L125, refreshed by `keepAlive()`), transfers model buffers rather than cloning them, and discards the engine port when a tab is hidden. Use those numbers as the starting point.
+  Note 2026-09-10: the 15 s idle unload landed with G-28 (`ENGINE_IDLE_MS`), and on Chrome the offscreen document closes with it. What is left here is measuring the peak and tuning `MAX_LOADED_ROUTES`.
   Touches: src/engine/bergamot.worker.ts (MAX_LOADED_ROUTES, unload after idle), src/engine/engine-host.ts, docs
   Acceptance: an idle timer unloads models after a configurable period and the measured peak on the fixture set is documented in README.
   Complexity: S
@@ -122,13 +122,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Evidence: local probe 2026-09-10 (`#inp`, `#img`, `#title-p`, document title); translatelocally #69, bergamot #314; Firefox `TRANSLATABLE_ATTRIBUTES` (L435: `alt` on AREA/IMAGE/IMG/INPUT, `placeholder` on INPUT/TEXTAREA, `title` everywhere, ten `aria-*`, `content` on `META[name=description|keywords]`, `value` only on `INPUT[type=button|reset]`), `<option>` explicit-value preservation (L6213-6222).
   Touches: src/content/segmenter.ts (attribute segments), src/content/renderer.ts (write attributes, preserve `<option value>`, restore), src/shared/messages.ts, tests
   Acceptance: the probe's placeholder, alt, title and document title are translated and restored; a `<select>` keeps its selected value and every option's original `value` after translation.
-  Complexity: M
-
-- [ ] P1 — G-28 — Per-session engine capability check with readable errors, worker restart, and offscreen close
-  Why: on pre-SSE4 CPUs, arm32 phones, or Chromium with the V8 optimiser disabled, the WASM fails to compile and the user sees a raw abort; a Bergamot HTML parse error aborts the whole service with no recovery; the offscreen document and worker live until the browser exits.
-  Evidence: bergamot-translator #418, #383 (SIMD hard requirement), #316 (`ABORT` on parse errors, `-fno-exceptions`); brave-browser #36187 (V8 optimiser setting disables WASM); Bugzilla 2019140 (Firefox 149 cached a stale unsupported verdict); `engine-host.ts` `onerror` drops all state with no restart; Chrome offscreen API (`WORKERS` reason has no lifetime limit, so it must be closed explicitly).
-  Touches: src/engine/engine-host.ts (probe `WebAssembly.validate` with a SIMD module each session, restart the worker on error, retry the failed batch once as plain text, `chrome.offscreen.closeDocument` when idle), src/popup/popup.ts (error copy naming the cause)
-  Acceptance: a forced worker abort mid-page recovers and finishes the page; an unsupported CPU shows "This computer's processor lacks the SIMD instructions the engine needs" instead of a stack trace; after G-13's idle unload the offscreen document is gone from `chrome://extensions`.
   Complexity: M
 
 - [ ] P1 — G-29 — Viewport-first scheduling with priorities and a pause when the tab is hidden

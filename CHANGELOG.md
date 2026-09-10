@@ -5,6 +5,9 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Added
+- The engine lets go of its models after fifteen seconds of quiet, and on Chrome the hidden document that hosts it closes too, so an idle browser is not holding a few hundred megabytes.
+- A processor that cannot run the engine is reported plainly ("this computer's processor lacks the SIMD instructions the engine needs") before anything is downloaded, instead of failing with a stack trace.
+- A translation whose engine dies mid page is retried once on a fresh engine rather than ending the page.
 - A site with an "always" rule translates itself when you open it, with no click. Glossa asks for access to that site when you add the rule, and the rule stays inert until you allow it.
 
 ## [0.2.1] - 2026-09-10

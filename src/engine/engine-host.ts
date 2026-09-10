@@ -28,10 +28,43 @@ import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot
 
 const DEFAULT_CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+// The engine idles out. Firefox uses 15 seconds per engine and discards it when a tab goes away;
+// this releases the worker, its models, and on Chrome the whole document hosting them.
+const ENGINE_IDLE_MS = 15_000;
+
+// A WebAssembly module whose body is `(module (func (result v128) (v128.const i32x4 0 0 0 0)))`.
+// It compiles only where SIMD is available, which is what the engine needs and what a pre-SSE4.1
+// desktop CPU, a 32-bit ARM phone, or a browser with its WASM optimiser switched off does not have.
+const SIMD_PROBE = new Uint8Array([
+  0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7b, 0x03,
+  0x02, 0x01, 0x00, 0x0a, 0x16, 0x01, 0x14, 0x00, 0xfd, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b
+]);
+
+export const NO_SIMD_MESSAGE =
+  "This computer's processor lacks the SIMD instructions the engine needs. On a desktop that means " +
+  "a CPU older than SSE4.1; in Brave or Chrome it can also mean the WebAssembly optimiser is " +
+  "switched off for this site.";
+
+// Never cached across sessions: Firefox 149 shipped a bug where a stale unsupported verdict stuck
+// (Bugzilla 2019140). One check per engine host is cheap.
+export function supportsSimd(): boolean {
+  try {
+    return WebAssembly.validate(SIMD_PROBE);
+  } catch {
+    return false;
+  }
+}
+
+// One retry per host. A second crash on the same batch is a real failure, not a hiccup.
+const MAX_RESTARTS = 1;
+
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
 export class EngineHost {
   readonly store = new ModelStore();
+  // Called when the engine has been idle long enough to release everything it holds.
+  onIdle: (() => void) | null = null;
   private worker: Worker | null = null;
   private workerReady: Promise<void> | null = null;
   private nextId = 1;
@@ -42,6 +75,9 @@ export class EngineHost {
   // The refresh interval is a setting, and the host cannot read settings on Chrome, so each request
   // brings the current value with it.
   private catalogMaxAgeMs = DEFAULT_CATALOG_MAX_AGE_MS;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  // Set when the worker dies so the next request starts a fresh one instead of failing forever.
+  private restarts = 0;
 
   async handle(request: EngineRequest): Promise<unknown> {
     // Which catalog records count depends on the platform and on whether the user asked for the
@@ -79,13 +115,55 @@ export class EngineHost {
     fragments: string[],
     environment?: CatalogEnvironment
   ) {
-    const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
-    // One request at a time: Bergamot blocks the worker thread for the whole batch.
-    const run = this.queue.then(() =>
-      this.call({ type: "translate", id: 0, routeKey, fragments, html: true })
-    );
+    this.keepAlive();
+    // One request at a time: Bergamot blocks the worker thread for the whole batch. A batch that
+    // dies with the worker is tried once more on the restarted one; Bergamot aborts the whole
+    // service on a parse error it cannot recover from, and one bad block should not end the page.
+    const run = this.queue.then(async () => {
+      try {
+        const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
+        return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
+      } catch (error) {
+        if (!this.worker && this.restarts < MAX_RESTARTS) {
+          this.restarts++;
+          const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
+          return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
+        }
+        throw error;
+      } finally {
+        this.keepAlive();
+      }
+    });
     this.queue = run.catch(() => undefined);
     return run as Promise<{ fragments: string[]; inferenceMs: number }>;
+  }
+
+  // Hold the engine open while work is arriving, and let it go when it stops.
+  private keepAlive(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      void this.shutdown();
+    }, ENGINE_IDLE_MS);
+  }
+
+  // Drop the worker, its models, and on Chrome the offscreen document that exists only to host it.
+  // Nothing is cached in memory that a later request cannot rebuild from the model store.
+  async shutdown(): Promise<void> {
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+    this.worker?.terminate();
+    this.worker = null;
+    this.workerReady = null;
+    this.loadedRoutes.clear();
+    this.pending.clear();
+    this.restarts = 0;
+    // On Chrome the host runs inside an offscreen document that would otherwise live until the
+    // browser exits. That document has no access to chrome.offscreen (only chrome.runtime), so it
+    // closes itself: offscreen.ts passes window.close as this hook. Firefox needs none of it.
+    this.onIdle?.();
   }
 
   async routeStatus(
@@ -132,6 +210,7 @@ export class EngineHost {
       catalogFetchedAt: catalog?.fetchedAt ?? null,
       catalogError: this.store.catalogError,
       engineLoaded: this.worker !== null,
+      engineSupported: supportsSimd(),
       byteSource: await this.store.activeSource()
     };
   }
@@ -210,6 +289,7 @@ export class EngineHost {
 
   private ensureWorker(): Promise<void> {
     if (this.workerReady) return this.workerReady;
+    if (!supportsSimd()) return Promise.reject(new Error(NO_SIMD_MESSAGE));
     this.workerReady = (async () => {
       const worker = new Worker(api.runtime.getURL("bergamot-worker.js"));
       worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.onWorkerMessage(event.data);

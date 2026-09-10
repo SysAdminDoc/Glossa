@@ -140,6 +140,8 @@ export interface ModelsListResponse {
   catalogFetchedAt: number | null;
   catalogError: string | null;
   engineLoaded: boolean;
+  // False when this machine's CPU (or the browser's WASM settings) cannot run the engine at all.
+  engineSupported: boolean;
   // Where the next model download will come from. Chrome browsers end up on the registry bucket
   // because Mozilla's attachment CDN refuses their user agent.
   byteSource: "mozilla-cdn" | "mozilla-gcs";

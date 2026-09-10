@@ -152,7 +152,7 @@ async function refreshModels(): Promise<void> {
   try {
     models = await sendUi<ModelsListResponse>({ type: "glossa:models:list" });
   } catch (error) {
-    models = { installed: [], sources: [], targets: [], catalogFetchedAt: null, catalogError: String(error), engineLoaded: false, byteSource: "mozilla-cdn" };
+    models = { installed: [], sources: [], targets: [], catalogFetchedAt: null, catalogError: String(error), engineLoaded: false, engineSupported: true, byteSource: "mozilla-cdn" };
   }
   renderModels();
 }

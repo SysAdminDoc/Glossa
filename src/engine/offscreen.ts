@@ -6,6 +6,10 @@ import { EngineHost } from "./engine-host.ts";
 // hosted in this offscreen document and the service worker talks to it over runtime messages.
 
 const host = new EngineHost();
+// An offscreen document created for the WORKERS reason has no lifetime of its own: it lives until
+// the browser exits unless something closes it. It cannot call chrome.offscreen either (only
+// chrome.runtime is available here), so it closes itself once the engine has gone idle.
+host.onIdle = () => window.close();
 // Exposed for the browser smoke and for manual debugging from the page's devtools.
 (globalThis as { glossaEngineHost?: EngineHost }).glossaEngineHost = host;
 
