@@ -73,13 +73,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P1
 
-- [ ] P1 — G-26 — Translate same-origin iframes without double injection
-  Why: content inside same-origin frames (comment widgets, docs viewers, Thunderbird-style mail bodies) is never translated; naive `allFrames` injection produces duplicate translations.
-  Evidence: local probe 2026-09-10 (`#frm` case untouched); kiss-translator #730 (two identical lines from top-frame plus iframe injection); immersive-translate #4052 (heap growth from hundreds of short-lived iframes).
-  Touches: src/background/background.ts (`executeScript` with `allFrames: true`, per-frame status keyed by `frameId`), src/content/content.ts (frame-local state, ignore cross-origin failures), src/popup/popup.ts (sum block counts)
-  Acceptance: the probe's iframe paragraph gets a bilingual block exactly once; a page with 50 empty iframes translates in the same time as without them.
-  Complexity: M
-
 - [ ] P1 — G-29 — Viewport-first scheduling with priorities and a pause when the tab is hidden
   Why: at HEAD a6cce06 every unit is queued in one pass sorted once by bounding rect, so a long page blocks on off-screen text while translations pop in at scattered positions; background tabs keep the engine busy.
   Evidence: translatelocally #26 (scattered pop-in); Firefox four IntersectionObservers with `rootMargin` `0%` and `150% 50%` (L1164-1396), P0-P7 by scroll direction (L3662), `AntiStarvationStack(2, 1)` with one request in flight (L4692, L5039), `onHidePage()` releasing the engine (L5333); `content.ts` `orderViewportFirst`.

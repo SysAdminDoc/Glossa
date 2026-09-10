@@ -138,6 +138,18 @@ try {
   const codeLine = await page.$eval("main p code", (element) => element.closest("p")?.querySelector("glossa-translation")?.textContent ?? "");
   assert(/run\s+npm install\s+at/.test(codeLine), `spacing around inline code was lost: "${codeLine}"`);
 
+  // Text inside a same-origin frame is text on the page. It has to be translated exactly once: a
+  // broadcast that reaches the frame twice would leave two translations under one paragraph.
+  const framed = await page.frameLocator("#frm").locator("#framed").evaluate((element) => ({
+    blocks: element.querySelectorAll("glossa-translation").length,
+    text: element.querySelector("glossa-translation")?.textContent ?? "",
+    original: element.childNodes[0]?.textContent ?? ""
+  }));
+  console.info(`smoke: framed paragraph: ${framed.text.trim().slice(0, 70)}`);
+  assert(framed.blocks === 1, `the framed paragraph carries ${framed.blocks} translations`);
+  assert(/comment|reader/i.test(framed.text), `the frame was not translated: "${framed.text}"`);
+  assert(/comentarios/i.test(framed.original), "the frame lost its original text");
+
   // Attributes a reader sees are translated too, and put back on restore. An option keeps what it
   // submits: translating its label must not change the value the form sends.
   const attrs = await page.evaluate(() => ({
@@ -283,6 +295,11 @@ try {
     anchors: document.querySelectorAll("#cards a").length
   }));
   assert(leftovers.anchors === 2, `restore left ${leftovers.anchors} card anchors instead of 2`);
+  const framedAfter = await page
+    .frameLocator("#frm")
+    .locator("#framed")
+    .evaluate((element) => element.querySelectorAll("glossa-translation").length);
+  assert(framedAfter === 0, `restore left ${framedAfter} translations inside the frame`);
   const restoredAttrs = await page.evaluate(() => ({
     title: document.title,
     placeholder: document.getElementById("search")?.getAttribute("placeholder") ?? "",

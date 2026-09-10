@@ -96,19 +96,54 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
 
 // ---- content script plumbing ----
 
-async function ensureContentScript(tabId: number): Promise<void> {
-  const probe = await sendToTab<PageState | undefined>(tabId, { type: "glossa:page-command", command: "status" });
-  if (probe?.injected) return;
-  await api.scripting.insertCSS({ target: { tabId }, files: ["content.css"] });
-  await api.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+// Content inside a frame is content: comment widgets, documentation viewers and mail bodies all live
+// in one. Injecting into every frame the extension may touch, and then talking to each frame by id,
+// is what keeps a frame's text from being missed and what keeps it from being translated twice: a
+// broadcast to a tab answers from whichever frame replies first, which is not something to build on.
+async function ensureContentScript(tabId: number): Promise<number[]> {
+  let frames: number[] = [];
+  try {
+    await api.scripting.insertCSS({ target: { tabId, allFrames: true }, files: ["content.css"] });
+    const results = await api.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["content.js"] });
+    frames = results.map((result) => result.frameId ?? 0);
+  } catch {
+    // A tab whose subframes are out of reach still has a main frame worth translating.
+    await api.scripting.insertCSS({ target: { tabId }, files: ["content.css"] });
+    await api.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    frames = [TOP_FRAME];
+  }
+  if (!frames.includes(TOP_FRAME)) frames.unshift(TOP_FRAME);
+  return frames;
 }
 
-async function sendToTab<T>(tabId: number, message: PageCommand): Promise<T | undefined> {
+const TOP_FRAME = 0;
+
+async function sendToTab<T>(tabId: number, message: PageCommand, frameId = TOP_FRAME): Promise<T | undefined> {
   try {
-    return (await api.tabs.sendMessage(tabId, message)) as T;
+    return (await api.tabs.sendMessage(tabId, message, { frameId })) as T;
   } catch {
     return undefined;
   }
+}
+
+// The same command to every frame, with the answers merged into one picture of the tab. A frame
+// that does not answer (cross-origin, already gone, never injected) is simply not counted.
+async function sendToFrames(tabId: number, message: PageCommand, frames: number[]): Promise<PageState | undefined> {
+  const states = await Promise.all(frames.map((frameId) => sendToTab<PageState>(tabId, message, frameId)));
+  return mergeStates(states.filter((state): state is PageState => Boolean(state?.injected)));
+}
+
+function mergeStates(states: PageState[]): PageState | undefined {
+  const top = states[0];
+  if (!top) return undefined;
+  return {
+    ...top,
+    translated: states.some((state) => state.translated),
+    translating: states.some((state) => state.translating),
+    blocksTotal: states.reduce((sum, state) => sum + state.blocksTotal, 0),
+    blocksDone: states.reduce((sum, state) => sum + state.blocksDone, 0),
+    lastError: states.find((state) => state.lastError)?.lastError ?? null
+  };
 }
 
 async function translatePage(tabId: number, targetOverride?: string, sourceOverride?: string): Promise<PageState | undefined> {
@@ -125,7 +160,7 @@ async function translatePage(tabId: number, targetOverride?: string, sourceOverr
     const current = await sendToTab<PageState>(tabId, { type: "glossa:page-command", command: "status" });
     return current ? { ...current, lastError: ruleBlock } : undefined;
   }
-  await ensureContentScript(tabId);
+  const frames = await ensureContentScript(tabId);
   const command: PageCommand = {
     type: "glossa:page-command",
     command: "translate",
@@ -135,7 +170,7 @@ async function translatePage(tabId: number, targetOverride?: string, sourceOverr
     skipFormFields: settings.skipFormFields,
     ...(sourceOverride ? { sourceLanguage: sourceOverride } : {})
   };
-  return sendToTab<PageState>(tabId, command);
+  return sendToFrames(tabId, command, frames);
 }
 
 async function detectLanguage(request: DetectRequest): Promise<DetectResponse> {
@@ -199,15 +234,16 @@ async function pageStatus(tabId: number): Promise<PageStatusResponse> {
   // Opening the popup is the user gesture that grants activeTab, so the content script can go in
   // now and detect the page language before anything is translated.
   let injectError: string | null = null;
+  let frames: number[] = [TOP_FRAME];
   if (url && /^(https?|file):/.test(url)) {
     try {
-      await ensureContentScript(tabId);
+      frames = await ensureContentScript(tabId);
     } catch (error) {
       // Browser-internal or store pages refuse injection; the popup shows the reason.
       injectError = error instanceof Error ? error.message : String(error);
     }
   }
-  const page = await sendToTab<PageState>(tabId, { type: "glossa:page-command", command: "status" });
+  const page = await sendToFrames(tabId, { type: "glossa:page-command", command: "status" }, frames);
   if (!page) {
     const reason = injectError ?? (url && /^(https?|file):/.test(url) ? "not-injected" : "unsupported-page");
     return { page: { injected: false, url, reason }, route: null, blocked: null };
@@ -228,8 +264,10 @@ async function handleUiRequest(request: UiRequest): Promise<unknown> {
       return pageStatus(request.tabId);
     case "glossa:translate-page":
       return translatePage(request.tabId, request.targetLanguage, request.sourceLanguage);
-    case "glossa:restore-page":
-      return sendToTab<PageState>(request.tabId, { type: "glossa:page-command", command: "restore" });
+    case "glossa:restore-page": {
+      const frames = await ensureContentScript(request.tabId);
+      return sendToFrames(request.tabId, { type: "glossa:page-command", command: "restore" }, frames);
+    }
     case "glossa:translate-selection": {
       const settings = await loadSettings();
       await ensureContentScript(request.tabId);
