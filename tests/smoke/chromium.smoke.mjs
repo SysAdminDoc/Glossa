@@ -415,6 +415,66 @@ try {
     await chrome.storage.local.set({ settings: { ...stored.settings, sourceLanguages: {} } });
   });
 
+  // The selection popover floats over the page, so it has to behave: dismissible with Escape, a
+  // close target big enough to hit, clear of the text it explains, and outside any editor.
+  await page.evaluate(() => {
+    const target = document.getElementById("intro");
+    const range = document.createRange();
+    range.selectNodeContents(target.firstChild);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    window.__editableBefore = document.getElementById("editable").innerHTML;
+  });
+  await worker.evaluate(async (id) => {
+    await chrome.tabs.sendMessage(id, {
+      type: "glossa:page-command",
+      command: "translate-selection",
+      targetLanguage: "en"
+    });
+  }, tabId);
+  await page.waitForFunction(
+    () => {
+      const body = document.querySelector(".glossa-popover-body");
+      return body && body.textContent && !body.textContent.includes("…");
+    },
+    null,
+    { timeout: 120_000 }
+  );
+  const popover = await page.evaluate(() => {
+    const box = document.querySelector(".glossa-popover");
+    const close = document.querySelector(".glossa-popover-close");
+    const rect = box.getBoundingClientRect();
+    const closeRect = close.getBoundingClientRect();
+    const selectionRect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+    const overlaps =
+      rect.left < selectionRect.right &&
+      rect.right > selectionRect.left &&
+      rect.top < selectionRect.bottom &&
+      rect.bottom > selectionRect.top;
+    return {
+      text: document.querySelector(".glossa-popover-body").textContent ?? "",
+      insideEditor: Boolean(document.querySelector("#editable .glossa-popover")),
+      parentIsRoot: box.parentElement === document.documentElement,
+      closeWidth: closeRect.width,
+      closeHeight: closeRect.height,
+      overlaps,
+      editableUnchanged: document.getElementById("editable").innerHTML === window.__editableBefore
+    };
+  });
+  console.info(`smoke: selection popover says: ${popover.text.trim().slice(0, 60)}`);
+  assert(/library/i.test(popover.text), `the selection was not translated: "${popover.text}"`);
+  assert(popover.parentIsRoot && !popover.insideEditor, "the popover was inserted inside the page's content");
+  assert(popover.editableUnchanged, "the popover changed the editable region's content");
+  assert(
+    popover.closeWidth >= 24 && popover.closeHeight >= 24,
+    `the close control is ${popover.closeWidth}x${popover.closeHeight}, under the 24 px minimum`
+  );
+  assert(!popover.overlaps, "the popover covers the selection it is explaining");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector(".glossa-popover") === null, null, { timeout: 5_000 });
+  console.info("smoke: Escape closed the popover");
+
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a
   // guard on what is observable, not a proof of the whole picture. The proof is the manifest:

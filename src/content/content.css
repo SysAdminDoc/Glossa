@@ -50,7 +50,13 @@ glossa-translation.glossa-t.glossa-inline {
 }
 
 .glossa-popover-close {
-  display: inline-block;
+  /* WCAG 2.5.8 asks for a target of at least 24 by 24 CSS pixels, and a close button that misses
+     is worse than no close button on a box floating over the page. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 24px;
   margin-top: 8px;
   padding: 4px 10px;
   border: 1px solid #585b70;
@@ -59,6 +65,11 @@ glossa-translation.glossa-t.glossa-inline {
   color: #cdd6f4;
   font: 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   cursor: pointer;
+}
+
+.glossa-popover-close:focus-visible {
+  outline: 2px solid #7c6cf2;
+  outline-offset: 2px;
 }
 
 .glossa-popover-close:hover {

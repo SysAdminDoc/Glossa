@@ -618,11 +618,20 @@ async function translateSelection(controller: Controller, target: string): Promi
   showPopover(parsed.body.textContent ?? "", anchor, false);
 }
 
+// The popover floats over the page, so it has to behave like something floating over a page:
+// dismissible with Escape (WCAG 1.4.13), a close target of at least 24 px (2.5.8), and placed clear
+// of the text it is explaining so it never covers the selection (2.4.11). It is attached to the
+// document element rather than near the selection, which keeps it out of any editor the page is
+// running: a box inserted inside a rich text editor gets saved as part of the document.
+let closePopover: (() => void) | null = null;
+
 function showPopover(text: string, anchor: DOMRect | null, isError: boolean): void {
-  document.querySelector(".glossa-popover")?.remove();
+  dismissPopover();
   const box = document.createElement("div");
   box.className = `glossa-popover${isError ? " glossa-popover-error" : ""}`;
   box.setAttribute("translate", "no");
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-label", "Glossa translation");
   const body = document.createElement("div");
   body.className = "glossa-popover-body";
   body.textContent = text;
@@ -630,13 +639,42 @@ function showPopover(text: string, anchor: DOMRect | null, isError: boolean): vo
   close.type = "button";
   close.className = "glossa-popover-close";
   close.textContent = "Close";
-  close.addEventListener("click", () => box.remove());
+  close.addEventListener("click", () => dismissPopover());
   box.append(body, close);
-  const top = anchor ? Math.min(window.innerHeight - 40, Math.max(8, anchor.bottom + 8)) : 16;
-  const left = anchor ? Math.min(window.innerWidth - 340, Math.max(8, anchor.left)) : 16;
-  box.style.top = `${top}px`;
-  box.style.left = `${left}px`;
   document.documentElement.append(box);
+  place(box, anchor);
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape") dismissPopover();
+  };
+  document.addEventListener("keydown", onKeyDown, true);
+  closePopover = () => {
+    document.removeEventListener("keydown", onKeyDown, true);
+    box.remove();
+    closePopover = null;
+  };
+}
+
+function dismissPopover(): void {
+  if (closePopover) closePopover();
+  else document.querySelector(".glossa-popover")?.remove();
+}
+
+// Below the selection when there is room, above it when there is not, and never across it.
+function place(box: HTMLElement, anchor: DOMRect | null): void {
+  const gap = 8;
+  const height = box.getBoundingClientRect().height || 80;
+  const width = box.getBoundingClientRect().width || 330;
+  if (!anchor) {
+    box.style.top = `${gap * 2}px`;
+    box.style.left = `${gap * 2}px`;
+    return;
+  }
+  const below = anchor.bottom + gap;
+  const fitsBelow = below + height <= window.innerHeight - gap;
+  const top = fitsBelow ? below : Math.max(gap, anchor.top - gap - height);
+  box.style.top = `${top}px`;
+  box.style.left = `${Math.min(Math.max(gap, anchor.left), Math.max(gap, window.innerWidth - width - gap))}px`;
 }
 
 boot();

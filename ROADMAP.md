@@ -116,20 +116,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on a 500-paragraph fixture the visible paragraphs are translated before any off-screen one and scrolling re-prioritises; a hidden tab issues no engine calls until shown.
   Complexity: L
 
-- [ ] P1 — G-31 — Selection popover meets WCAG hover and target rules and never lands inside an editor
-  Why: the popover cannot be dismissed with Esc, its close target is under 24 px, it can cover the selection it explains, and it is appended to the document root without checking editors.
-  Evidence: WCAG 1.4.13, 2.5.8, 2.4.11; linguist #344 (focus stolen from the selection); simple-translate #342 (popup saved into TinyMCE content); `content.ts` `showPopover`.
-  Touches: src/content/content.ts `showPopover`, src/content/content.css
-  Acceptance: Esc closes the popover; the close control measures at least 24 by 24 CSS px; the popover is positioned outside the selection rect; on a `contenteditable` page the popover is a sibling of the editor, never inside it, and the editor's `innerHTML` is unchanged afterwards.
-  Complexity: S
-
-- [ ] P1 — G-34 — Release pipeline and version bump script
-  Why: no release exists; version strings live in four files edited by hand; the house rule is ZIP as the primary asset with a CRX3 secondary and SHA-256 sidecars.
-  Evidence: README install section points at a releases page with nothing on it; tests/manifest.test.ts guards the strings but nothing bumps them; house release rules.
-  Touches: tools/bump.mjs (package.json, both manifests, README badge, CHANGELOG heading), tools/release.mjs (build, CRX3 with a gitignored selfhost pem, `.sha256` sidecars, `gh release create` with notes from CHANGELOG), README.md
-  Acceptance: `npm run release -- 0.2.0` produces both ZIPs, a CRX, sidecars, a tagged commit and a GitHub release whose assets download and match the sidecars.
-  Complexity: M
-
 - [ ] P1 — G-35 — Reproducible source archive and reviewer notes for AMO and the Chrome Web Store
   Why: esbuild output triggers AMO's source-submission rule; reviewers must rebuild a byte-identical XPI from a README naming OS and exact tool versions; neither store's policy addresses runtime-fetched model weights, so the listing must explain them.
   Evidence: extensionworkshop source-code-submission (default reviewer environment Ubuntu 24.04 ARM64, Node 24.14.0, npm 11.9.0); Chrome remote-hosted-code policy names WASM (bundled here) and allows data fetches; CWS 2026-08-01 policy update on single purpose.
