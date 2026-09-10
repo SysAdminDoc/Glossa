@@ -4,14 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P1
 
-- [ ] G-05 — Signed Firefox build for permanent installs
-  Research note 2026-09-10: blocked on G-24 (`data_collection_permissions` is mandatory for new AMO submissions since 2025-11-03) and G-35 (reproducible source archive; esbuild output triggers AMO's source-submission rule and a reviewer must rebuild a byte-identical XPI). The AMO API is v5; `web-ext sign --channel unlisted --upload-source-code`.
-  Why: temporary add-ons vanish when Firefox closes. AMO unlisted signing is automated and needs no public listing.
-  Evidence: README install section; Astra-Deck 2026-09-04 research confirmed unlisted signing works without a listing.
-  Touches: tools/release-firefox.mjs (new, web-ext sign or the AMO API), README.md
-  Acceptance: the release carries a signed `.xpi` that installs from `about:addons` and survives a restart.
-  Complexity: M
-
 - [ ] G-06 — Chrome built-in Translator API as an optional second engine
   Why: on Chrome 138+ and Edge 148+ the on-device Translator API needs no model download from a third party and covers a few languages Bergamot lacks. It must stay opt-in: the packs come from Google's component updater.
   Evidence: research pass section 2; Linguist issue #611 asks for the same.
