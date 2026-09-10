@@ -138,6 +138,14 @@ try {
   assert(cards.unitOnGrid === null, "the card grid itself was sent as one unit");
   assert(cards.translatedNames.length === 2, `expected 2 translated card names, got ${cards.translatedNames.length}`);
 
+  // A url, an email address and a reference number have to come back byte for byte, spacing and all.
+  const contact = await page.$eval("#contact glossa-translation", (block) => block.textContent ?? "");
+  console.info(`smoke: contact line: ${contact}`);
+  for (const literal of ["info@ejemplo.es", "https://ejemplo.es/catalogo?sala=3", "2026123456"]) {
+    assert(contact.includes(literal), `"${literal}" did not survive translation: "${contact}"`);
+  }
+  assert(!contact.includes("ejemplo. es"), `a protected literal was split: "${contact}"`);
+
   const shadow = await page.evaluate(() => {
     const root = document.getElementById("host")?.shadowRoot;
     const block = root?.querySelector("glossa-translation");

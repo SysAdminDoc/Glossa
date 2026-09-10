@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-21 — Protect URLs, emails, and bare numbers inside units
-  Why: the engine inserted a space into a URL (`ruta? x=1`) and translated an email domain (`ejemplo` to `example`); bare digits can come back doubled.
-  Evidence: local probe 2026-09-10 (`#mixed` case); mozilla/translations #600 (`5 5`); bergamot-translator #419 (punctuation-only garbage).
-  Touches: src/content/segmenter.ts `serializeUnit` (extend the `var[data-glossa-hold]` placeholder to text-level spans matched by URL, email, and number regexes), tests/segmenter.test.ts
-  Acceptance: the probe's URL and email survive byte-identical inside the translated block; a unit consisting only of digits or punctuation is never sent.
-  Complexity: S
-
 - [ ] P0 — G-22 — Honour per-element `lang` that differs from the page language
   Why: an Arabic `lang="ar"` paragraph on a Spanish page was pushed through the es→en route and came back mangled; mixed-language pages are a standing complaint.
   Evidence: local probe 2026-09-10 (`#rtl` case); Firefox `#matchesDocumentLanguage()` skips subtrees whose `lang` differs (L3513); Bugzilla 1952764; mozilla/translations #1111.

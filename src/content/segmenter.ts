@@ -9,8 +9,12 @@ export const TRANSLATION_CLASS = "glossa-t";
 export const TRANSLATION_TAG = "GLOSSA-TRANSLATION";
 
 export type Segment =
-  | { kind: "element"; element: Element; html: string; text: string; holds: Element[] }
+  | { kind: "element"; element: Element; html: string; text: string; holds: Hold[] }
   | { kind: "text"; node: Text; text: string };
+
+// What a placeholder stands for: an inline element the page marked as untranslatable, or a run of
+// text inside a sentence (a URL, an address, a reference number) that has to come back unchanged.
+export type Hold = Element | Text;
 
 // Inline elements inside a unit that must survive untouched. Bergamot copies `code`, `kbd`,
 // `samp`, `var` and `math` through verbatim on its own; translate="no" and .notranslate are DOM
@@ -120,9 +124,10 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
 // Serialise a unit for the engine. Protected inline descendants become `var` placeholders that
 // Bergamot passes through untouched; the originals are returned so the renderer can put them
 // back by index. Clone and original are walked with the same selector, so indexes line up.
-export function serializeUnit(element: Element): { html: string; holds: Element[] } {
-  const holds = Array.from(element.querySelectorAll(HOLD_SELECTOR));
-  if (holds.length === 0) {
+export function serializeUnit(element: Element): { html: string; holds: Hold[] } {
+  const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR));
+  const source = element.textContent ?? "";
+  if (holds.length === 0 && !PROTECTED_TEXT.test(source)) {
     return { html: element.innerHTML, holds };
   }
   const clone = element.cloneNode(true) as Element;
@@ -135,7 +140,44 @@ export function serializeUnit(element: Element): { html: string; holds: Element[
     placeholder.textContent = held.textContent ?? "";
     held.replaceWith(placeholder);
   });
+  protectText(clone, holds);
   return { html: clone.innerHTML, holds };
+}
+
+// Runs of text the engine must not touch. It has been seen putting a space inside a query string
+// (`ruta? x=1`) and translating the domain of an email address (`ejemplo` to `example`), and long
+// digit runs come back duplicated. Short numbers stay in the sentence: a model that cannot see
+// "5 libros" has no way to get the agreement right.
+const PROTECTED_TEXT =
+  /[a-z][a-z0-9+.-]*:\/\/[^\s<>"']+|www\.[a-z0-9][^\s<>"']*|[^\s<>"'@,;:()[\]]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.[a-z]{2,}|\d{4,}|\d+(?:[.,:/-]\d+){2,}/giu;
+
+// Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an
+// untranslatable element gets, and the exact original characters are kept to be put back.
+function protectText(clone: Element, holds: Hold[]): void {
+  const doc = clone.ownerDocument;
+  const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) texts.push(node as Text);
+  for (const text of texts) {
+    // Anything already protected, verbatim by the engine or by a placeholder, is left alone.
+    if (text.parentElement?.closest(`var, code, kbd, samp, math, ${HOLD_SELECTOR}`)) continue;
+    PROTECTED_TEXT.lastIndex = 0;
+    if (!PROTECTED_TEXT.test(text.data)) continue;
+    PROTECTED_TEXT.lastIndex = 0;
+    const fragment = doc.createDocumentFragment();
+    let cursor = 0;
+    for (let match = PROTECTED_TEXT.exec(text.data); match; match = PROTECTED_TEXT.exec(text.data)) {
+      if (match.index > cursor) fragment.append(doc.createTextNode(text.data.slice(cursor, match.index)));
+      const placeholder = doc.createElement("var");
+      placeholder.setAttribute(HOLD_ATTRIBUTE, String(holds.length));
+      placeholder.textContent = match[0];
+      holds.push(doc.createTextNode(match[0]));
+      fragment.append(placeholder);
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < text.data.length) fragment.append(doc.createTextNode(text.data.slice(cursor)));
+    text.replaceWith(fragment);
+  }
 }
 
 export function shouldSkip(element: Element, options: SegmentOptions): boolean {

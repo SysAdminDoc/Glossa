@@ -14,6 +14,7 @@ globals.Document = window.Document;
 globals.DocumentFragment = window.DocumentFragment;
 globals.HTMLElement = window.HTMLElement;
 globals.DOMParser = window.DOMParser;
+globals.NodeFilter = window.NodeFilter;
 
 const { batchSegments, collectFromNodes, collectSegments, escapeHtml, segmentFragment } = await import("../src/content/segmenter.ts");
 const { Renderer } = await import("../src/content/renderer.ts");
@@ -102,6 +103,50 @@ test("renderer restores protected inline elements from their placeholders", () =
   assert.equal(block.querySelector("var"), null);
   assert.equal(block.querySelector("span.brand")?.outerHTML, '<span translate="no" class="brand">Café Aurora</span>');
   assert.equal(block.textContent, "The brand Café Aurora opens today with many new things.");
+});
+
+test("urls, email addresses and reference numbers become placeholders", () => {
+  const body = load(
+    `<p id="p">Escribe a <a href="#c">info@ejemplo.es</a> o visita https://ejemplo.es/ruta?x=1 con el expediente 2026123456 antes del 5 de mayo.</p>`
+  );
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const html = (segment as { html: string }).html;
+  // Three placeholders, and the short number stays inside the sentence.
+  assert.match(html, /<var data-glossa-hold="0">info@ejemplo\.es<\/var>/);
+  assert.match(html, /<var data-glossa-hold="1">https:\/\/ejemplo\.es\/ruta\?x=1<\/var>/);
+  assert.match(html, /<var data-glossa-hold="2">2026123456<\/var>/);
+  assert.match(html, /5 de mayo/);
+  assert.equal((segment as { holds: unknown[] }).holds.length, 3);
+});
+
+test("a protected url survives byte for byte even when the engine mangles the spacing", () => {
+  const body = load(`<p id="p">Visita https://ejemplo.es/ruta?x=1 para ver el catálogo completo de la biblioteca.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  // What the engine does to a placeholder: keeps it, loses the spaces around it.
+  renderer.apply(segment, 'Visit<var data-glossa-hold="0">https://ejemplo.es/ruta?x=1</var>to see the full library catalogue.', {
+    displayMode: "bilingual",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const block = window.document.querySelector("#p glossa-translation")!;
+  assert.equal(block.querySelector("var"), null);
+  assert.equal(block.textContent, "Visit https://ejemplo.es/ruta?x=1 to see the full library catalogue.");
+});
+
+test("an email domain is not translated away", () => {
+  const body = load(`<p id="p">Para reservar una sala escribe a info@ejemplo.es y espera la confirmación.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, 'To book a room write to <var data-glossa-hold="0">info@example.com</var> and wait for confirmation.', {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  assert.match(window.document.getElementById("p")!.textContent ?? "", /info@ejemplo\.es/);
 });
 
 test("candidates that are not rendered yet are reported as deferred", () => {

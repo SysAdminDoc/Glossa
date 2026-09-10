@@ -11,6 +11,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - Writes to the page are no longer seen as page changes by the extension's own observer, so translated text is never fed back to the engine.
 - Restore puts back a `lang` attribute the page set itself instead of deleting it.
 - The engine is never handed its own output. Text it produced on the page is remembered for ten minutes, so a page that copies a finished translation into a new element does not get that text translated a second time.
+- Web addresses, email addresses and long reference numbers inside a sentence come back exactly as they went in. The engine used to put a space inside a query string and translate the domain part of an address.
 
 ## [0.1.0] - 2026-09-10
 

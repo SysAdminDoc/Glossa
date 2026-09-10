@@ -1,4 +1,4 @@
-import { HOLD_ATTRIBUTE, PARAGRAPH_TAGS, TRANSLATION_CLASS, TRANSLATION_TAG, UNIT_ATTRIBUTE, type Segment } from "./segmenter.ts";
+import { HOLD_ATTRIBUTE, PARAGRAPH_TAGS, TRANSLATION_CLASS, TRANSLATION_TAG, UNIT_ATTRIBUTE, type Hold, type Segment } from "./segmenter.ts";
 import type { DisplayMode } from "../shared/settings.ts";
 
 // Applies translated fragments back to the page and remembers enough to undo it without a reload.
@@ -221,9 +221,13 @@ function wantsBilingual(element: Element, text: string): boolean {
   return text.trim().length >= 60;
 }
 
-function parseFragment(html: string, holds: Element[]): Node[] {
+function parseFragment(html: string, holds: Hold[]): Node[] {
   const doc = parser.parseFromString(`<body>${html}</body>`, "text/html");
-  // Put protected inline elements back where their placeholders landed.
+  // Spacing first, while the placeholders are still elements. The engine drops the whitespace
+  // around anything it copies verbatim, and once a placeholder has become a bare text node (a URL,
+  // a reference number) there is nothing left to recognise it by.
+  repairInlineSpacing(doc.body);
+  // Then put back what each placeholder stands for, byte for byte.
   for (const placeholder of doc.body.querySelectorAll(`var[${HOLD_ATTRIBUTE}]`)) {
     const index = Number(placeholder.getAttribute(HOLD_ATTRIBUTE));
     const original = holds[index];
@@ -233,7 +237,6 @@ function parseFragment(html: string, holds: Element[]): Node[] {
       placeholder.replaceWith(doc.createTextNode(placeholder.textContent ?? ""));
     }
   }
-  repairInlineSpacing(doc.body);
   // Nothing executable survives the trip. Scripts are inert in a parsed document already; strip
   // them and event handler attributes anyway so a fragment can never carry one back.
   for (const script of doc.querySelectorAll("script, iframe, object, embed")) script.remove();
