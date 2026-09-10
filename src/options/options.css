@@ -13,6 +13,13 @@
   --error: #f38ba8;
 }
 
+/* A class that sets `display` beats the UA rule for the hidden attribute, so say it here
+   once rather than remembering it at every call site. */
+[hidden] {
+  display: none !important;
+}
+
+
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;

@@ -1,6 +1,6 @@
 {
   "name": "glossa",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Private, on-device web page translation for Chrome and Firefox. No cloud, no account, no telemetry.",

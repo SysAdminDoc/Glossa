@@ -2,6 +2,14 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
+## [0.2.1] - 2026-09-10
+
+### Added
+- Firefox: when the model hosts are not allowed, the popup says so and offers a button that asks for them. Downloads work straight after, with no reload. This is what you see if you switch those hosts off in `about:addons`.
+
+### Fixed
+- The permission notice appeared in the popup for everyone, including people who had already allowed the model hosts. A stylesheet rule was overriding the attribute that hides it.
+
 ## [0.2.0] - 2026-09-10
 
 ### Added

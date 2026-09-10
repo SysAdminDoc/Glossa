@@ -22,6 +22,11 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures"
 ADDON = ROOT / "dist" / "firefox-smoke.zip"
 EXTENSION_ID = "glossa@sysadmindoc.github.io"
+MODEL_HOSTS = [
+    "https://firefox.settings.services.mozilla.com/*",
+    "https://firefox-settings-attachments.cdn.mozilla.net/*",
+    "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/*",
+]
 UUID = "1f1a0b6e-9b4a-4a4e-9c2e-2b0d0c1a5e77"
 
 
@@ -66,34 +71,43 @@ def main() -> None:
     driver = webdriver.Firefox(options=options, service=service)
     try:
         driver.install_addon(str(ADDON), temporary=True)
-        # Firefox treats MV3 host permissions as optional and grants none to a temporary add-on.
-        # Grant the manifest's hosts the way the install prompt would, from the browser chrome.
-        with driver.context(driver.CONTEXT_CHROME):
-            granted = driver.execute_async_script(
-                """
-                const [id, origins, done] = arguments;
-                (async () => {
-                  const { ExtensionPermissions } = ChromeUtils.importESModule(
-                    "resource://gre/modules/ExtensionPermissions.sys.mjs"
-                  );
-                  const { ExtensionParent } = ChromeUtils.importESModule(
-                    "resource://gre/modules/ExtensionParent.sys.mjs"
-                  );
-                  const extension = ExtensionParent.GlobalManager.getExtension(id);
-                  await ExtensionPermissions.add(id, { permissions: [], origins }, extension);
-                  const policy = WebExtensionPolicy.getByID(id);
-                  done(JSON.stringify(policy?.allowedOrigins?.patterns?.map((p) => p.pattern) ?? null));
-                })().catch((error) => done("ERR " + error));
-                """,
-                EXTENSION_ID,
-                [
-                    "http://127.0.0.1/*",
-                    "https://firefox.settings.services.mozilla.com/*",
-                    "https://firefox-settings-attachments.cdn.mozilla.net/*",
-                    "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/*",
-                ],
-            )
-        print(f"smoke(firefox): granted hosts: {granted}")
+
+        def permissions(action, origins):
+            """Add or remove host permissions from the browser chrome, the way the install prompt and
+            the about:addons toggles do. The popup's own permissions.request cannot be driven
+            headlessly: it opens a doorhanger that only a real click can answer."""
+            with driver.context(driver.CONTEXT_CHROME):
+                return driver.execute_async_script(
+                    """
+                    const [id, action, origins, done] = arguments;
+                    (async () => {
+                      const { ExtensionPermissions } = ChromeUtils.importESModule(
+                        "resource://gre/modules/ExtensionPermissions.sys.mjs"
+                      );
+                      const { ExtensionParent } = ChromeUtils.importESModule(
+                        "resource://gre/modules/ExtensionParent.sys.mjs"
+                      );
+                      const extension = ExtensionParent.GlobalManager.getExtension(id);
+                      if (action === "add") {
+                        await ExtensionPermissions.add(id, { permissions: [], origins }, extension);
+                      } else {
+                        await ExtensionPermissions.remove(id, { permissions: [], origins }, extension);
+                      }
+                      const policy = WebExtensionPolicy.getByID(id);
+                      done(JSON.stringify(policy ? policy.allowedOrigins.patterns.map((p) => p.pattern) : null));
+                    })().catch((error) => done("ERR " + error));
+                    """,
+                    EXTENSION_ID,
+                    action,
+                    origins,
+                )
+
+        # Firefox 155 does grant a temporary MV3 add-on the host permissions in its manifest (probed
+        # 2026-09-10: WebExtensionPolicy.allowedOrigins lists them with nothing granted by hand). What
+        # a user can still do is switch them off in about:addons, which is what this removes.
+        revoked = permissions("remove", MODEL_HOSTS)
+        print(f"smoke(firefox): host permissions after revoking the model hosts: {revoked}")
+
         driver.get(fixture_url)
         page_handle = driver.current_window_handle
         # tabUrl is a match pattern; a port in the pattern would never match.
@@ -119,6 +133,32 @@ def main() -> None:
         )
         driver.switch_to.window(popup_handle)
         wait_for(driver, lambda d: d.current_url.startswith("moz-extension://"), 30, "popup url")
+
+        # Without the model hosts, the popup must offer to ask for them rather than fail a download
+        # with a bare network error. Wait on the button text, not on the notice being visible: the
+        # notice starts out visible if a stylesheet overrides the hidden attribute, which is exactly
+        # the bug this check used to miss.
+        wait_for(
+            driver,
+            lambda d: d.find_element(By.ID, "action").text == "Allow model downloads first",
+            60,
+            "the popup to offer the model-host permission",
+        )
+        print(f'smoke(firefox): without model hosts the button reads "{driver.find_element(By.ID, "action").text}"')
+        if not driver.find_element(By.ID, "grant-row").is_displayed():
+            fail("the popup asked for nothing while the model hosts were missing")
+        if driver.find_element(By.ID, "action").is_enabled():
+            fail("the translate button was enabled while the model hosts were missing")
+
+        granted = permissions("add", MODEL_HOSTS)
+        print(f"smoke(firefox): host permissions after allowing them again: {granted}")
+        driver.refresh()
+        wait_for(
+            driver,
+            lambda d: not d.find_element(By.ID, "grant-row").is_displayed(),
+            30,
+            "the permission notice to go away once the hosts are granted",
+        )
         try:
             wait_for(driver, lambda d: d.find_element(By.ID, "action").is_enabled(), 60, "popup to finish checking the page")
         except SystemExit:

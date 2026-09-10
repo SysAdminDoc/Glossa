@@ -37,8 +37,11 @@ await rm(profileDir, { recursive: true, force: true });
 await mkdir(profileDir, { recursive: true });
 await mkdir(outDir, { recursive: true });
 
+// GLOSSA_CHROMIUM_PATH picks a specific Chromium binary, for the same reason the smoke supports it:
+// a firewall that allows outbound traffic per binary may not know about a fresh Playwright build.
+const executablePath = process.env.GLOSSA_CHROMIUM_PATH;
 const context = await chromium.launchPersistentContext(profileDir, {
-  channel: "chromium",
+  ...(executablePath ? { executablePath } : { channel: "chromium" }),
   headless: true,
   deviceScaleFactor: 2,
   colorScheme: "dark",

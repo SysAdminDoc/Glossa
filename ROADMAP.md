@@ -4,13 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P0
 
-- [ ] G-02 — Explain and recover a missing model-host permission on Firefox
-  Why: Firefox MV3 treats `host_permissions` as optional. A temporary add-on starts with none at all (verified 2026-09-10: the Firefox smoke had to grant them from the browser chrome), and a user can decline them at install. Without them every model download fails with a bare fetch error.
-  Evidence: MDN manifest `host_permissions` notes for Firefox 127+; tests/smoke/firefox.smoke.py grants origins through ExtensionPermissions; src/engine/model-store.ts has no permission check.
-  Touches: src/engine/model-store.ts, src/popup/popup.ts, src/options/options.ts
-  Acceptance: when `permissions.contains` for the two hosts is false, the popup shows a one-line reason and a button that calls `permissions.request` in the click handler; a download then succeeds without a reload.
-  Complexity: S
-
 - [ ] G-03 — Auto-translate for sites with an "always" rule
   Why: the options page already collects per-host rules but nothing acts on "always". Users who set a rule expect the page to change on load.
   Evidence: src/shared/settings.ts `siteRules`; research signal ranks per-site rules as table stakes.

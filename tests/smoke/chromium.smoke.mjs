@@ -83,6 +83,17 @@ try {
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
   await popup.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
 
+  // Chromium grants the manifest's hosts at install, so the permission notice must be invisible.
+  // `hidden` alone is not enough: a class that sets `display` overrides it.
+  const notice = await popup.$eval("#grant-row", (row) => ({
+    display: getComputedStyle(row).display,
+    height: row.getBoundingClientRect().height
+  }));
+  assert(
+    notice.display === "none" && notice.height === 0,
+    `the model-host permission notice is visible with the hosts granted (display ${notice.display})`
+  );
+
   const detected = await popup.$eval("#source", (select) => select.value);
   assert(detected === "es", `expected detected language es, got "${detected}"`);
   await popup.selectOption("#target", "en");
