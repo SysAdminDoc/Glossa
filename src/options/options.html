@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossa settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <img src="icons/icon-48.png" alt="" width="36" height="36" />
+      <div>
+        <h1>Glossa</h1>
+        <p class="tagline">On-device page translation. <span id="version"></span></p>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Translation</h2>
+        <div class="field">
+          <label for="target">Translate pages into</label>
+          <select id="target"></select>
+        </div>
+        <div class="field">
+          <span class="field-label">Show translations</span>
+          <div class="segmented" role="group" aria-label="Display mode">
+            <button type="button" data-mode="bilingual" id="mode-bilingual">Below the original</button>
+            <button type="button" data-mode="replace" id="mode-replace">In place of the original</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="hover" /> Show the original text on hover when replacing</label>
+        <label class="check"><input type="checkbox" id="skip-form-fields" /> Never translate inside editable fields</label>
+        <label class="check"><input type="checkbox" id="selection-popup" /> Offer a translation when text is selected (off by default, uses the context menu otherwise)</label>
+      </section>
+
+      <section class="panel">
+        <h2>Languages you read</h2>
+        <p class="hint">Pages in these languages are never offered for translation.</p>
+        <div class="chips" id="never-chips"></div>
+        <div class="inline-form">
+          <select id="never-add"></select>
+          <button type="button" class="btn" id="never-add-btn">Add</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Site rules</h2>
+        <p class="hint">"Never" stops Glossa from touching a site. "Always" translates it on every visit once the all-sites permission is granted.</p>
+        <table class="table" id="rules">
+          <thead><tr><th>Host</th><th>Rule</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="inline-form">
+          <input type="text" id="rule-host" placeholder="example.com" />
+          <select id="rule-kind"><option value="never">Never</option><option value="always">Always</option></select>
+          <button type="button" class="btn" id="rule-add">Add</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Language models</h2>
+        <p class="hint">Each model is downloaded once from Mozilla's catalog, checked against its published hash, and kept on this device. Nothing else is ever sent or received.</p>
+        <div class="catalog-line">
+          <span id="catalog-status"></span>
+          <button type="button" class="btn small" id="catalog-refresh">Refresh catalog</button>
+        </div>
+        <table class="table" id="models">
+          <thead><tr><th>Pair</th><th>Version</th><th>Size</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="inline-form">
+          <select id="install-from"></select>
+          <span class="arrow">→</span>
+          <select id="install-to"></select>
+          <button type="button" class="btn" id="install">Download</button>
+        </div>
+        <div class="progress" id="progress" hidden>
+          <div class="bar"><div class="fill" id="progress-fill"></div></div>
+          <div class="progress-text" id="progress-text"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Privacy</h2>
+        <ul class="plain">
+          <li>Translation runs inside your browser using the Bergamot engine that Firefox uses. Page text never leaves this device.</li>
+          <li>The extension has no permission to read websites on its own. It only touches a page when you ask it to.</li>
+          <li>Network access is limited to three Mozilla-operated locations, used only to fetch the model catalog and model files: <code>firefox.settings.services.mozilla.com</code>, <code>firefox-settings-attachments.cdn.mozilla.net</code>, and Mozilla's model bucket at <code>storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data</code>. Every file is checked against the hash Mozilla publishes before it is used.</li>
+          <li>No account, no telemetry, no analytics, no crash reporting.</li>
+        </ul>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="options.js"></script>
+  </body>
+</html>

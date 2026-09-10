@@ -1,0 +1,101 @@
+<p align="center">
+  <img src="src/extension/icons/icon-256.png" width="96" height="96" alt="Glossa icon" />
+</p>
+
+<h1 align="center">Glossa</h1>
+
+<p align="center">Translate web pages on your own device. No cloud, no account, no telemetry.</p>
+
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-7c6cf2" />
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-a6e3a1" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Chrome%20%7C%20Firefox-89b4fa" />
+  <img alt="Engine" src="https://img.shields.io/badge/engine-Bergamot%20(MPL--2.0)-f9e2af" />
+</p>
+
+Glossa is a browser extension that translates pages without sending the text anywhere. It runs the same neural translation engine that Firefox uses for its built-in translator, compiled to WebAssembly, inside your browser. Page text never leaves the machine.
+
+## Why another translator
+
+Every popular translator extension, including the ones marketed on privacy, ships with a cloud engine as the default. The one that leads the market keeps its source closed and had a public data leak in 2025. Browser built-in translators are convenient but you're trusting the vendor's word about what gets uploaded.
+
+Glossa takes the opposite approach. There is no cloud engine in the code at all, so there is nothing to opt out of. The extension holds no permission to read websites on its own. It touches a page only when you ask, and the only hosts it can ever contact are the three Mozilla-operated locations that serve the language models.
+
+<p align="center">
+  <img src="docs/screenshots/page-bilingual.png" width="720" alt="A Spanish page with English translations shown under each block" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/popup-before.png" width="300" alt="The popup before translating, showing the download size" />
+  <img src="docs/screenshots/popup-after.png" width="300" alt="The popup after translating" />
+</p>
+
+## What it does
+
+- Translates a whole page, keeping the original in place and showing the translation under each block. A replace mode is one click away, with the original as a hover tooltip.
+- Detects the page language locally. You can override it.
+- Keeps inline links and formatting inside sentences, and leaves code blocks, brand names marked `translate="no"`, and form fields alone.
+- Follows content that arrives later, so infinite scroll and single-page apps get translated too. Open shadow roots are included.
+- Restores the original page without a reload.
+- Translates a selection from the context menu.
+- Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
+
+Coverage follows Firefox's catalog: about 60 languages, all pivoting through English. A Spanish to French translation therefore runs two models.
+
+## Install
+
+Glossa is not in any store yet. Load it unpacked from a release ZIP or from a local build.
+
+**Chrome, Edge, Brave, and other Chromium browsers**
+
+1. Download `glossa-chrome-vX.Y.Z.zip` from the [releases page](https://github.com/SysAdminDoc/Glossa/releases) and extract it to a folder you will keep. The browser loads the extension from that folder on every start.
+2. Open `chrome://extensions`, turn on Developer mode, click Load unpacked, and pick the folder.
+
+**Firefox**
+
+1. Download `glossa-firefox-vX.Y.Z.zip`.
+2. Open `about:debugging#/runtime/this-firefox`, click Load Temporary Add-on, and choose the ZIP. Temporary add-ons are removed when Firefox closes. A signed build for permanent installs is on the roadmap.
+
+## Build from source
+
+Requirements: Node 24 or newer, Python 3 with Pillow (only for regenerating icons).
+
+```bash
+npm install
+npm run engine:fetch    # downloads the 5 MB Bergamot WASM binary and verifies both hashes
+npm run build           # writes dist/chrome, dist/firefox, and one ZIP per target
+```
+
+`npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run screenshots` refreshes the images above the same way.
+
+## How it works
+
+```
+page  ──(activeTab click)──▶  content script
+                                 │  block-level segments, inline tags kept
+                                 ▼
+                            background
+                                 │
+              Chrome: offscreen document   Firefox: background page
+                                 │
+                        Web Worker running Bergamot (WASM, SIMD, single thread)
+                                 │  models from Cache storage
+                                 ▼
+                       translated HTML fragments back into the page
+```
+
+The engine binary ships inside the package. Models are data. The catalog at `firefox.settings.services.mozilla.com` says which files a pair needs and publishes a SHA-256 hash for each. The bytes then come from one of two Mozilla-operated sources that hold identical files: the Remote Settings CDN at `firefox-settings-attachments.cdn.mozilla.net`, or Mozilla's model registry bucket on Google Cloud Storage. The CDN answers 406 to any browser whose user agent says "Chrome", so Chromium browsers end up on the bucket after one refused request. Every file is verified against the catalog hash before it is stored, whichever source served it. All three locations are listed in the manifest and nothing else is.
+
+## Privacy
+
+- Translation happens in a Web Worker inside the extension. No page text is sent anywhere.
+- The extension has no host permission for websites. It injects its script only into the tab you invoke it on.
+- Network access is limited to three Mozilla-operated locations, and only for model downloads. You can verify this in the manifest and in the browser's network log. On Chromium browsers the model bytes come from a Mozilla bucket hosted on Google Cloud Storage, so Google's edge sees a download of a static file for a language pair. A self-hosted mirror option is on the roadmap for people who want to avoid even that.
+- No analytics, no crash reporting, no account, no update checks beyond what the browser does for any extension.
+
+## Licenses
+
+Glossa is MIT. The Bergamot engine (`bergamot-translator.js` and `bergamot-translator.wasm`) and the language models are Mozilla Public License 2.0; the license text ships in every build as `LICENSE.bergamot.txt`. See [vendor/bergamot/README.md](vendor/bergamot/README.md) for how the engine is pinned and updated.
+
+## Acknowledgements
+
+The engine and models come from Mozilla's [translations](https://github.com/mozilla/translations) project, which grew out of the EU-funded Bergamot project at the University of Edinburgh and partners. Glossa would not exist without that work.

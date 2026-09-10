@@ -1,0 +1,26 @@
+{
+  "name": "bergamot-translator",
+  "release": "v0.6.0",
+  "remoteSettingsVersion": "4.0",
+  "remoteSettingsCollection": "translations-wasm-v2",
+  "recordId": "ce71828c-5e7a-4024-8f18-03064bf0b9f0",
+  "attachment": {
+    "url": "https://firefox-settings-attachments.cdn.mozilla.net/main-workspace/translations-wasm-v2/a76f9efe-b185-4a7f-9c3b-5f5d216d12e6.zst",
+    "filename": "bergamot-translator.wasm.zst",
+    "size": 1211955,
+    "sha256": "327fcfc7b7e9d95f6fa0844ebf899cfc05469872ef02d3aef5783182839a6255"
+  },
+  "decompressed": {
+    "filename": "bergamot-translator.wasm",
+    "size": 4960506,
+    "sha256": "f38ef807636a7c994afedaab7ff8ffe0d590d21897f05139f747b80fd7bbe926"
+  },
+  "glue": {
+    "filename": "bergamot-translator.js",
+    "source": "https://github.com/mozilla-firefox/firefox/blob/48d55cf7ec80093903e2ef7f58b61a84a22ef716/toolkit/components/translations/bergamot-translator/bergamot-translator.js",
+    "versionString": "v0.6.0+eea6e5a8",
+    "sha256": "faff1ef6285b0d26f01787776fd49299dfb756ecb9688aa990c250e66797b47d"
+  },
+  "license": "MPL-2.0",
+  "pinnedOn": "2026-09-10"
+}

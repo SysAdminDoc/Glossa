@@ -1,0 +1,14 @@
+{
+  "extensionName": {
+    "message": "Glossa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Translate web pages on your own device. No cloud, no account, no telemetry.",
+    "description": "Extension description shown in the store and the add-ons manager"
+  },
+  "actionTitle": {
+    "message": "Translate this page with Glossa",
+    "description": "Toolbar button tooltip"
+  }
+}

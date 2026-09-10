@@ -1,0 +1,66 @@
+/* Injected into pages on demand. Everything is namespaced with glossa- so nothing leaks into
+   host styles. No backdrop-filter: it is a performance sink on real pages. */
+
+glossa-translation.glossa-t {
+  display: block;
+  margin-top: 0.3em;
+  padding-left: 0.6em;
+  border-left: 2px solid rgba(124, 108, 242, 0.55);
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: normal;
+}
+
+glossa-translation.glossa-t.glossa-inline {
+  display: inline;
+  margin: 0 0 0 0.35em;
+  padding: 0;
+  border: 0;
+  opacity: 0.85;
+}
+
+[data-glossa-unit="pending"] {
+  transition: opacity 120ms ease;
+}
+
+.glossa-popover {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: 330px;
+  max-height: 60vh;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 12px 14px 10px;
+  border: 1px solid #45475a;
+  border-radius: 12px;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.glossa-popover-error {
+  border-color: #f38ba8;
+}
+
+.glossa-popover-body {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.glossa-popover-close {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px solid #585b70;
+  border-radius: 8px;
+  background: #313244;
+  color: #cdd6f4;
+  font: 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+}
+
+.glossa-popover-close:hover {
+  background: #45475a;
+}

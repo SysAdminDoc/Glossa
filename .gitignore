@@ -1,0 +1,26 @@
+# Local working notes
+CLAUDE.md
+CODEX_CHANGELOG.md
+.claude/
+
+# Dependencies
+node_modules/
+
+# Build output and release artifacts (rebuilt from source; attached to releases)
+dist/
+
+# The Bergamot WASM binary is fetched and hash-verified by tools/fetch-engine.mjs.
+# The pin lives in vendor/bergamot/engine.lock.json; the 5 MB binary stays out of history.
+vendor/bergamot/bergamot-translator.wasm
+vendor/bergamot/bergamot-translator.wasm.zst
+
+# Self-distribution signing key. Never commit.
+*.pem
+
+# Smoke-test browser profiles and captures
+.tmp/
+test-results/
+
+# OS noise
+Thumbs.db
+.DS_Store

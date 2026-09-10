@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Glossa</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img class="logo" src="icons/icon-32.png" alt="" width="20" height="20" />
+      <span class="brand">Glossa</span>
+      <span class="version" id="version"></span>
+    </header>
+
+    <section class="card" id="page-card">
+      <div class="row">
+        <span class="label">Page language</span>
+        <select id="source" class="select" aria-label="Page language"></select>
+      </div>
+      <div class="row">
+        <span class="label">Translate to</span>
+        <select id="target" class="select" aria-label="Target language"></select>
+      </div>
+      <div class="row modes" role="group" aria-label="Display mode">
+        <button type="button" class="mode" data-mode="bilingual" id="mode-bilingual">Below original</button>
+        <button type="button" class="mode" data-mode="replace" id="mode-replace">Replace</button>
+      </div>
+      <button type="button" class="primary" id="action" disabled>Checking page…</button>
+      <div class="progress" id="progress" hidden>
+        <div class="bar"><div class="fill" id="progress-fill"></div></div>
+        <div class="progress-text" id="progress-text"></div>
+      </div>
+      <p class="status" id="status"></p>
+    </section>
+
+    <footer class="foot">
+      <span class="privacy">Runs on this device. No page text leaves your browser.</span>
+      <a href="#" id="open-options">Settings &amp; languages</a>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Página de prueba</title>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Bienvenido a la biblioteca municipal</h1>
+      <nav>
+        <a href="#catalogo">Catálogo</a>
+        <a href="#horarios">Horarios</a>
+        <a href="#contacto">Contacto</a>
+      </nav>
+    </header>
+    <main>
+      <p id="intro">La biblioteca abre todos los días de la semana, excepto los domingos. Puedes consultar el <a href="#catalogo">catálogo en línea</a> antes de tu visita.</p>
+      <ul id="rules">
+        <li>Cada persona puede tomar prestados hasta cinco libros.</li>
+        <li>El préstamo dura tres semanas y se puede renovar una vez.</li>
+        <li class="notranslate">Sala 3B</li>
+      </ul>
+      <p>Para instalar el programa ejecuta <code>npm install</code> en la terminal.</p>
+      <pre id="code">const saludo = "hola mundo";</pre>
+      <p id="brand">Nuestro patrocinador es <span translate="no">Café Aurora</span>, en la plaza mayor.</p>
+      <div id="mixed">
+        Texto suelto dentro de un contenedor con bloques.
+        <p>Un párrafo dentro del contenedor.</p>
+      </div>
+      <section id="host"></section>
+      <p id="late" hidden>Este párrafo aparece más tarde.</p>
+    </main>
+    <script>
+      // Open shadow root with translatable text.
+      const host = document.getElementById("host");
+      const root = host.attachShadow({ mode: "open" });
+      const p = document.createElement("p");
+      p.id = "shadow-text";
+      p.textContent = "Este texto vive dentro de un shadow root.";
+      root.append(p);
+    </script>
+  </body>
+</html>

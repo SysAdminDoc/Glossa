@@ -1,0 +1,45 @@
+{
+  "name": "glossa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Private, on-device web page translation for Chrome and Firefox. No cloud, no account, no telemetry.",
+  "license": "MIT",
+  "author": "SysAdminDoc",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SysAdminDoc/Glossa.git"
+  },
+  "homepage": "https://github.com/SysAdminDoc/Glossa",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "engine:fetch": "node tools/fetch-engine.mjs",
+    "catalog:snapshot": "node tools/snapshot-catalog.mjs",
+    "icons": "node tools/icons.mjs",
+    "build": "node tools/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"tools/**/*.mjs\"",
+    "test": "node --test --test-concurrency=1 tests/*.test.ts",
+    "smoke": "node tools/build.mjs --smoke && node tests/smoke/chromium.smoke.mjs",
+    "screenshots": "node tools/build.mjs --smoke && node tools/screenshots.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "fzstd": "0.1.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.2.9",
+    "esbuild": "0.28.2",
+    "eslint": "10.10.0",
+    "globals": "17.11.0",
+    "happy-dom": "20.14.3",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
