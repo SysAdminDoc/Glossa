@@ -93,6 +93,39 @@ body {
   font: inherit;
 }
 
+/* Shown only when the model hosts are not granted yet, which is the normal state of a fresh
+   Firefox install: Firefox treats host permissions as optional. */
+.grant {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.grant-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
 .modes {
   gap: 6px;
   margin-top: 2px;

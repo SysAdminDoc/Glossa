@@ -1,4 +1,5 @@
 import { api } from "../shared/api.ts";
+import { MODEL_ORIGINS } from "../shared/catalog.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type {
@@ -25,6 +26,8 @@ const progressBox = $<HTMLDivElement>("progress");
 const progressFill = $<HTMLDivElement>("progress-fill");
 const progressText = $<HTMLDivElement>("progress-text");
 const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".mode"));
+const grantRow = $<HTMLDivElement>("grant-row");
+const grantButton = $<HTMLButtonElement>("grant");
 
 let tabId: number | null = null;
 let page: PageState | null = null;
@@ -32,6 +35,9 @@ let route: RouteStatus | null = null;
 // Set when the user's own settings rule this page out: a "never" rule for the host, or a page in a
 // language they said they read.
 let blocked: string | null = null;
+// Firefox hands out `host_permissions` as optional ones, and a temporary install gets none at all,
+// so a download can fail with nothing but a network error to show for it.
+let modelHostsGranted = true;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
 
@@ -93,8 +99,14 @@ function render(): void {
   const target = targetSelect.value;
   actionButton.classList.remove("secondary");
 
+  grantRow.hidden = modelHostsGranted;
   if (blocked && !page?.translated) {
     actionButton.textContent = "Turned off for this page";
+    actionButton.disabled = true;
+    return;
+  }
+  if (!modelHostsGranted && !page?.translated) {
+    actionButton.textContent = "Allow model downloads first";
     actionButton.disabled = true;
     return;
   }
@@ -136,6 +148,16 @@ function render(): void {
   }
   actionButton.textContent = "Translate page";
   actionButton.disabled = busy;
+}
+
+// A permission check, not a request: asking may only happen from a click handler.
+async function checkModelHosts(): Promise<void> {
+  try {
+    modelHostsGranted = await api.permissions.contains({ origins: [...MODEL_ORIGINS] });
+  } catch {
+    // A browser that cannot answer is treated as granted; the download error will say otherwise.
+    modelHostsGranted = true;
+  }
 }
 
 async function refreshRoute(): Promise<void> {
@@ -307,6 +329,7 @@ async function init(): Promise<void> {
     return;
   }
   try {
+    await checkModelHosts();
     await loadPage();
     await refreshRoute();
   } catch (error) {
@@ -324,6 +347,26 @@ async function init(): Promise<void> {
       void saveSettings({ displayMode: displayMode });
     });
   }
+  // The request has to happen inside the click handler: both browsers refuse it otherwise.
+  grantButton.addEventListener("click", () => {
+    api.permissions.request({ origins: [...MODEL_ORIGINS] }).then(
+      async (granted) => {
+        modelHostsGranted = granted;
+        if (granted) {
+          setStatus("Model hosts allowed. Downloads can run now.", "ok");
+          // No reload needed: the next fetch carries the new permission.
+          await refreshRoute();
+        } else {
+          setStatus("Without that permission Glossa cannot download a language model.", "warn");
+        }
+        render();
+      },
+      (error: unknown) => {
+        setStatus(error instanceof Error ? error.message : String(error), "error");
+      }
+    );
+  });
+
   actionButton.addEventListener("click", () => void onAction());
   $("open-options").addEventListener("click", (event) => {
     event.preventDefault();

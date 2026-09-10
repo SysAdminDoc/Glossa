@@ -50,6 +50,9 @@ interface Controller {
   output: OutputCache;
   // What `<html lang>` claims. A unit that declares a different language is written in that one.
   pageLanguage: string | null;
+  // The pair the page is currently translated with, so a late mutation is handled the same way.
+  source: string | null;
+  target: string | null;
   // From the user's settings, carried on the translate command: the engine never sees the content of
   // an editable field unless this is off.
   skipFormFields: boolean;
@@ -85,6 +88,8 @@ function boot(): void {
     deferred: new Set(),
     output: new OutputCache(),
     pageLanguage: null,
+    source: null,
+    target: null,
     skipFormFields: true,
     routes: new Map()
   };
@@ -182,6 +187,8 @@ async function translatePage(
   }
   controller.state.detectedLanguage = source;
   controller.state.targetLanguage = command.targetLanguage;
+  controller.source = source;
+  controller.target = command.targetLanguage;
   controller.skipFormFields = command.skipFormFields;
   controller.state.lastError = null;
   controller.options = {
@@ -204,7 +211,7 @@ async function translatePage(
     await translateByLanguage(controller, segments, source, command.targetLanguage, generation);
     if (generation !== controller.generation) return;
     controller.state.translated = controller.state.lastError === null || controller.state.blocksDone > 0;
-    startObserver(controller, source, command.targetLanguage);
+    startObserver(controller);
   } finally {
     if (generation === controller.generation) {
       controller.state.translating = false;
@@ -286,15 +293,16 @@ async function translateSegments(
   const fresh = segments.filter((segment) => !controller.output.has(segment.text));
   const echoed = segments.length - fresh.length;
   if (echoed > 0) controller.state.blocksTotal -= echoed;
-  withObserverPaused(controller, () => {
+  withObserverPaused(controller, fresh, () => {
     for (const segment of fresh) controller.renderer.markPending(segment);
   });
-  for (const batch of batchSegments(fresh)) {
+
+  const batches = batchSegments(fresh);
+  for (let index = 0; index < batches.length; index++) {
+    const batch = batches[index]!;
     if (generation !== controller.generation) {
-      withObserverPaused(controller, () => {
-        for (const segment of batch) controller.renderer.unmark(segment);
-      });
-      continue;
+      unmarkAll(controller, batches.slice(index));
+      return;
     }
     const request: TranslateRequest = {
       type: "glossa:translate",
@@ -309,23 +317,23 @@ async function translateSegments(
       response = { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
     if (generation !== controller.generation) {
-      withObserverPaused(controller, () => {
-        for (const segment of batch) controller.renderer.unmark(segment);
-      });
-      continue;
+      unmarkAll(controller, batches.slice(index));
+      return;
     }
     if (!response || !response.ok) {
       controller.state.lastError = response?.error ?? "No answer from the translation engine";
-      withObserverPaused(controller, () => {
-        for (const segment of batch) controller.renderer.unmark(segment);
-      });
+      // A failing engine fails for every batch, so stop. Every block still carrying a marker has to
+      // lose it, or it counts as handled and no later run will ever pick it up again.
+      unmarkAll(controller, batches.slice(index));
       report(controller);
-      // A failing engine fails for every batch; stop instead of spamming the same error.
-      break;
+      return;
     }
-    withObserverPaused(controller, () => {
-      batch.forEach((segment, index) => {
-        const translated = response.fragments[index] ?? "";
+    withObserverPaused(controller, batch, () => {
+      batch.forEach((segment, slot) => {
+        // A unit that lost its marker while the batch was in flight was reset or restored under us;
+        // writing the old translation into it now would undo whatever replaced it.
+        if (segment.kind === "element" && segment.element.getAttribute(UNIT_ATTRIBUTE) !== "pending") return;
+        const translated = response.fragments[slot] ?? "";
         const applied = controller.renderer.apply(segment, translated, controller.options!);
         if (applied) controller.output.remember(applied);
       });
@@ -335,12 +343,21 @@ async function translateSegments(
   }
 }
 
+function unmarkAll(controller: Controller, batches: Segment[][]): void {
+  const all = batches.flat();
+  withObserverPaused(controller, all, () => {
+    for (const segment of all) controller.renderer.unmark(segment);
+  });
+}
+
 function restore(controller: Controller): void {
   controller.generation++;
   stopObserver(controller);
   controller.deferred.clear();
   controller.output.clear();
   controller.routes.clear();
+  controller.source = null;
+  controller.target = null;
   controller.renderer.restoreAll();
   controller.state.translated = false;
   controller.state.translating = false;
@@ -353,42 +370,14 @@ function restore(controller: Controller): void {
 // Single-page apps keep rendering after the first pass, and they also reveal, edit and re-render
 // blocks in place. Watch for all four: added nodes, text edits, the attributes that decide whether
 // a block is translatable, and class or style changes that may have revealed a deferred candidate.
-function startObserver(controller: Controller, source: string, target: string): void {
+function startObserver(controller: Controller): void {
   stopObserver(controller);
   const observer = new MutationObserver((mutations) => {
+    let queued = false;
     for (const mutation of mutations) {
-      if (isOurs(mutation.target)) continue;
-      switch (mutation.type) {
-        case "childList":
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
-              if (!isOurs(node)) controller.pending.add(node);
-            }
-          }
-          // Children removed from a translated unit means the page re-rendered it: our record
-          // points at nodes that are no longer in the tree.
-          if (mutation.removedNodes.length > 0) markStale(controller, mutation.target);
-          break;
-        case "characterData":
-          // An edit inside a translated unit invalidates that unit; anywhere else it is new text.
-          if (!markStale(controller, mutation.target)) controller.pending.add(mutation.target);
-          break;
-        case "attributes": {
-          const element = mutation.target as Element;
-          const name = mutation.attributeName ?? "";
-          if (name === "lang" || name === "translate") markStale(controller, element);
-          if (DIRECT_ATTRIBUTES.has(name)) controller.pending.add(element);
-          recheckDeferred(controller);
-          break;
-        }
-      }
+      if (classify(controller, mutation)) queued = true;
     }
-    if (controller.pending.size === 0 && controller.stale.size === 0) return;
-    if (controller.observerTimer !== null) window.clearTimeout(controller.observerTimer);
-    controller.observerTimer = window.setTimeout(() => {
-      controller.observerTimer = null;
-      void translateChanged(controller, source, target);
-    }, OBSERVER_DEBOUNCE_MS);
+    if (queued) schedule(controller);
   });
   observer.observe(document.body, {
     childList: true,
@@ -398,6 +387,53 @@ function startObserver(controller: Controller, source: string, target: string): 
     attributeFilter: WATCHED_ATTRIBUTES
   });
   controller.observer = observer;
+}
+
+// Sort one mutation into "look at these nodes" or "this translated unit is stale". Returns whether
+// anything was queued.
+function classify(controller: Controller, mutation: MutationRecord): boolean {
+  if (isOurs(mutation.target)) return false;
+  switch (mutation.type) {
+    case "childList":
+      // A change inside a translated unit invalidates the unit as a whole: whatever it now says, the
+      // translation hanging off it was made from different text. Handling the added nodes on their
+      // own instead would translate a fragment and leave the rest stale.
+      if (markStale(controller, mutation.target)) return true;
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
+          if (!isOurs(node)) controller.pending.add(node);
+        }
+      }
+      return controller.pending.size > 0;
+    case "characterData":
+      // An edit inside a translated unit invalidates that unit; anywhere else it is new text.
+      if (markStale(controller, mutation.target)) return true;
+      controller.pending.add(mutation.target);
+      return true;
+    case "attributes": {
+      const element = mutation.target as Element;
+      const name = mutation.attributeName ?? "";
+      let queued = false;
+      if (name === "lang" || name === "translate") queued = markStale(controller, element) || queued;
+      if (DIRECT_ATTRIBUTES.has(name)) {
+        controller.pending.add(element);
+        queued = true;
+      }
+      const revealed = recheckDeferred(controller);
+      return queued || revealed;
+    }
+    default:
+      return false;
+  }
+}
+
+function schedule(controller: Controller): void {
+  if (controller.pending.size === 0 && controller.stale.size === 0) return;
+  if (controller.observerTimer !== null) window.clearTimeout(controller.observerTimer);
+  controller.observerTimer = window.setTimeout(() => {
+    controller.observerTimer = null;
+    void translateChanged(controller);
+  }, OBSERVER_DEBOUNCE_MS);
 }
 
 // Find the translated unit a changed node belongs to, if any, and mark it for a fresh translation.
@@ -418,8 +454,9 @@ function markStale(controller: Controller, node: Node): boolean {
 
 // A class or style change may have revealed something an earlier pass skipped. Only those exact
 // elements are re-examined, so this stays cheap on pages that churn classes constantly.
-function recheckDeferred(controller: Controller): void {
-  if (controller.deferred.size === 0) return;
+function recheckDeferred(controller: Controller): boolean {
+  if (controller.deferred.size === 0) return false;
+  let queued = false;
   for (const element of controller.deferred) {
     if (!element.isConnected) {
       controller.deferred.delete(element);
@@ -428,8 +465,10 @@ function recheckDeferred(controller: Controller): void {
     if (isShown(element)) {
       controller.deferred.delete(element);
       controller.pending.add(element);
+      queued = true;
     }
   }
+  return queued;
 }
 
 function isShown(element: Element): boolean {
@@ -438,15 +477,17 @@ function isShown(element: Element): boolean {
   return typeof probe.checkVisibility === "function" ? probe.checkVisibility() : true;
 }
 
-async function translateChanged(controller: Controller, source: string, target: string): Promise<void> {
-  if (!controller.state.translated) return;
+async function translateChanged(controller: Controller): Promise<void> {
+  const source = controller.source;
+  const target = controller.target;
+  if (!controller.state.translated || !source || !target) return;
   const roots = Array.from(controller.pending);
   controller.pending.clear();
   const stale = Array.from(controller.stale);
   controller.stale.clear();
 
   // Dropping our own output is itself a mutation, so do it inside a paused window.
-  withObserverPaused(controller, () => {
+  withObserverPaused(controller, stale, () => {
     for (const element of stale) {
       const dropped = controller.renderer.reset(element);
       if (dropped && element.isConnected) roots.push(element);
@@ -490,14 +531,40 @@ function stopObserver(controller: Controller): void {
   }
 }
 
-// Writes to the page must never come back as mutations to react to. The records a synchronous write
-// queues are dropped with takeRecords, which empties the queue without running the callback.
-function withObserverPaused<T>(controller: Controller, write: () => T): T {
+// Writes to the page must never come back as mutations to react to. `takeRecords` empties the queue
+// without running the callback, but that queue can also hold changes the page made in the same turn
+// (its own async work runs between our await and our write), and throwing those away loses content
+// for good. So the records are taken and replayed: the ones targeting a node we just wrote to are
+// dropped, everything else is classified as usual.
+function withObserverPaused<T>(controller: Controller, written: Iterable<Segment> | Iterable<Node>, write: () => T): T {
+  const ours = new Set<Node>();
+  for (const entry of written as Iterable<Segment | Node>) {
+    if (isSegment(entry)) {
+      if (entry.kind === "element") {
+        ours.add(entry.element);
+      } else {
+        ours.add(entry.node);
+        if (entry.node.parentNode) ours.add(entry.node.parentNode);
+      }
+    } else {
+      ours.add(entry);
+    }
+  }
   try {
     return write();
   } finally {
-    controller.observer?.takeRecords();
+    const records = controller.observer?.takeRecords() ?? [];
+    let queued = false;
+    for (const record of records) {
+      if (ours.has(record.target)) continue;
+      if (classify(controller, record)) queued = true;
+    }
+    if (queued) schedule(controller);
   }
+}
+
+function isSegment(value: Segment | Node): value is Segment {
+  return typeof (value as Segment).kind === "string" && (value as { nodeType?: number }).nodeType === undefined;
 }
 
 function segmentOptions(controller: Controller): { skipFormFields: boolean; deferred: Set<Element> } {

@@ -1,4 +1,13 @@
-import { HOLD_ATTRIBUTE, PARAGRAPH_TAGS, TRANSLATION_CLASS, TRANSLATION_TAG, UNIT_ATTRIBUTE, type Hold, type Segment } from "./segmenter.ts";
+import {
+  HOLD_ATTRIBUTE,
+  PAD_ATTRIBUTE,
+  PARAGRAPH_TAGS,
+  TRANSLATION_CLASS,
+  TRANSLATION_TAG,
+  UNIT_ATTRIBUTE,
+  type Hold,
+  type Segment
+} from "./segmenter.ts";
 import type { DisplayMode } from "../shared/settings.ts";
 
 // Applies translated fragments back to the page and remembers enough to undo it without a reload.
@@ -63,13 +72,18 @@ const WORD_EDGE = /[\p{L}\p{N}]/u;
 
 export function repairInlineSpacing(root: ParentNode): void {
   for (const element of root.querySelectorAll("code, kbd, samp, var, [translate='no'], .notranslate")) {
+    // A text-level placeholder records where the source actually had whitespace. "v1.2.3" and
+    // "(https://example.com)" had none, and putting a space there would corrupt them.
+    const pad = element.getAttribute(PAD_ATTRIBUTE);
+    const padLeft = pad === null || pad.includes("l");
+    const padRight = pad === null || pad.includes("r");
     const previous = element.previousSibling;
-    if (previous && previous.nodeType === Node.TEXT_NODE) {
+    if (padLeft && previous && previous.nodeType === Node.TEXT_NODE) {
       const text = previous as Text;
       if (text.data.length > 0 && WORD_EDGE.test(text.data.slice(-1))) text.data += " ";
     }
     const next = element.nextSibling;
-    if (next && next.nodeType === Node.TEXT_NODE) {
+    if (padRight && next && next.nodeType === Node.TEXT_NODE) {
       const text = next as Text;
       if (text.data.length > 0 && WORD_EDGE.test(text.data.charAt(0))) text.data = " " + text.data;
     }
@@ -178,12 +192,22 @@ export class Renderer {
       const owner = record.kind === "element" ? record.element : record.node.parentElement;
       if (owner !== target) continue;
       if (record.appended?.isConnected) record.appended.remove();
-      if (record.kind === "element" && record.addedTitle) record.element.removeAttribute("title");
+      if (record.kind === "element") {
+        if (record.addedTitle) record.element.removeAttribute("title");
+        // The `lang` we stamped in replace mode says "this is English now". Leaving it behind makes
+        // the block look like it is already in the target language, and it would never be offered
+        // for translation again.
+        if (record.previousLang === null) record.element.removeAttribute("lang");
+        else record.element.setAttribute("lang", record.previousLang);
+      }
       this.records.splice(index, 1);
       dropped = true;
     }
+    // A unit still waiting on the engine has a marker but no record yet. Clearing it is what lets
+    // the caller collect the element again, so report that as a reset too.
+    const hadMarker = target.hasAttribute(UNIT_ATTRIBUTE);
     target.removeAttribute(UNIT_ATTRIBUTE);
-    return dropped;
+    return dropped || hadMarker;
   }
 
   restoreAll(): number {

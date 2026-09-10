@@ -17,6 +17,14 @@ export const MODEL_SOURCES = {
   gcsRegistryUrl: "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/db/models.json"
 } as const;
 
+// The only origins Glossa ever reaches. Firefox treats `host_permissions` as optional and a
+// temporary install starts with none of them, so the UI has to be able to ask for these by name.
+export const MODEL_ORIGINS: readonly string[] = [
+  "https://firefox.settings.services.mozilla.com/*",
+  "https://firefox-settings-attachments.cdn.mozilla.net/*",
+  "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/*"
+];
+
 // Firefox pins the model major version it can load. Bergamot 4.0 (the engine we vendor) reads 3.x.
 export const MODEL_MAJOR_VERSION = 3;
 

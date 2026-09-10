@@ -22,6 +22,12 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The model catalog's own platform gates are respected. A desktop browser was picking the Android build of the Japanese, Korean, Chinese and Russian models, and prerelease models were offered as if they had shipped. Norwegian Nynorsk now has a display name instead of showing as `nn`.
 - A block that declares its own language is translated with that language's model, or left alone when the model is not installed. An Arabic quotation on a Spanish page used to be pushed through the Spanish model and came back as nonsense.
 - Every setting on the options page now changes what the extension does. A "never" rule keeps Glossa off that site entirely and says so in the popup, a page in a language you read is not offered, the editable-field skip is honoured, and the catalog refresh uses the interval you set.
+- A protected run of text keeps its exact spacing. A version number like `v1.2.3` is no longer spaced out, and a url in brackets stays tight against them.
+- One block's protected text no longer switches protection off for the next block, which happened whenever a block's only text sat inside `<code>`.
+- A footnote or tooltip block nested inside a link no longer splits the sentence around it into fragments.
+- A block the page re-renders gets its original language back, so it is offered for translation again instead of looking like it is already translated.
+- When the engine fails, every block it did not reach is released instead of being skipped for the rest of the page's life.
+- A change the page makes while a translation is being written to the page is no longer lost.
 
 ## [0.1.0] - 2026-09-10
 

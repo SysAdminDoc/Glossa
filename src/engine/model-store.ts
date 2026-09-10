@@ -1,5 +1,7 @@
+import { api } from "../shared/api.ts";
 import {
   attachmentUrl,
+  MODEL_ORIGINS,
   MODEL_SOURCES,
   pairKey,
   REMOTE_SETTINGS,
@@ -119,6 +121,23 @@ export class HttpError extends Error {
   }
 }
 
+// Firefox grants `host_permissions` as optional ones and a temporary install starts with none, so a
+// network failure there is usually a missing permission rather than a missing network. The check is
+// cheap and only runs when a request has already failed.
+const MISSING_PERMISSION_MESSAGE =
+  "Glossa has no permission to reach Mozilla's model hosts yet. Open the Glossa popup and choose " +
+  "\"Allow model downloads\".";
+
+async function describeNetworkFailure(error: unknown): Promise<Error> {
+  try {
+    const granted = await api.permissions.contains({ origins: [...MODEL_ORIGINS] });
+    if (!granted) return new Error(MISSING_PERMISSION_MESSAGE);
+  } catch {
+    // A browser that cannot answer leaves the original error in place.
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export class ModelStore {
   private catalogPromise: Promise<StoredCatalog> | null = null;
   private lastCatalogError: string | null = null;
@@ -158,7 +177,12 @@ export class ModelStore {
   }
 
   private async fetchCatalog(): Promise<StoredCatalog> {
-    const response = await fetch(REMOTE_SETTINGS.recordsUrl, { cache: "no-store" });
+    let response: Response;
+    try {
+      response = await fetch(REMOTE_SETTINGS.recordsUrl, { cache: "no-store" });
+    } catch (error) {
+      throw await describeNetworkFailure(error);
+    }
     if (!response.ok) {
       throw new HttpError(`Catalog request failed: HTTP ${response.status}`, response.status);
     }
@@ -315,7 +339,12 @@ export class ModelStore {
   }
 
   private async fetchBytes(url: string, expectedSize: number | null, onLoaded: (loaded: number) => void): Promise<Uint8Array> {
-    const response = await fetch(url, { cache: "no-store" });
+    let response: Response;
+    try {
+      response = await fetch(url, { cache: "no-store" });
+    } catch (error) {
+      throw await describeNetworkFailure(error);
+    }
     if (!response.ok) {
       throw new HttpError(`Download from ${new URL(url).host} failed: HTTP ${response.status}`, response.status);
     }

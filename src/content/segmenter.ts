@@ -117,6 +117,9 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       continue;
     }
     const { html, holds } = serializeUnit(element);
+    // A block that is nothing but a url or a reference number has no prose left once the
+    // placeholders are in; sending it wastes a round trip and risks the engine rewriting it.
+    if (holds.length > 0 && !LETTER.test(textOutsideHolds(html))) continue;
     out.push({ kind: "element", element, html, text, holds, lang: effectiveLang(element) });
   }
 }
@@ -125,7 +128,10 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
 // over the one on `<html>`, which is the whole point: a quoted paragraph in another language must
 // not go through the page's route.
 function effectiveLang(start: Element | null): string | null {
-  const holder = start?.closest("[lang]");
+  // A `lang` on one of our own replaced units is the target language we stamped there, not the
+  // language of the page's content. Skipping those keeps new source text inside a translated block
+  // from looking like it is already translated.
+  const holder = start?.closest(`[lang]:not([${UNIT_ATTRIBUTE}])`);
   const value = holder?.getAttribute("lang")?.trim();
   return value ? value : null;
 }
@@ -136,7 +142,7 @@ function effectiveLang(start: Element | null): string | null {
 export function serializeUnit(element: Element): { html: string; holds: Hold[] } {
   const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR));
   const source = element.textContent ?? "";
-  if (holds.length === 0 && !PROTECTED_TEXT.test(source)) {
+  if (holds.length === 0 && !hasProtectedText(source)) {
     return { html: element.innerHTML, holds };
   }
   const clone = element.cloneNode(true) as Element;
@@ -156,9 +162,38 @@ export function serializeUnit(element: Element): { html: string; holds: Hold[] }
 // Runs of text the engine must not touch. It has been seen putting a space inside a query string
 // (`ruta? x=1`) and translating the domain of an email address (`ejemplo` to `example`), and long
 // digit runs come back duplicated. Short numbers stay in the sentence: a model that cannot see
-// "5 libros" has no way to get the agreement right.
-const PROTECTED_TEXT =
-  /[a-z][a-z0-9+.-]*:\/\/[^\s<>"']+|www\.[a-z0-9][^\s<>"']*|[^\s<>"'@,;:()[\]]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.[a-z]{2,}|\d{4,}|\d+(?:[.,:/-]\d+){2,}/giu;
+// "5 libros" has no way to get the agreement right, and a number welded to letters (`RTX4090`) is
+// part of a word, not a reference.
+//
+// The quantifiers are bounded. An unbroken 16k-character token (an inline data URI, a hash) makes an
+// unbounded version backtrack for hundreds of milliseconds on the page's critical path.
+const PROTECTED_PATTERN = [
+  // scheme://rest, never ending on sentence punctuation
+  "[a-z][a-z0-9+.-]{0,31}://[^\\s<>\"']{0,512}[^\\s<>\"'.,;:!?)\\]}]",
+  // bare www host and path
+  "www\\.[a-z0-9][^\\s<>\"']{0,512}[^\\s<>\"'.,;:!?)\\]}]",
+  // local@domain.tld
+  "[^\\s<>\"'@,;:()\\[\\]]{1,128}@[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\\.[a-z0-9-]{1,63})*\\.[a-z]{2,24}",
+  // A grouped number comes first, so 2026-09-10 is one run rather than "2026" plus a tail. A letter
+  // may sit in front of a group ("v1.2.3" is a version string), but a plain digit run welded to
+  // letters is part of a word ("RTX4090"), so that one needs clear space on both sides.
+  "\\d{1,16}(?:[.,:/-]\\d{1,16}){2,8}(?![\\p{L}\\p{N}])",
+  "(?<![\\p{L}\\p{N}])\\d{4,32}(?![\\p{L}\\p{N}])"
+].join("|");
+
+// Two regexes over one pattern on purpose. A `/g` regex carries `lastIndex` between calls, and a
+// `test()` that leaves it set makes the next unit's scan start in the middle of its text and miss
+// everything before it. The gate is stateless; only the scanner is global.
+const PROTECTED_GATE = new RegExp(PROTECTED_PATTERN, "iu");
+const PROTECTED_SCANNER = new RegExp(PROTECTED_PATTERN, "giu");
+
+// Where the source text had whitespace next to a placeholder, so the renderer knows which side may
+// get a space back when the engine drops it. "v1.2.3" must not come back as "v 1.2.3".
+export const PAD_ATTRIBUTE = "data-glossa-pad";
+
+export function hasProtectedText(text: string): boolean {
+  return PROTECTED_GATE.test(text);
+}
 
 // Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an
 // untranslatable element gets, and the exact original characters are kept to be put back.
@@ -170,23 +205,38 @@ function protectText(clone: Element, holds: Hold[]): void {
   for (const text of texts) {
     // Anything already protected, verbatim by the engine or by a placeholder, is left alone.
     if (text.parentElement?.closest(`var, code, kbd, samp, math, ${HOLD_SELECTOR}`)) continue;
-    PROTECTED_TEXT.lastIndex = 0;
-    if (!PROTECTED_TEXT.test(text.data)) continue;
-    PROTECTED_TEXT.lastIndex = 0;
+    if (!hasProtectedText(text.data)) continue;
     const fragment = doc.createDocumentFragment();
     let cursor = 0;
-    for (let match = PROTECTED_TEXT.exec(text.data); match; match = PROTECTED_TEXT.exec(text.data)) {
+    PROTECTED_SCANNER.lastIndex = 0;
+    for (let match = PROTECTED_SCANNER.exec(text.data); match; match = PROTECTED_SCANNER.exec(text.data)) {
       if (match.index > cursor) fragment.append(doc.createTextNode(text.data.slice(cursor, match.index)));
+      const end = match.index + match[0].length;
       const placeholder = doc.createElement("var");
       placeholder.setAttribute(HOLD_ATTRIBUTE, String(holds.length));
+      placeholder.setAttribute(PAD_ATTRIBUTE, padSides(text.data, match.index, end));
       placeholder.textContent = match[0];
       holds.push(doc.createTextNode(match[0]));
       fragment.append(placeholder);
-      cursor = match.index + match[0].length;
+      cursor = end;
     }
     if (cursor < text.data.length) fragment.append(doc.createTextNode(text.data.slice(cursor)));
     text.replaceWith(fragment);
   }
+}
+
+const SPACE = /\s/u;
+
+function padSides(data: string, start: number, end: number): string {
+  const left = start === 0 || SPACE.test(data.charAt(start - 1));
+  const right = end >= data.length || SPACE.test(data.charAt(end));
+  return `${left ? "l" : ""}${right ? "r" : ""}`;
+}
+
+// The serialized unit with every placeholder's content removed, which is what the engine is
+// actually being asked to translate.
+function textOutsideHolds(html: string): string {
+  return html.replace(/<var [^>]*data-glossa-hold[^>]*>[\s\S]*?<\/var>/gi, "").replace(/<[^>]+>/g, "");
 }
 
 export function shouldSkip(element: Element, options: SegmentOptions): boolean {
@@ -212,10 +262,21 @@ function isContainer(element: Element): boolean {
   for (const child of element.children) {
     if (BLOCK_TAGS.has(child.tagName)) return true;
     if (child.shadowRoot) return true;
-    // An inline wrapper whose subtree holds blocks: card grids are built as `div > a > div`, and
-    // sending the wrapper as one unit makes bilingual mode append a second copy of every card
-    // inside it. Firefox recurses for the same reason (nodeNeedsSubdividing).
+  }
+  // An inline wrapper can still hold blocks: card grids are built as `div > a > div`, and sending
+  // the wrapper as one unit makes bilingual mode append a second copy of every card in it. That
+  // only applies to an element with no prose of its own. A paragraph with a footnote tooltip
+  // inside a `<sup><a>` has to stay one sentence, which is the whole point of block-level units.
+  if (hasOwnText(element)) return false;
+  for (const child of element.children) {
     if (child.querySelector(BLOCK_SELECTOR)) return true;
+  }
+  return false;
+}
+
+function hasOwnText(element: Element): boolean {
+  for (const child of element.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE && LETTER.test((child as Text).data)) return true;
   }
   return false;
 }

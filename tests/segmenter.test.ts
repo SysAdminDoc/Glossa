@@ -113,9 +113,9 @@ test("urls, email addresses and reference numbers become placeholders", () => {
   assert.ok(segment && segment.kind === "element");
   const html = (segment as { html: string }).html;
   // Three placeholders, and the short number stays inside the sentence.
-  assert.match(html, /<var data-glossa-hold="0">info@ejemplo\.es<\/var>/);
-  assert.match(html, /<var data-glossa-hold="1">https:\/\/ejemplo\.es\/ruta\?x=1<\/var>/);
-  assert.match(html, /<var data-glossa-hold="2">2026123456<\/var>/);
+  assert.match(html, /<var data-glossa-hold="0" data-glossa-pad="lr">info@ejemplo\.es<\/var>/);
+  assert.match(html, /<var data-glossa-hold="1" data-glossa-pad="lr">https:\/\/ejemplo\.es\/ruta\?x=1<\/var>/);
+  assert.match(html, /<var data-glossa-hold="2" data-glossa-pad="lr">2026123456<\/var>/);
   assert.match(html, /5 de mayo/);
   assert.equal((segment as { holds: unknown[] }).holds.length, 3);
 });
@@ -166,6 +166,129 @@ test("each unit carries the language the page declares for it", () => {
   // The nested paragraph inherits the quote's language, not the document's.
   assert.equal(byId.get("ar"), "ar");
   assert.equal(byId.get("fr"), "fr-CA");
+});
+
+test("one unit's protected text does not disable the next unit's", () => {
+  // The scan is global, so a gate that leaves its lastIndex behind makes the following unit start
+  // matching in the middle of its own text. The first unit's only text lives inside <code>, which
+  // the protection skips, so nothing resets the index on its behalf.
+  const body = load(
+    `<li id="doc"><code>https://api.ejemplo.es/v1/usuarios</code></li>` +
+      `<p id="victim">Escribe a info@ejemplo.es hoy mismo para reservar una sala de lectura.</p>`
+  );
+  const segments = collectSegments(body, options);
+  const victim = segments.find((s) => s.kind === "element" && s.element.id === "victim") as
+    | { html: string; holds: unknown[] }
+    | undefined;
+  assert.ok(victim, "the second paragraph was not collected");
+  assert.equal(victim.holds.length, 1);
+  assert.match(victim.html, /<var data-glossa-hold="0"[^>]*>info@ejemplo\.es<\/var>/);
+});
+
+test("a block nested inside an inline element does not split the sentence around it", () => {
+  const body = load(
+    `<p id="p">El préstamo dura quince días<sup><a href="#n1">1<div class="tip">Nota al pie.</div></a></sup> y se puede renovar.</p>`
+  );
+  const segments = collectSegments(body, options);
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0]?.kind, "element");
+  assert.equal((segments[0] as { element: Element }).element.id, "p");
+});
+
+test("a number welded to letters is left inside the word", () => {
+  const body = load(`<p id="p">La tarjeta RTX4090 no cabe en este equipo pequeño de la sala.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  assert.equal((segment as { holds: unknown[] }).holds.length, 0);
+});
+
+test("a version string keeps its shape through the engine's spacing damage", () => {
+  const body = load(`<p id="p">Actualiza a la versión v1.2.3 de la aplicación ahora por favor.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  // The protected run had no space before it, so no space may be put back there.
+  const html = (segment as { html: string }).html;
+  assert.match(html, /v<var data-glossa-hold="0" data-glossa-pad="r">1\.2\.3<\/var>/);
+  const renderer = new Renderer();
+  renderer.apply(segment, 'Update to version v<var data-glossa-hold="0" data-glossa-pad="r">1.2.3</var>of the app now please.', {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  assert.equal(
+    window.document.getElementById("p")!.textContent,
+    "Update to version v1.2.3 of the app now please."
+  );
+});
+
+test("a url in brackets keeps the brackets tight", () => {
+  const body = load(`<p id="p">Consulta el catálogo (https://ejemplo.es/catalogo) cuando quieras hoy.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(
+    segment,
+    'Check the catalogue (<var data-glossa-hold="0" data-glossa-pad="">https://ejemplo.es/catalogo</var>) whenever you like today.',
+    { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" }
+  );
+  assert.equal(
+    window.document.getElementById("p")!.textContent,
+    "Check the catalogue (https://ejemplo.es/catalogo) whenever you like today."
+  );
+});
+
+test("a block that is only a url is never sent", () => {
+  const body = load(`<p id="p">https://ejemplo.es/catalogo/2026</p><p id="q">1234567890</p>`);
+  assert.deepEqual(collectSegments(body, options), []);
+});
+
+test("the lang we stamp on a replaced unit is not read back as the page's language", () => {
+  window.document.documentElement.setAttribute("lang", "es");
+  const body = load(`<p id="p">Un párrafo en español que se reemplaza del todo.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, "A Spanish paragraph that is replaced entirely.", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(p.getAttribute("lang"), "en");
+  // New Spanish content the page renders inside that unit must still read as Spanish.
+  const fresh = window.document.createElement("span");
+  fresh.textContent = "Una frase nueva en español dentro del bloque.";
+  p.append(fresh);
+  const again = collectFromNodes([fresh as unknown as Node], options);
+  assert.equal(again.length, 1);
+  assert.equal(again[0]?.lang, "es");
+});
+
+test("reset gives a replaced unit its language back so it can be translated again", () => {
+  const body = load(`<p id="p" lang="es">Otro párrafo en español para reemplazar entero.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, "Another Spanish paragraph to replace entirely.", {
+    displayMode: "replace",
+    showOriginalOnHover: true,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(renderer.reset(p as unknown as Element), true);
+  assert.equal(p.getAttribute("lang"), "es");
+  assert.equal(p.getAttribute("title"), null);
+  assert.equal(p.getAttribute("data-glossa-unit"), null);
+});
+
+test("reset reports a unit that was only marked pending, so it is collected again", () => {
+  const body = load(`<p id="p">Un párrafo que todavía espera al motor de traducción.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.markPending(segment);
+  assert.equal(renderer.reset(window.document.getElementById("p") as unknown as Element), true);
+  assert.equal(window.document.getElementById("p")!.getAttribute("data-glossa-unit"), null);
 });
 
 test("candidates that are not rendered yet are reported as deferred", () => {
