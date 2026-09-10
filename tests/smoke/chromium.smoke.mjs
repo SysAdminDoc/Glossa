@@ -138,6 +138,17 @@ try {
   assert(cards.unitOnGrid === null, "the card grid itself was sent as one unit");
   assert(cards.translatedNames.length === 2, `expected 2 translated card names, got ${cards.translatedNames.length}`);
 
+  // A paragraph that declares its own language is not part of the Spanish route. No Arabic model is
+  // installed here, so it has to be left exactly as it was rather than pushed through es->en.
+  const rtl = await page.$eval("#rtl", (element) => ({
+    blocks: element.querySelectorAll("glossa-translation").length,
+    unit: element.getAttribute("data-glossa-unit"),
+    text: element.textContent ?? ""
+  }));
+  assert(rtl.blocks === 0, `the Arabic paragraph was translated through the Spanish route (${rtl.blocks} blocks)`);
+  assert(rtl.unit === null, `the Arabic paragraph was marked as a unit (${rtl.unit})`);
+  assert(rtl.text.trim() === "هذا النص مكتوب باللغة العربية.", "the Arabic text changed");
+
   // A url, an email address and a reference number have to come back byte for byte, spacing and all.
   const contact = await page.$eval("#contact glossa-translation", (block) => block.textContent ?? "");
   console.info(`smoke: contact line: ${contact}`);

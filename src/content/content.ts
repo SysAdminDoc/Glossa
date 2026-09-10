@@ -1,5 +1,14 @@
 import { api } from "../shared/api.ts";
-import type { DetectRequest, DetectResponse, PageCommand, PageState, TranslateRequest, TranslateResponse } from "../shared/messages.ts";
+import { normalizeLanguageTag } from "../shared/catalog.ts";
+import type {
+  DetectRequest,
+  DetectResponse,
+  PageCommand,
+  PageState,
+  RouteStatus,
+  TranslateRequest,
+  TranslateResponse
+} from "../shared/messages.ts";
 import { OutputCache } from "./output-cache.ts";
 import { Renderer, type RenderOptions } from "./renderer.ts";
 import {
@@ -39,6 +48,11 @@ interface Controller {
   deferred: Set<Element>;
   // Everything the engine has already written on this page, so it is never sent back in.
   output: OutputCache;
+  // What `<html lang>` claims. A unit that declares a different language is written in that one.
+  pageLanguage: string | null;
+  // Per-language answer to "is there a model for this on disk", so a page with three quoted
+  // languages asks once each.
+  routes: Map<string, boolean>;
 }
 
 function boot(): void {
@@ -66,7 +80,9 @@ function boot(): void {
     pending: new Set(),
     stale: new Set(),
     deferred: new Set(),
-    output: new OutputCache()
+    output: new OutputCache(),
+    pageLanguage: null,
+    routes: new Map()
   };
 
   api.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (value: unknown) => void) => {
@@ -175,9 +191,12 @@ async function translatePage(
   report(controller);
 
   try {
+    controller.pageLanguage = normalizeLanguageTag(document.documentElement.getAttribute("lang"));
+    // Models can have been installed since the last run.
+    controller.routes.clear();
     const segments = orderViewportFirst(collectSegments(document.body, segmentOptions(controller)));
     controller.state.blocksTotal = segments.length;
-    await translateSegments(controller, segments, source, command.targetLanguage, generation);
+    await translateByLanguage(controller, segments, source, command.targetLanguage, generation);
     if (generation !== controller.generation) return;
     controller.state.translated = controller.state.lastError === null || controller.state.blocksDone > 0;
     startObserver(controller, source, command.targetLanguage);
@@ -187,6 +206,67 @@ async function translatePage(
       report(controller);
     }
   }
+}
+
+// A page is not always written in one language. A unit that declares a `lang` of its own (a quoted
+// paragraph, a foreign title, an RTL excerpt) is grouped under that language: pushing Arabic through
+// a Spanish model returns nonsense. Such a group is only translated when its model is already on
+// this device, because downloading 25 MB for one quoted paragraph is not a decision to make on the
+// user's behalf; otherwise it is left in its original language.
+async function translateByLanguage(
+  controller: Controller,
+  segments: Segment[],
+  pageSource: string,
+  target: string,
+  generation: number
+): Promise<void> {
+  const groups = new Map<string, Segment[]>();
+  let skipped = 0;
+  for (const segment of segments) {
+    const declared = normalizeLanguageTag(segment.lang);
+    const language = declared && declared !== controller.pageLanguage ? declared : pageSource;
+    if (language === target) {
+      // Already in the language the reader asked for.
+      skipped++;
+      continue;
+    }
+    const group = groups.get(language);
+    if (group) group.push(segment);
+    else groups.set(language, [segment]);
+  }
+  if (skipped > 0) controller.state.blocksTotal -= skipped;
+
+  // The page's own language first: that is the one the user accepted a download for.
+  const order = [pageSource, ...[...groups.keys()].filter((language) => language !== pageSource)];
+  for (const language of order) {
+    const group = groups.get(language);
+    if (!group) continue;
+    if (language !== pageSource && !(await hasInstalledRoute(controller, language, target))) {
+      controller.state.blocksTotal -= group.length;
+      continue;
+    }
+    if (generation !== controller.generation) return;
+    await translateSegments(controller, group, language, target, generation);
+  }
+}
+
+async function hasInstalledRoute(controller: Controller, source: string, target: string): Promise<boolean> {
+  const key = `${source}->${target}`;
+  const known = controller.routes.get(key);
+  if (known !== undefined) return known;
+  let installed = false;
+  try {
+    const status = (await api.runtime.sendMessage({
+      type: "glossa:route-status",
+      sourceLanguage: source,
+      targetLanguage: target
+    })) as RouteStatus | undefined;
+    installed = Boolean(status?.hops && status.installed);
+  } catch {
+    installed = false;
+  }
+  controller.routes.set(key, installed);
+  return installed;
 }
 
 async function translateSegments(
@@ -255,6 +335,7 @@ function restore(controller: Controller): void {
   stopObserver(controller);
   controller.deferred.clear();
   controller.output.clear();
+  controller.routes.clear();
   controller.renderer.restoreAll();
   controller.state.translated = false;
   controller.state.translating = false;
@@ -378,7 +459,7 @@ async function translateChanged(controller: Controller, source: string, target: 
   const segments = collectFromNodes(live, segmentOptions(controller));
   if (segments.length === 0) return;
   controller.state.blocksTotal += segments.length;
-  await translateSegments(controller, segments, source, target, controller.generation);
+  await translateByLanguage(controller, segments, source, target, controller.generation);
 }
 
 function isOurs(node: Node): boolean {

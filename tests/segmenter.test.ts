@@ -149,6 +149,25 @@ test("an email domain is not translated away", () => {
   assert.match(window.document.getElementById("p")!.textContent ?? "", /info@ejemplo\.es/);
 });
 
+test("each unit carries the language the page declares for it", () => {
+  window.document.documentElement.setAttribute("lang", "es");
+  const body = load(
+    `<p id="es">Un párrafo en español con bastante texto.</p>` +
+      `<blockquote lang="ar" id="ar"><p>نص عربي مكتوب هنا.</p></blockquote>` +
+      `<p lang="fr-CA" id="fr">Un paragraphe écrit en français.</p>`
+  );
+  const segments = collectSegments(body, options);
+  const byId = new Map(
+    segments
+      .filter((s) => s.kind === "element")
+      .map((s) => [(s as { element: Element }).element.id || (s as { element: Element }).element.parentElement?.id, s.lang])
+  );
+  assert.equal(byId.get("es"), "es");
+  // The nested paragraph inherits the quote's language, not the document's.
+  assert.equal(byId.get("ar"), "ar");
+  assert.equal(byId.get("fr"), "fr-CA");
+});
+
 test("candidates that are not rendered yet are reported as deferred", () => {
   const body = load(`<p id="now">Visible desde el principio.</p><p id="later" hidden>Aparece más tarde.</p>`);
   const deferred = new Set<Element>();

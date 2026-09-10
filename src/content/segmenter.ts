@@ -9,8 +9,8 @@ export const TRANSLATION_CLASS = "glossa-t";
 export const TRANSLATION_TAG = "GLOSSA-TRANSLATION";
 
 export type Segment =
-  | { kind: "element"; element: Element; html: string; text: string; holds: Hold[] }
-  | { kind: "text"; node: Text; text: string };
+  | { kind: "element"; element: Element; html: string; text: string; holds: Hold[]; lang: string | null }
+  | { kind: "text"; node: Text; text: string; lang: string | null };
 
 // What a placeholder stands for: an inline element the page marked as untranslatable, or a run of
 // text inside a sentence (a URL, an address, a reference number) that has to come back unchanged.
@@ -92,7 +92,7 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
     if (child.nodeType === Node.TEXT_NODE) {
       const text = child as Text;
       if (LETTER.test(text.data) && !isMarkedText(text)) {
-        out.push({ kind: "text", node: text, text: text.data });
+        out.push({ kind: "text", node: text, text: text.data, lang: effectiveLang(text.parentElement) });
       }
       continue;
     }
@@ -117,8 +117,17 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       continue;
     }
     const { html, holds } = serializeUnit(element);
-    out.push({ kind: "element", element, html, text, holds });
+    out.push({ kind: "element", element, html, text, holds, lang: effectiveLang(element) });
   }
+}
+
+// The language this unit is written in, as the page declares it. A `lang` deeper in the tree wins
+// over the one on `<html>`, which is the whole point: a quoted paragraph in another language must
+// not go through the page's route.
+function effectiveLang(start: Element | null): string | null {
+  const holder = start?.closest("[lang]");
+  const value = holder?.getAttribute("lang")?.trim();
+  return value ? value : null;
 }
 
 // Serialise a unit for the engine. Protected inline descendants become `var` placeholders that

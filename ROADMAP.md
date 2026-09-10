@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-22 — Honour per-element `lang` that differs from the page language
-  Why: an Arabic `lang="ar"` paragraph on a Spanish page was pushed through the es→en route and came back mangled; mixed-language pages are a standing complaint.
-  Evidence: local probe 2026-09-10 (`#rtl` case); Firefox `#matchesDocumentLanguage()` skips subtrees whose `lang` differs (L3513); Bugzilla 1952764; mozilla/translations #1111.
-  Touches: src/content/segmenter.ts (carry the effective `lang` per unit), src/content/content.ts (group units by source language, skip units whose language equals the target or has no route)
-  Acceptance: on the probe fixture the Arabic paragraph is either translated through an ar→en route or left untouched with no engine call; never sent through es→en.
-  Complexity: M
-
 - [ ] P0 — G-23 — Make every persisted setting act or remove its control
   Why: the options page lets users add site rules and "languages you read", toggle the editable-field skip, and the catalog refresh interval, and none of them changes behaviour; `skipFormFields` is hardcoded `true`.
   Evidence: grep of `siteRules`, `neverTranslateLanguages`, `catalogRefreshHours` (read only by settings.ts and options.ts); `content.ts` lines 160 and 279; simple-translate #137 (a kill switch that did not persist drew sustained complaints).
