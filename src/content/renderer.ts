@@ -2,6 +2,7 @@ import {
   attributeMarker,
   clearIds,
   LABEL_MARKER,
+  MARKER_SELECTOR,
   HOLD_ATTRIBUTE,
   ID_ATTRIBUTE,
   PAD_ATTRIBUTE,
@@ -54,12 +55,16 @@ interface AttributeRecord {
   element: Element;
   attribute: string;
   original: string;
+  // What was written. A page that rewrites the attribute afterwards owns it, and restoring has to
+  // leave that alone rather than putting a stale original back over live content.
+  translated: string;
 }
 
 interface LabelRecord {
   kind: "label";
   element: Element;
   original: string;
+  translated: string;
   // An <option> with no value of its own submits its text, so translating the text would change
   // what the form sends. The value is written out explicitly before that can happen.
   addedValue: boolean;
@@ -219,7 +224,7 @@ export class Renderer {
     const original = element.getAttribute(segment.attribute) ?? "";
     element.setAttribute(marker, original);
     element.setAttribute(segment.attribute, text);
-    this.records.push({ kind: "attribute", element, attribute: segment.attribute, original });
+    this.records.push({ kind: "attribute", element, attribute: segment.attribute, original, translated: text });
     return text;
   }
 
@@ -231,13 +236,15 @@ export class Renderer {
     const original = element.textContent ?? "";
     let addedValue = false;
     if (element.tagName === "OPTION" && !element.hasAttribute("value")) {
-      // Pin what this option submits before its text changes underneath it.
-      element.setAttribute("value", original);
+      // Pin what this option submits before its text changes underneath it. An option with no
+      // value of its own submits its text stripped and collapsed, which is not the raw content:
+      // an option written across three lines would otherwise start posting the whitespace too.
+      element.setAttribute("value", original.replace(/\s+/gu, " ").trim());
       addedValue = true;
     }
     element.textContent = text;
     element.setAttribute(LABEL_MARKER, "1");
-    this.records.push({ kind: "label", element, original, addedValue });
+    this.records.push({ kind: "label", element, original, translated: text, addedValue });
     return text;
   }
 
@@ -273,13 +280,18 @@ export class Renderer {
       const owner = record.kind === "text" ? record.node.parentElement : record.element;
       if (owner !== target) continue;
       if (record.kind === "attribute") {
-        // An attribute the page rewrote is the page's again: take the marker off and forget it.
-        record.element.removeAttribute(attributeMarker(record.attribute));
+        // The unit is being re-collected, so this attribute has to go back to what the page said
+        // before it can be translated again. Dropping only the record left the translation in
+        // place with nothing able to undo it.
+        restoreAttribute(record);
         this.records.splice(index, 1);
         dropped = true;
         continue;
       }
       if (record.kind === "label") {
+        if ((record.element.textContent ?? "") === record.translated) {
+          record.element.textContent = record.original;
+        }
         record.element.removeAttribute(LABEL_MARKER);
         if (record.addedValue) record.element.removeAttribute("value");
         this.records.splice(index, 1);
@@ -312,14 +324,15 @@ export class Renderer {
     let restored = 0;
     for (const record of this.records.reverse()) {
       if (record.kind === "attribute") {
-        if (record.original) record.element.setAttribute(record.attribute, record.original);
-        else record.element.removeAttribute(record.attribute);
-        record.element.removeAttribute(attributeMarker(record.attribute));
+        restoreAttribute(record);
         restored++;
         continue;
       }
       if (record.kind === "label") {
-        record.element.textContent = record.original;
+        // Only if the page has not written its own text there since.
+        if ((record.element.textContent ?? "") === record.translated) {
+          record.element.textContent = record.original;
+        }
         record.element.removeAttribute(LABEL_MARKER);
         if (record.addedValue) record.element.removeAttribute("value");
         restored++;
@@ -352,8 +365,29 @@ export class Renderer {
       restored++;
     }
     this.records.length = 0;
+    // A marker with no record behind it is an element the page cloned after it was translated.
+    // Sweeping them is what keeps a duplicated widget from being skipped forever afterwards.
+    for (const stray of document.querySelectorAll(MARKER_SELECTOR)) {
+      for (const attribute of Array.from(stray.attributes)) {
+        if (attribute.name.startsWith("data-glossa-was-")) {
+          stray.setAttribute(attribute.name.slice("data-glossa-was-".length), attribute.value);
+          stray.removeAttribute(attribute.name);
+        }
+      }
+      stray.removeAttribute(LABEL_MARKER);
+    }
     return restored;
   }
+}
+
+function restoreAttribute(record: { element: Element; attribute: string; original: string; translated: string }): void {
+  const current = record.element.getAttribute(record.attribute);
+  // Only undo what is still ours. A page that rewrote the tooltip since keeps its own value.
+  if (current === record.translated) {
+    if (record.original) record.element.setAttribute(record.attribute, record.original);
+    else record.element.removeAttribute(record.attribute);
+  }
+  record.element.removeAttribute(attributeMarker(record.attribute));
 }
 
 // Rebuild the translated tree out of the page's own elements. Every element the engine gave back

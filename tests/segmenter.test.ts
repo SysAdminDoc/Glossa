@@ -570,3 +570,153 @@ test("a translated attribute is written back and restored, and an option keeps w
   assert.equal(option.textContent, "Sala de lectura");
   assert.equal(window.document.getElementById("o")!.getAttribute("value"), null);
 });
+
+
+test("a text node handed to the collector is not an error", () => {
+  // The observer queues raw text nodes. Asking one for its descendants used to throw and take the
+  // whole flush with it, including the units it had already dropped records for.
+  const body = load(`<div id="host">Texto suelto que aparece más tarde en la página.</div>`);
+  void body;
+  const text = window.document.getElementById("host")!.firstChild as unknown as Node;
+  const segments = collectFromNodes([text], options);
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0]?.kind, "text");
+});
+
+test("an editable region is left alone, attributes and all", () => {
+  const body = load(
+    `<div id="editor" contenteditable="true">` +
+      `<p>Texto que el usuario está escribiendo ahora mismo.</p>` +
+      `<img alt="Fachada de la biblioteca" src="x.gif" />` +
+      `<a href="#h" title="Consulta los horarios">Horarios</a>` +
+      `</div>`
+  );
+  const before = window.document.getElementById("editor")!.innerHTML;
+  const segments = collectSegments(body, options);
+  assert.deepEqual(segments, [], "nothing inside an editable region may be collected");
+  assert.equal(window.document.getElementById("editor")!.innerHTML, before);
+});
+
+test("an attribute is collected once, however many passes run over it", () => {
+  const body = load(`<p><a href="#h" id="link" title="Consulta los horarios de apertura">Horarios</a></p>`);
+  const [attribute] = collectSegments(body, options).filter((s) => s.kind === "attribute");
+  assert.ok(attribute);
+  const renderer = new Renderer();
+  renderer.apply(attribute, "Check the opening hours", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  // A second pass sees the marker and leaves it alone: without that the translation goes back
+  // through the engine on every mutation flush.
+  assert.deepEqual(collectSegments(body, options).filter((s) => s.kind === "attribute"), []);
+  renderer.restoreAll();
+  assert.equal(window.document.getElementById("link")!.getAttribute("title"), "Consulta los horarios de apertura");
+  assert.equal(collectSegments(body, options).filter((s) => s.kind === "attribute").length, 1);
+});
+
+test("the hover original this extension parks on a unit is never translated", () => {
+  const body = load(`<p id="p">Consultar el catálogo en línea es muy cómodo para todos.</p>`);
+  const [segment] = collectSegments(body, options);
+  assert.ok(segment && segment.kind === "element");
+  const renderer = new Renderer();
+  renderer.apply(segment, "Searching the catalogue online is very convenient.", {
+    displayMode: "replace",
+    showOriginalOnHover: true,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(p.getAttribute("title"), "Consultar el catálogo en línea es muy cómodo para todos.");
+  // The title is the original, kept for hovering. Collecting it would send it back to the engine
+  // and replace the one thing it exists to show.
+  assert.deepEqual(collectSegments(body, options).filter((s) => s.kind === "attribute"), []);
+});
+
+test("a page that rewrites a translated attribute keeps its own value", () => {
+  const body = load(`<p><a href="#h" id="link" title="Consulta los horarios">Horarios</a></p>`);
+  const [attribute] = collectSegments(body, options).filter((s) => s.kind === "attribute");
+  assert.ok(attribute);
+  const renderer = new Renderer();
+  renderer.apply(attribute, "Check the opening hours", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const link = window.document.getElementById("link")!;
+  link.setAttribute("title", "Quedan 3 plazas");
+  renderer.restoreAll();
+  assert.equal(link.getAttribute("title"), "Quedan 3 plazas", "restore overwrote what the page had written");
+  assert.equal(link.getAttribute("data-glossa-was-title"), null);
+});
+
+test("resetting a unit puts its attributes back so it can be translated again", () => {
+  const body = load(`<p id="p" title="Consulta los horarios">Un párrafo con su propia descripción emergente.</p>`);
+  const segments = collectSegments(body, options);
+  const attribute = segments.find((s) => s.kind === "attribute")!;
+  const renderer = new Renderer();
+  renderer.apply(attribute, "Check the opening hours", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  const p = window.document.getElementById("p")!;
+  assert.equal(p.getAttribute("title"), "Check the opening hours");
+  renderer.reset(p as unknown as Element);
+  assert.equal(p.getAttribute("title"), "Consulta los horarios", "reset left the attribute translated with no way back");
+  assert.equal(p.getAttribute("data-glossa-was-title"), null);
+});
+
+test("markers on an element the page cloned are swept on restore", () => {
+  const body = load(`<p id="p"><img id="photo" alt="Fachada de la biblioteca" src="x.gif" /></p>`);
+  const [attribute] = collectSegments(body, options).filter((s) => s.kind === "attribute");
+  assert.ok(attribute);
+  const renderer = new Renderer();
+  renderer.apply(attribute, "Library frontage", {
+    displayMode: "replace",
+    showOriginalOnHover: false,
+    targetLanguage: "en"
+  });
+  // The page duplicates the widget after it was translated. The copy carries the marker and no
+  // record knows about it.
+  const clone = window.document.getElementById("photo")!.cloneNode(true);
+  clone.id = "photo-copy";
+  window.document.getElementById("p")!.append(clone as never);
+  renderer.restoreAll();
+  assert.equal(window.document.querySelectorAll("[data-glossa-was-alt]").length, 0, "a marker was left in the page");
+  assert.equal(window.document.getElementById("photo-copy")!.getAttribute("alt"), "Fachada de la biblioteca");
+});
+
+test("what a form submits is never changed by a translation", () => {
+  const body = load(
+    `<form>` +
+      `<select id="sel"><option id="o">\n      Sala de lectura\n    </option></select>` +
+      `<input id="go" type="submit" name="accion" value="Guardar cambios" />` +
+      `<input id="plain" type="button" value="Mostrar más" />` +
+      `<datalist id="list"><option>Sala infantil</option></datalist>` +
+      `</form>`
+  );
+  const segments = collectSegments(body, options);
+  const values = segments
+    .filter((s) => s.kind === "attribute" && s.attribute === "value")
+    .map((s) => (s as { text: string }).text);
+  // A submit button's value is what the form posts; a plain button's is only a label.
+  assert.deepEqual(values, ["Mostrar más"]);
+  // A datalist option is inserted by value, so its text is not a label to translate.
+  const labels = segments.filter((s) => s.kind === "label").map((s) => (s as { text: string }).text);
+  assert.deepEqual(labels, ["Sala de lectura"]);
+
+  const label = segments.find((s) => s.kind === "label")!;
+  const renderer = new Renderer();
+  renderer.apply(label, "Reading room", { displayMode: "replace", showOriginalOnHover: false, targetLanguage: "en" });
+  // The value written is what the browser would have submitted: stripped and collapsed.
+  assert.equal(window.document.getElementById("o")!.getAttribute("value"), "Sala de lectura");
+});
+
+test("an attribute inside a translate=no element is left alone through the property too", () => {
+  const body = load(`<p><img id="brand" alt="Café Aurora, la marca" src="x.gif" /></p>`);
+  const image = window.document.getElementById("brand")!;
+  // happy-dom has no `translate` IDL attribute, and a browser does: define it so the branch a
+  // browser actually takes is the one under test.
+  Object.defineProperty(image, "translate", { value: false, configurable: true });
+  assert.deepEqual(collectSegments(body, options).filter((s) => s.kind === "attribute"), []);
+});

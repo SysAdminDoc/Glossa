@@ -93,10 +93,14 @@ const TRANSLATABLE_ATTRIBUTES: Array<{ attribute: string; applies: (element: Ele
   { attribute: "alt", applies: (element) => ["AREA", "IMG", "IMAGE", "INPUT"].includes(element.tagName) },
   { attribute: "placeholder", applies: (element) => ["INPUT", "TEXTAREA"].includes(element.tagName) },
   {
+    // Only on a button that submits nothing. A submit button's value is both its label and the
+    // value the form posts, and a server that branches on it would see a different answer.
     attribute: "value",
     applies: (element) =>
-      element.tagName === "INPUT" && ["button", "reset", "submit"].includes((element.getAttribute("type") ?? "").toLowerCase())
+      element.tagName === "INPUT" && ["button", "reset"].includes((element.getAttribute("type") ?? "").toLowerCase())
   },
+  // The visible label of a group of options, and of an option that carries one.
+  { attribute: "label", applies: (element) => element.tagName === "OPTGROUP" || element.tagName === "OPTION" },
   ...ARIA_TEXT_ATTRIBUTES.map((attribute) => ({ attribute, applies: () => true }))
 ];
 
@@ -116,7 +120,7 @@ export function collectSegments(root: Node, options: SegmentOptions): Segment[] 
   walk(root, out, options);
   // Attributes are a separate pass over the whole subtree. The unit walk stops at the first block
   // that is a unit, and the placeholder of an input inside that block still has to be found.
-  if (options.attributes !== false) collectReadableAttributes(root, out);
+  if (options.attributes !== false) collectReadableAttributes(root, out, options);
   return out;
 }
 
@@ -126,7 +130,7 @@ export function collectFromNodes(nodes: Node[], options: SegmentOptions): Segmen
   const out: Segment[] = [];
   visit(nodes, out, options);
   if (options.attributes !== false) {
-    for (const node of nodes) collectReadableAttributes(node, out);
+    for (const node of nodes) collectReadableAttributes(node, out, options);
   }
   return out;
 }
@@ -174,17 +178,35 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
 
 // Every element under this root that carries something a person reads. Elements the page marked as
 // untranslatable are skipped whole, and so is anything already translated.
-function collectReadableAttributes(root: Node, out: Segment[]): void {
-  const start = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : null;
+function collectReadableAttributes(root: Node, out: Segment[], options: SegmentOptions): void {
+  // A text node has no attributes and no descendants. It arrives here from the observer, which
+  // queues raw text nodes, and asking it for querySelectorAll used to throw and take the whole
+  // flush with it: the stale units it had already dropped records for were then unrestorable.
+  const scope =
+    root.nodeType === Node.ELEMENT_NODE
+      ? (root as Element)
+      : root.nodeType === Node.DOCUMENT_NODE || root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+        ? (root as Document | DocumentFragment)
+        : null;
+  if (!scope) return;
+
   const candidates: Element[] = [];
-  if (start) candidates.push(start);
-  const scope = start ?? (root as Document | DocumentFragment);
+  if (root.nodeType === Node.ELEMENT_NODE) candidates.push(root as Element);
   candidates.push(...Array.from(scope.querySelectorAll("*")));
   for (const element of candidates) {
-    if (element.classList.contains(TRANSLATION_CLASS) || element.tagName === TRANSLATION_TAG) continue;
+    // Anything inside our own output, or inside a block already translated, is not source text.
+    // The `title` a replace-mode unit carries is the original this extension parked there, and
+    // translating that is how the show-original-on-hover feature quietly disappears.
+    if (element.closest(SKIP_ATTRIBUTE_SCOPE)) continue;
     if (isProtected(element)) continue;
+    if (options.skipFormFields && (element as HTMLElement).isContentEditable) continue;
     collectAttributes(element, out);
+    // A shadow root is part of the page too, and querySelectorAll does not cross into one.
+    if (element.shadowRoot) collectReadableAttributes(element.shadowRoot, out, options);
     if (element.tagName !== "OPTION" && element.tagName !== "TITLE") continue;
+    // A datalist option is a suggestion the browser inserts by value, so translating its text
+    // changes what gets typed into the field rather than what the user reads.
+    if (element.tagName === "OPTION" && element.closest("datalist")) continue;
     const label = (element.textContent ?? "").trim();
     if (!label || !LETTER.test(label)) continue;
     if (element.hasAttribute(LABEL_MARKER)) continue;
@@ -192,7 +214,19 @@ function collectReadableAttributes(root: Node, out: Segment[]): void {
   }
 }
 
+// Subtrees the attribute pass never enters. Everything here is either Glossa's own output or a
+// block it has already been through.
+const SKIP_ATTRIBUTE_SCOPE = `${TRANSLATION_TAG.toLowerCase()}, .${TRANSLATION_CLASS}, [${UNIT_ATTRIBUTE}], [hidden]`;
+
 export const LABEL_MARKER = "data-glossa-label";
+
+// Every attribute marker plus the label marker, as a selector. Restoring sweeps these rather than
+// trusting its own records: an element cloned by the page after translation carries the marker into
+// the copy, where no record has ever heard of it.
+export const MARKER_SELECTOR = [
+  ...new Set(TRANSLATABLE_ATTRIBUTES.map(({ attribute }) => `[${attributeMarker(attribute)}]`)),
+  `[${LABEL_MARKER}]`
+].join(", ");
 
 function collectAttributes(element: Element, out: Segment[]): void {
   for (const { attribute, applies } of TRANSLATABLE_ATTRIBUTES) {
@@ -215,12 +249,10 @@ export function attributeMarker(attribute: string): string {
 // inside a `translate="no"` block still has a placeholder, and it still must not be touched.
 function isProtected(element: Element): boolean {
   const html = element as HTMLElement;
-  if ("translate" in html) {
-    if (html.translate === false) return true;
-  } else if (element.closest('[translate="no" i]')) {
-    return true;
-  }
-  return Boolean(element.closest(".notranslate"));
+  // `translate` reflects the inherited state, so it covers ancestors in one read. Only where the
+  // property is missing does this have to walk, and then it walks once for both conventions.
+  if ("translate" in html && html.translate === false) return true;
+  return Boolean(element.closest('[translate="no" i], .notranslate'));
 }
 
 // The language this unit is written in, as the page declares it. A `lang` deeper in the tree wins

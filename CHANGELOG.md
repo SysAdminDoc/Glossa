@@ -14,6 +14,14 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - Every release now carries a source archive, and the packages are byte-reproducible from it: the same source and the same commands produce ZIPs with the same SHA-256 as the published ones. `npm run verify:source` checks that by unpacking the archive and rebuilding.
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
+### Fixed
+- A page that inserts plain text after the first pass no longer stops the translation of later changes. The attribute pass tripped over text nodes and took the whole update with it.
+- Tooltips, image text and placeholders inside an editable region are left alone, like the text around them, so nothing Glossa writes can be saved into a document you are editing.
+- A submit button keeps its value, so a form sends what it always sent. A dropdown option pins the value the browser would really have submitted, and suggestions in a `<datalist>` are no longer relabelled.
+- The original text parked on a replaced block for hovering is never itself translated, and nothing inside Glossa's own output is fed back to the engine.
+- Showing the original leaves a tooltip alone if the page has changed it since, puts back attributes on blocks the page re-rendered, and clears markers from elements the page copied after translation.
+- Option group labels are translated, and so are tooltips inside open shadow roots.
+
 ## [0.3.0] - 2026-09-10
 
 ### Added
