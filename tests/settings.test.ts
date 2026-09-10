@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-// settings.ts imports the extension API alias at module load. Provide a stub global before the
-// import so the module evaluates under Node.
+// settings.ts imports the extension API alias at module load. Provide a stub global and the
+// build-time target flag (esbuild substitutes that one in a real build) before the import, so the
+// module evaluates under Node.
 (globalThis as { chrome?: unknown }).chrome = { storage: { local: {} }, i18n: { getUILanguage: () => "en-US" } };
+(globalThis as { __GLOSSA_HAS_OFFSCREEN__?: boolean }).__GLOSSA_HAS_OFFSCREEN__ = false;
 const { defaultSettings, mergeSettings } = await import("../src/shared/settings.ts");
 
 test("defaults follow the UI language and never translate it", () => {

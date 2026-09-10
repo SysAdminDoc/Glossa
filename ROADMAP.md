@@ -138,13 +138,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a "never" rule for the fixture host makes the popup say so and translate nothing; adding the detected language to "languages you read" disables the button; unchecking the editable-field skip translates the probe's `contenteditable` block; the catalog refresh honours the configured interval in a unit test.
   Complexity: M
 
-- [ ] P0 — G-24 — Declare data collection and strip Chrome-only code from the Firefox bundle
-  Why: `web-ext lint` on `dist/firefox` reports `MISSING_DATA_COLLECTION_PERMISSIONS`, which blocks any new AMO submission, plus two `UNSUPPORTED_API` warnings for `offscreen.*` calls that Firefox never executes.
-  Evidence: `web-ext lint --source-dir dist/firefox` run 2026-09-10 (0 errors, 3 warnings); Mozilla add-ons blog 2025-10-23; `browser_specific_settings.gecko.data_collection_permissions` shape on MDN.
-  Touches: src/extension/manifest.firefox.json (`data_collection_permissions: { required: ["none"] }`), tools/build.mjs (per-target `define` such as `__GLOSSA_HAS_OFFSCREEN__`), src/background/background.ts (guard the offscreen branch on the define so esbuild drops it), tests/manifest.test.ts
-  Acceptance: `web-ext lint` reports 0 warnings; the Firefox bundle contains no `offscreen` string; the Chrome build is unchanged.
-  Complexity: S
-
 ### P1
 
 - [ ] P1 — G-26 — Translate same-origin iframes without double injection

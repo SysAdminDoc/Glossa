@@ -50,6 +50,14 @@ if (wasmHash !== lock.decompressed.sha256) {
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
+// "chrome-smoke" builds the chrome manifest, "firefox-smoke" the firefox one.
+function manifestTargetOf(target) {
+  return target.replace(/-smoke$/, "");
+}
+
+// The offscreen document exists only to host the engine on Chrome.
+const CHROME_ONLY = new Set(["offscreen.js", "offscreen.html"]);
+
 const bundles = [
   { entry: "src/background/background.ts", out: "background.js" },
   { entry: "src/content/content.ts", out: "content.js" },
@@ -76,7 +84,11 @@ for (const target of TARGETS) {
   const targetDir = path.join(dist, target);
   await mkdir(targetDir, { recursive: true });
 
-  for (const bundle of bundles) {
+  const chromeTarget = !manifestTargetOf(target).startsWith("firefox");
+  const targetBundles = bundles.filter((bundle) => chromeTarget || !CHROME_ONLY.has(bundle.out));
+  const targetCopies = copies.filter(([, to]) => chromeTarget || !CHROME_ONLY.has(to));
+
+  for (const bundle of targetBundles) {
     await esbuild.build({
       entryPoints: [path.join(root, bundle.entry)],
       outfile: path.join(targetDir, bundle.out),
@@ -87,12 +99,21 @@ for (const target of TARGETS) {
       minify: false,
       sourcemap: false,
       legalComments: "inline",
-      define: { __GLOSSA_VERSION__: JSON.stringify(pkg.version), __GLOSSA_TARGET__: JSON.stringify(target) },
+      define: {
+        __GLOSSA_VERSION__: JSON.stringify(pkg.version),
+        __GLOSSA_TARGET__: JSON.stringify(target),
+        // Firefox has no offscreen API. False here removes the `chrome.offscreen` reference from
+        // expressions; the statements guarded by the CHROME_ONLY label go with dropLabels below.
+        __GLOSSA_HAS_OFFSCREEN__: JSON.stringify(chromeTarget)
+      },
+      // Everything inside a `CHROME_ONLY:` label is cut from the Firefox bundle. AMO's linter
+      // refuses calls to APIs Firefox does not implement, even on a branch that never runs.
+      dropLabels: chromeTarget ? [] : ["CHROME_ONLY"],
       logLevel: "warning"
     });
   }
 
-  for (const [from, to] of copies) {
+  for (const [from, to] of targetCopies) {
     const destination = path.join(targetDir, to);
     await mkdir(path.dirname(destination), { recursive: true });
     await copyFile(path.join(root, from), destination);
@@ -104,7 +125,7 @@ for (const target of TARGETS) {
     await copyFile(path.join(root, "src", "extension", "icons", `icon-${size}.png`), path.join(iconsDir, `icon-${size}.png`));
   }
 
-  const manifestTarget = target.replace(/-smoke$/, "");
+  const manifestTarget = manifestTargetOf(target);
   const manifest = JSON.parse(await readFile(path.join(root, "src", "extension", `manifest.${manifestTarget}.json`), "utf8"));
   manifest.version = pkg.version;
   if (target.endsWith("-smoke")) {
@@ -113,8 +134,13 @@ for (const target of TARGETS) {
   await writeFile(path.join(targetDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   // Bundled code must never contain eval; the extension CSP forbids it and store review flags it.
-  for (const bundle of bundles) {
+  // The Firefox bundle must also carry no call to a Chrome-only API: AMO's linter reports those as
+  // UNSUPPORTED_API even on a branch that can never run.
+  for (const bundle of targetBundles) {
     const code = await readFile(path.join(targetDir, bundle.out), "utf8");
+    if (!chromeTarget && /chrome\.offscreen|OFFSCREEN_DOCUMENT/.test(code)) {
+      throw new Error(`${bundle.out} in the Firefox build still references the offscreen API`);
+    }
     if (/\beval\s*\(/.test(code) || /new Function\s*\(/.test(code)) {
       throw new Error(`${bundle.out} contains eval or new Function`);
     }

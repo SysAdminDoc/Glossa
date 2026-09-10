@@ -7,6 +7,10 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ### Added
 - An option to offer Mozilla's prerelease language models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk), off by default because Firefox ships them to its nightly channel only.
 
+### Changed
+- The Firefox build declares that it collects no data, which Mozilla requires of every new add-on submission, and its minimum Firefox version is now 142 (the release where that declaration is understood on both desktop and Android).
+- The Firefox build no longer carries any Chrome-only code. The offscreen-document branch is cut at build time, so `web-ext lint` reports no errors, warnings or notices.
+
 ### Fixed
 - Card grids and other link-wrapped blocks (`div > a > div`) are walked into instead of being sent to the engine as one unit, so bilingual mode no longer appends a second copy of every card.
 - Content revealed after the first pass is picked up: the observer now watches text edits and the attributes that decide whether a block is translatable (`hidden`, `open`, `lang`, `translate`, `aria-hidden`), and re-checks the blocks an earlier pass skipped when a class or style changes.

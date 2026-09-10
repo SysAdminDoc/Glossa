@@ -56,6 +56,18 @@ test("firefox manifest uses an event page, chrome a service worker", async () =>
   assert.ok(!firefox.permissions.includes("offscreen"));
 });
 
+test("firefox declares its data collection, which AMO requires for new submissions", async () => {
+  const firefox = JSON.parse(await readFile(path.join(root, "src", "extension", "manifest.firefox.json"), "utf8"));
+  const gecko = firefox.browser_specific_settings.gecko;
+  // Mandatory for every new AMO submission since 2025-11-03. Glossa collects nothing, and "none"
+  // is the keyword that says so; it may not be combined with any other value.
+  assert.deepEqual(gecko.data_collection_permissions, { required: ["none"] });
+  // The key itself landed in Firefox 140 and in Firefox for Android 142. A lower floor makes
+  // `web-ext lint` report the key as unsupported by the minimum version.
+  const [major] = gecko.strict_min_version.split(".").map(Number);
+  assert.ok(major >= 142, `strict_min_version ${gecko.strict_min_version} is below the data collection key's floor`);
+});
+
 test("README and CHANGELOG carry the package version", async () => {
   const readme = await readFile(path.join(root, "README.md"), "utf8");
   const changelog = await readFile(path.join(root, "CHANGELOG.md"), "utf8");

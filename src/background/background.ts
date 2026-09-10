@@ -25,29 +25,32 @@ import { EngineHost } from "../engine/engine-host.ts";
 
 const MENU_TRANSLATE_PAGE = "glossa-translate-page";
 const MENU_TRANSLATE_SELECTION = "glossa-translate-selection";
-const OFFSCREEN_URL = "offscreen.html";
-
 const localEngine: EngineHost | null = hasOffscreenApi ? null : new EngineHost();
-let offscreenCreating: Promise<void> | null = null;
+let creating: Promise<void> | null = null;
 
 // ---- engine bridge ----
 
-async function ensureOffscreen(): Promise<void> {
-  if (offscreenCreating) return offscreenCreating;
-  offscreenCreating = (async () => {
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
+// Chrome only. The label is what the Firefox build drops (esbuild `dropLabels`), so that bundle
+// carries no call to an API Firefox does not have, which is what AMO's linter refuses. Firefox
+// hosts the engine in its background page and never needs a second document.
+async function ensureEngineHostDocument(): Promise<void> {
+  CHROME_ONLY: {
+    if (creating) return creating;
+    creating = (async () => {
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
+      });
+      if (contexts.length > 0) return;
+      await chrome.offscreen.createDocument({
+        url: "offscreen.html",
+        reasons: [chrome.offscreen.Reason.WORKERS],
+        justification: "Runs the on-device translation engine in a Web Worker"
+      });
+    })().finally(() => {
+      creating = null;
     });
-    if (contexts.length > 0) return;
-    await chrome.offscreen.createDocument({
-      url: OFFSCREEN_URL,
-      reasons: [chrome.offscreen.Reason.WORKERS],
-      justification: "Runs the on-device translation engine in a Web Worker"
-    });
-  })().finally(() => {
-    offscreenCreating = null;
-  });
-  return offscreenCreating;
+    return creating;
+  }
 }
 
 async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">): Promise<T> {
@@ -58,7 +61,7 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
   if (localEngine) {
     return (await localEngine.handle(full)) as T;
   }
-  await ensureOffscreen();
+  await ensureEngineHostDocument();
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
