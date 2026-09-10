@@ -39,6 +39,16 @@ const BLOCK_TAGS = new Set([
   "TR", "UL", "PRE", "IFRAME", "CANVAS", "VIDEO", "AUDIO", "SVG"
 ]);
 
+// Replaced or inline-by-default elements. They appear in BLOCK_TAGS because a direct child of that
+// kind splits a unit, but an icon buried inside a link must not turn the paragraph around it into a
+// container, so the deep search below ignores them.
+const INLINE_BY_DEFAULT = new Set(["SVG", "CANVAS", "VIDEO", "AUDIO", "IFRAME", "COL", "COLGROUP"]);
+
+const BLOCK_SELECTOR = Array.from(BLOCK_TAGS)
+  .filter((tag) => !INLINE_BY_DEFAULT.has(tag))
+  .map((tag) => tag.toLowerCase())
+  .join(",");
+
 // Units in these tags read as paragraphs and get the bilingual (translation below) treatment.
 export const PARAGRAPH_TAGS = new Set([
   "P", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "DD", "DT", "FIGCAPTION", "SUMMARY",
@@ -141,6 +151,10 @@ function isContainer(element: Element): boolean {
   for (const child of element.children) {
     if (BLOCK_TAGS.has(child.tagName)) return true;
     if (child.shadowRoot) return true;
+    // An inline wrapper whose subtree holds blocks: card grids are built as `div > a > div`, and
+    // sending the wrapper as one unit makes bilingual mode append a second copy of every card
+    // inside it. Firefox recurses for the same reason (nodeNeedsSubdividing).
+    if (child.querySelector(BLOCK_SELECTOR)) return true;
   }
   return false;
 }

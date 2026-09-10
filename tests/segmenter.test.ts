@@ -42,6 +42,30 @@ test("containers with block children are recursed, and their loose text becomes 
   );
 });
 
+test("an inline wrapper with block descendants is a container, not a unit", () => {
+  const body = load(
+    `<div id="cards">` +
+      `<a href="#1"><div class="name">Libro primero</div><div class="price">Diez euros</div></a>` +
+      `<a href="#2"><div class="name">Libro segundo</div><div class="price">Doce euros</div></a>` +
+      `</div>`
+  );
+  const segments = collectSegments(body, options);
+  const units = segments.filter((s) => s.kind === "element");
+  // One unit per inner div, never the grid and never the anchors.
+  assert.deepEqual(
+    units.map((s) => (s as { element: Element }).element.className),
+    ["name", "price", "name", "price"]
+  );
+});
+
+test("an inline icon deep inside a unit does not split the unit", () => {
+  const body = load(`<p id="p">Mira <a href="#x"><svg viewBox="0 0 1 1"></svg>el mapa</a> ahora mismo.</p>`);
+  const segments = collectSegments(body, options);
+  const units = segments.filter((s) => s.kind === "element");
+  assert.equal(units.length, 1);
+  assert.equal((units[0] as { element: Element }).element.id, "p");
+});
+
 test("code, pre, translate=no, notranslate, hidden, and inputs are skipped", () => {
   const body = load(`
     <p>Ejecuta <code>npm install</code> ahora.</p>

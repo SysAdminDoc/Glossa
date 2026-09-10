@@ -2,6 +2,11 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Fixed
+- Card grids and other link-wrapped blocks (`div > a > div`) are walked into instead of being sent to the engine as one unit, so bilingual mode no longer appends a second copy of every card.
+
 ## [0.1.0] - 2026-09-10
 
 First scaffold. Everything below works end to end in headless Chromium 153 and in Firefox 155, each driven through the real popup by an automated smoke test.

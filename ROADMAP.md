@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-18 — Treat inline wrappers with block descendants as containers
-  Why: `<div><a><div>…</div></a></div>` is sent as one HTML unit and bilingual mode appends a second copy of every card and link; card grids on shopping and news sites double in size.
-  Evidence: local probe 2026-09-10 (`#cards` case: four anchors after translation, two before); Firefox `nodeNeedsSubdividing()` recurses and `getIsBlockLike()` tests computed `display !== "inline"` (`translations-document.sys.mjs` L6624-6657).
-  Touches: src/content/segmenter.ts `isContainer`, tests/segmenter.test.ts, tests/fixtures/es.html
-  Acceptance: the probe fixture yields one unit per inner `div`, never per grid; the smoke asserts the anchor count is unchanged after translation and after restore.
-  Complexity: S
-
 - [ ] P0 — G-19 — Observe attribute and text mutations and re-check hidden units
   Why: revealing a `hidden` paragraph, opening `<details>`, editing a text node, or flipping `lang` after translation leaves the block untranslated or shows a stale translation under new text; a unit the page re-renders in place keeps `data-glossa-unit` and is never touched again.
   Evidence: local probe 2026-09-10 (`#late`, `#edited`, `#langflip`, `#det` cases); `content.ts` `startObserver` passes `{ childList: true, subtree: true }` only; Firefox `MUTATION_OBSERVER_OPTIONS` uses `attributeFilter` plus `attributeOldValue` (L518) and its `isNodeHidden` ladder (L5997) re-evaluates on demand; Bugzilla 1855260.

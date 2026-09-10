@@ -71,6 +71,9 @@ try {
   }, `http://127.0.0.1:${port}/es.html`);
   assert(tabId, "fixture tab not found by the service worker");
 
+  const cardsBefore = await page.$eval("#cards", (grid) => grid.querySelectorAll("a").length);
+  assert(cardsBefore === 2, `fixture card grid should hold 2 anchors, found ${cardsBefore}`);
+
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
   await popup.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
@@ -119,6 +122,17 @@ try {
   const codeLine = await page.$eval("main p code", (element) => element.closest("p")?.querySelector("glossa-translation")?.textContent ?? "");
   assert(/run\s+npm install\s+at/.test(codeLine), `spacing around inline code was lost: "${codeLine}"`);
 
+  // An inline wrapper holding blocks must be walked into, not sent whole: a grid sent as one unit
+  // comes back duplicated in bilingual mode and the anchor count doubles.
+  const cards = await page.$eval("#cards", (grid) => ({
+    anchors: grid.querySelectorAll("a").length,
+    translatedNames: Array.from(grid.querySelectorAll(".name glossa-translation")).map((b) => b.textContent ?? ""),
+    unitOnGrid: grid.getAttribute("data-glossa-unit")
+  }));
+  assert(cards.anchors === 2, `card grid anchors went from 2 to ${cards.anchors} after translation`);
+  assert(cards.unitOnGrid === null, "the card grid itself was sent as one unit");
+  assert(cards.translatedNames.length === 2, `expected 2 translated card names, got ${cards.translatedNames.length}`);
+
   const shadow = await page.evaluate(() => {
     const root = document.getElementById("host")?.shadowRoot;
     const block = root?.querySelector("glossa-translation");
@@ -153,8 +167,10 @@ try {
   const leftovers = await page.evaluate(() => ({
     blocks: document.querySelectorAll("glossa-translation").length,
     units: document.querySelectorAll("[data-glossa-unit]").length,
-    intro: document.getElementById("intro")?.textContent ?? ""
+    intro: document.getElementById("intro")?.textContent ?? "",
+    anchors: document.querySelectorAll("#cards a").length
   }));
+  assert(leftovers.anchors === 2, `restore left ${leftovers.anchors} card anchors instead of 2`);
   assert(leftovers.blocks === 0 && leftovers.units === 0, `restore left ${leftovers.blocks} blocks and ${leftovers.units} units`);
   assert(/consultar el catálogo en línea/.test(leftovers.intro), "restore did not bring the original paragraph back");
 
