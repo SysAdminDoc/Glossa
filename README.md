@@ -100,6 +100,42 @@ builds the artifacts with their SHA-256 sidecars and a CRX; `npm run release:pub
 commit and creates the GitHub release. The CRX signing key is generated into a gitignored
 `glossa.pem` on first use, and keeping that file is what keeps the extension id stable.
 
+## For store reviewers
+
+**Single purpose.** Glossa translates the text of a web page into another language, on the user's own
+machine. It does nothing else.
+
+**Why each permission is there.**
+
+- `activeTab` and `scripting`: the content script is injected into the tab the user invokes Glossa
+  on, and only then. There is no content script declared for any site.
+- `storage` and `unlimitedStorage`: settings, and the language models, which are tens of megabytes
+  each and live in the browser's Cache storage.
+- `contextMenus`: the "Translate this page" and "Translate selection" entries.
+- `offscreen` (Chrome only): the translation engine is a WebAssembly module in a Web Worker, and a
+  service worker cannot keep one alive. Firefox's background page hosts it directly and the Firefox
+  package contains no offscreen code at all.
+- Three host permissions, all Mozilla-operated: `firefox.settings.services.mozilla.com` for the
+  model catalog, `firefox-settings-attachments.cdn.mozilla.net` and Mozilla's model bucket on
+  `storage.googleapis.com` for the model files themselves.
+- `<all_urls>` is optional and never requested at install. It is asked for, from a click, only when
+  a user adds an "always translate" rule for a site, and only for that site.
+
+**About the model files.** The engine is a WebAssembly binary inside the package; it is never
+fetched at runtime. What is fetched is data: the language model files Mozilla publishes for its own
+translator. Each file is checked against the SHA-256 hash in Mozilla's catalog before it is used,
+whichever of the two sources served it, and nothing is fetched until a user asks for a language.
+
+**What is sent.** Nothing but those model requests. Page text is translated in a Web Worker inside
+the extension and never leaves the machine. There is no analytics, no telemetry, no account, no
+remote configuration and no error reporting.
+
+**Rebuilding the package.** Every release carries `glossa-source-vX.Y.Z.zip` with the full source,
+the lockfile, and a `BUILDING.txt` naming the exact steps and the engine hashes. The packages are
+byte-reproducible: `npm ci --ignore-scripts && npm rebuild esbuild && npm run engine:fetch &&
+npm run build` produces ZIPs whose SHA-256 matches the published ones exactly, which
+`npm run verify:source` checks by unpacking the archive and doing it.
+
 ## How it works
 
 ```

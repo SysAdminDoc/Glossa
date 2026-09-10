@@ -2,6 +2,12 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Added
+- Every release now carries a source archive, and the packages are byte-reproducible from it: the same source and the same commands produce ZIPs with the same SHA-256 as the published ones. `npm run verify:source` checks that by unpacking the archive and rebuilding.
+- The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
+
 ## [0.3.0] - 2026-09-10
 
 ### Added

@@ -105,6 +105,10 @@ async function loadOrCreateKey() {
 console.info(`release: Glossa ${tag}`);
 run(process.execPath, [path.join(root, "tools", "build.mjs")]);
 
+// AMO requires the source when the submitted files came out of a build step, and it is worth
+// publishing either way: anyone can check that the package matches the source it claims.
+run(process.execPath, [path.join(root, "tools", "source-archive.mjs")]);
+
 const zips = (await readdir(dist)).filter((name) => name.startsWith("glossa-") && name.endsWith(".zip"));
 if (zips.length === 0) throw new Error("no release ZIP in dist/");
 
@@ -113,6 +117,7 @@ const key = await loadOrCreateKey();
 for (const name of zips) {
   const full = path.join(dist, name);
   assets.push(full);
+  if (name.includes("-source-")) continue;
   if (name.includes("-chrome-")) {
     const crxPath = full.replace(/\.zip$/, ".crx");
     await writeFile(crxPath, packCrx3(await readFile(full), key));

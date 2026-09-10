@@ -109,13 +109,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: on a 500-paragraph fixture the visible paragraphs are translated before any off-screen one and scrolling re-prioritises; a hidden tab issues no engine calls until shown.
   Complexity: L
 
-- [ ] P1 — G-35 — Reproducible source archive and reviewer notes for AMO and the Chrome Web Store
-  Why: esbuild output triggers AMO's source-submission rule; reviewers must rebuild a byte-identical XPI from a README naming OS and exact tool versions; neither store's policy addresses runtime-fetched model weights, so the listing must explain them.
-  Evidence: extensionworkshop source-code-submission (default reviewer environment Ubuntu 24.04 ARM64, Node 24.14.0, npm 11.9.0); Chrome remote-hosted-code policy names WASM (bundled here) and allows data fetches; CWS 2026-08-01 policy update on single purpose.
-  Touches: tools/source-archive.mjs (source, lockfile, engine.lock.json, build script, README with `npm ci --ignore-scripts && npm run engine:fetch && npm run build`), docs/store/ (single-purpose statement, permission justifications, model-data explanation, privacy statement)
-  Acceptance: a clean checkout on the documented Node version reproduces `dist/glossa-firefox-v*.zip` byte for byte; the docs/store texts exist and are linked from README.
-  Complexity: S
-
 - [ ] P1 — G-36 — Localise the extension UI
   Why: a translator whose own popup and options are English-only is a documented complaint; every UI string is hardcoded in HTML and TypeScript and `_locales` holds only the name and description.
   Evidence: translatelocally #43; `src/popup/popup.html`, `src/options/options.html`, `src/extension/_locales/en/messages.json`.
