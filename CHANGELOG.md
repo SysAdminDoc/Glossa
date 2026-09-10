@@ -21,6 +21,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - Web addresses, email addresses and long reference numbers inside a sentence come back exactly as they went in. The engine used to put a space inside a query string and translate the domain part of an address.
 - The model catalog's own platform gates are respected. A desktop browser was picking the Android build of the Japanese, Korean, Chinese and Russian models, and prerelease models were offered as if they had shipped. Norwegian Nynorsk now has a display name instead of showing as `nn`.
 - A block that declares its own language is translated with that language's model, or left alone when the model is not installed. An Arabic quotation on a Spanish page used to be pushed through the Spanish model and came back as nonsense.
+- Every setting on the options page now changes what the extension does. A "never" rule keeps Glossa off that site entirely and says so in the popup, a page in a language you read is not offered, the editable-field skip is honoured, and the catalog refresh uses the interval you set.
 
 ## [0.1.0] - 2026-09-10
 

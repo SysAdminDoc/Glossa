@@ -88,6 +88,40 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   return out;
 }
 
+// The catalog is the only periodic network call Glossa makes, so the interval is a setting rather
+// than a constant.
+export function catalogMaxAgeMs(settings: Pick<Settings, "catalogRefreshHours">): number {
+  const hours = Number.isFinite(settings.catalogRefreshHours) ? settings.catalogRefreshHours : 24;
+  return Math.max(1, Math.min(hours, 24 * 30)) * 60 * 60 * 1000;
+}
+
+// Whether the user's settings allow translating this page at all. Returns the reason not to, or
+// null when nothing is in the way.
+export function blockedReason(
+  settings: Pick<Settings, "siteRules" | "neverTranslateLanguages">,
+  url: string | null,
+  detectedLanguage: string | null,
+  languageName: (code: string) => string
+): string | null {
+  const host = hostOf(url);
+  if (host && settings.siteRules[host] === "never") {
+    return `Glossa is turned off for ${host}. Change that on the options page.`;
+  }
+  if (detectedLanguage && settings.neverTranslateLanguages.includes(detectedLanguage)) {
+    return `You read ${languageName(detectedLanguage)}, so this page is left alone.`;
+  }
+  return null;
+}
+
+export function hostOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadSettings(): Promise<Settings> {
   const stored = await api.storage.local.get(SETTINGS_KEY);
   return mergeSettings(stored[SETTINGS_KEY], api.i18n.getUILanguage());

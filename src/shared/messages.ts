@@ -32,7 +32,7 @@ export type TranslateResponse =
   | { ok: false; error: string };
 
 export type PageCommand =
-  | { type: "glossa:page-command"; command: "translate"; targetLanguage: string; displayMode: DisplayMode; showOriginalOnHover: boolean; sourceLanguage?: string }
+  | { type: "glossa:page-command"; command: "translate"; targetLanguage: string; displayMode: DisplayMode; showOriginalOnHover: boolean; skipFormFields: boolean; sourceLanguage?: string }
   | { type: "glossa:page-command"; command: "restore" }
   | { type: "glossa:page-command"; command: "status" }
   | { type: "glossa:page-command"; command: "translate-selection"; targetLanguage: string };
@@ -59,6 +59,9 @@ export interface PageStatusRequest {
 export interface PageStatusResponse {
   page: PageState | { injected: false; url: string | null; reason: string };
   route: RouteStatus | null;
+  // Set when the user's own settings say this page must not be translated: a "never" rule for the
+  // host, or a page in a language they told us they read. The text is shown as-is in the popup.
+  blocked: string | null;
 }
 
 export interface TranslatePageRequest {
@@ -148,6 +151,8 @@ export interface ModelsListResponse {
 interface EngineEnvelope {
   target: typeof ENGINE_TARGET;
   experimental?: boolean;
+  // How stale the model catalog may be before it is fetched again, from the user's settings.
+  catalogMaxAgeMs?: number;
 }
 
 export type EngineRequest =

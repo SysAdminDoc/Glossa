@@ -29,6 +29,9 @@ const modeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".mo
 let tabId: number | null = null;
 let page: PageState | null = null;
 let route: RouteStatus | null = null;
+// Set when the user's own settings rule this page out: a "never" rule for the host, or a page in a
+// language they said they read.
+let blocked: string | null = null;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
 
@@ -90,6 +93,11 @@ function render(): void {
   const target = targetSelect.value;
   actionButton.classList.remove("secondary");
 
+  if (blocked && !page?.translated) {
+    actionButton.textContent = "Turned off for this page";
+    actionButton.disabled = true;
+    return;
+  }
   if (!injected) {
     actionButton.textContent = "Translate page";
     actionButton.disabled = busy;
@@ -131,6 +139,12 @@ function render(): void {
 }
 
 async function refreshRoute(): Promise<void> {
+  if (blocked) {
+    // Nothing to ask the engine about: the user's settings already ruled this page out.
+    route = null;
+    render();
+    return;
+  }
   const source = sourceSelect.value || page?.detectedLanguage || null;
   const target = targetSelect.value;
   if (!source || !target || source === target) {
@@ -156,6 +170,8 @@ async function refreshRoute(): Promise<void> {
 async function loadPage(): Promise<void> {
   if (tabId === null) return;
   const response = await sendUi<PageStatusResponse>({ type: "glossa:page-status", tabId });
+  blocked = response.blocked;
+  if (blocked) setStatus(blocked, "warn");
   if (response.page.injected) {
     page = response.page;
     route = response.route;
@@ -163,7 +179,9 @@ async function loadPage(): Promise<void> {
       sourceSelect.value = page.detectedLanguage;
       if (sourceSelect.value !== page.detectedLanguage) sourceSelect.value = "";
     }
-    if (page.lastError) {
+    if (blocked) {
+      // Already shown above; a stale page error must not replace it.
+    } else if (page.lastError) {
       setStatus(page.lastError, "error");
     } else if (page.translated) {
       setStatus(`Translated ${page.blocksDone} blocks on this device.`, "ok");
@@ -176,7 +194,7 @@ async function loadPage(): Promise<void> {
       actionButton.disabled = true;
       return;
     }
-    setStatus("Click Translate to read this page in your language.");
+    if (!blocked) setStatus("Click Translate to read this page in your language.");
   }
   render();
 }

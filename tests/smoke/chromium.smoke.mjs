@@ -251,6 +251,48 @@ try {
   assert(leftovers.blocks === 0 && leftovers.units === 0, `restore left ${leftovers.blocks} blocks and ${leftovers.units} units`);
   assert(/consultar el catálogo en línea/.test(leftovers.intro), "restore did not bring the original paragraph back");
 
+  // Settings have to change behaviour, not just persist. With the default on, an editable block is
+  // left alone; with it off, the same block is translated. Anything else means a dead control.
+  const editableDefault = await page.$eval("#editable", (element) => element.querySelectorAll("glossa-translation").length);
+  assert(editableDefault === 0, "an editable block was translated while the skip setting was on");
+
+  await worker.evaluate(async () => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, skipFormFields: false } });
+  });
+  await popup.click("#action");
+  await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
+    timeout: 240_000
+  });
+  await page.waitForFunction(() => document.querySelectorAll("#editable glossa-translation").length === 1, null, {
+    timeout: 120_000
+  });
+  const editableOff = await page.$eval("#editable glossa-translation", (block) => block.textContent ?? "");
+  console.info(`smoke: editable block with the skip off: ${editableOff}`);
+  assert(/edit/i.test(editableOff), `editable block translation looks wrong: "${editableOff}"`);
+
+  // And a "never" rule for this host turns the whole thing off, with the reason in the popup.
+  await popup.click("#action");
+  await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Translate page", null, {
+    timeout: 30_000
+  });
+  await worker.evaluate(async (host) => {
+    const stored = await chrome.storage.local.get("settings");
+    await chrome.storage.local.set({ settings: { ...stored.settings, siteRules: { [host]: "never" } } });
+  }, "127.0.0.1");
+  await popup.reload();
+  await popup.waitForFunction(
+    () => document.getElementById("action")?.textContent === "Turned off for this page",
+    null,
+    { timeout: 30_000 }
+  );
+  const blockedStatus = await popup.$eval("#status", (element) => element.textContent ?? "");
+  console.info(`smoke: blocked status "${blockedStatus}"`);
+  assert(/127\.0\.0\.1/.test(blockedStatus), `the popup did not name the blocked host: "${blockedStatus}"`);
+  assert(await popup.$eval("#action", (button) => button.disabled), "the action button stayed enabled on a never host");
+  const afterRule = await page.evaluate(() => document.querySelectorAll("glossa-translation").length);
+  assert(afterRule === 0, `a never host still carried ${afterRule} translations`);
+
   // Network audit: every request Playwright saw from the extension must go to a model host.
   // Requests from the offscreen document are not always surfaced by Playwright, so this is a
   // guard on what is observable, not a proof of the whole picture. The proof is the manifest:

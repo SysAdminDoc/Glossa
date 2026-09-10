@@ -50,6 +50,9 @@ interface Controller {
   output: OutputCache;
   // What `<html lang>` claims. A unit that declares a different language is written in that one.
   pageLanguage: string | null;
+  // From the user's settings, carried on the translate command: the engine never sees the content of
+  // an editable field unless this is off.
+  skipFormFields: boolean;
   // Per-language answer to "is there a model for this on disk", so a page with three quoted
   // languages asks once each.
   routes: Map<string, boolean>;
@@ -82,6 +85,7 @@ function boot(): void {
     deferred: new Set(),
     output: new OutputCache(),
     pageLanguage: null,
+    skipFormFields: true,
     routes: new Map()
   };
 
@@ -178,6 +182,7 @@ async function translatePage(
   }
   controller.state.detectedLanguage = source;
   controller.state.targetLanguage = command.targetLanguage;
+  controller.skipFormFields = command.skipFormFields;
   controller.state.lastError = null;
   controller.options = {
     displayMode: command.displayMode,
@@ -496,7 +501,7 @@ function withObserverPaused<T>(controller: Controller, write: () => T): T {
 }
 
 function segmentOptions(controller: Controller): { skipFormFields: boolean; deferred: Set<Element> } {
-  return { skipFormFields: true, deferred: controller.deferred };
+  return { skipFormFields: controller.skipFormFields, deferred: controller.deferred };
 }
 
 function report(controller: Controller): void {

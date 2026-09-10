@@ -16,7 +16,8 @@ import {
   type TranslateResponse,
   type UiRequest
 } from "../shared/messages.ts";
-import { loadSettings } from "../shared/settings.ts";
+import { blockedReason, catalogMaxAgeMs, loadSettings } from "../shared/settings.ts";
+import { languageName } from "../shared/languages.ts";
 import { EngineHost } from "../engine/engine-host.ts";
 
 // Background: routes messages between the content script, the UI pages, and the engine. On Chrome
@@ -57,7 +58,12 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
   // The engine host cannot read settings on Chrome, so the one setting that changes which catalog
   // records are usable rides along with the request.
   const settings = await loadSettings();
-  const full = { target: ENGINE_TARGET, experimental: settings.experimentalModels, ...request } as EngineRequest;
+  const full = {
+    target: ENGINE_TARGET,
+    experimental: settings.experimentalModels,
+    catalogMaxAgeMs: catalogMaxAgeMs(settings),
+    ...request
+  } as EngineRequest;
   if (localEngine) {
     return (await localEngine.handle(full)) as T;
   }
@@ -99,6 +105,18 @@ async function sendToTab<T>(tabId: number, message: PageCommand): Promise<T | un
 
 async function translatePage(tabId: number, targetOverride?: string, sourceOverride?: string): Promise<PageState | undefined> {
   const settings = await loadSettings();
+  let url: string | null = null;
+  try {
+    url = (await api.tabs.get(tabId)).url ?? null;
+  } catch {
+    url = null;
+  }
+  // A "never" rule for the host means exactly that: nothing is injected and nothing is sent.
+  const ruleBlock = blockedReason(settings, url, null, languageName);
+  if (ruleBlock) {
+    const current = await sendToTab<PageState>(tabId, { type: "glossa:page-command", command: "status" });
+    return current ? { ...current, lastError: ruleBlock } : undefined;
+  }
   await ensureContentScript(tabId);
   const command: PageCommand = {
     type: "glossa:page-command",
@@ -106,6 +124,7 @@ async function translatePage(tabId: number, targetOverride?: string, sourceOverr
     targetLanguage: targetOverride ?? settings.targetLanguage,
     displayMode: settings.displayMode,
     showOriginalOnHover: settings.showOriginalOnHover,
+    skipFormFields: settings.skipFormFields,
     ...(sourceOverride ? { sourceLanguage: sourceOverride } : {})
   };
   return sendToTab<PageState>(tabId, command);
@@ -152,6 +171,11 @@ async function pageStatus(tabId: number): Promise<PageStatusResponse> {
   } catch {
     url = null;
   }
+  // A host the user turned Glossa off for is never touched, not even to detect its language.
+  const hostBlock = blockedReason(settings, url, null, languageName);
+  if (hostBlock) {
+    return { page: { injected: false, url, reason: "site-never" }, route: null, blocked: hostBlock };
+  }
   // Opening the popup is the user gesture that grants activeTab, so the content script can go in
   // now and detect the page language before anything is translated.
   let injectError: string | null = null;
@@ -166,14 +190,16 @@ async function pageStatus(tabId: number): Promise<PageStatusResponse> {
   const page = await sendToTab<PageState>(tabId, { type: "glossa:page-command", command: "status" });
   if (!page) {
     const reason = injectError ?? (url && /^(https?|file):/.test(url) ? "not-injected" : "unsupported-page");
-    return { page: { injected: false, url, reason }, route: null };
+    return { page: { injected: false, url, reason }, route: null, blocked: null };
   }
   const source = page.detectedLanguage;
   const target = page.targetLanguage ?? settings.targetLanguage;
-  const route = source && source !== target
+  // A page in a language the user reads is detected but never offered.
+  const blocked = blockedReason(settings, url, source, languageName);
+  const route = source && source !== target && !blocked
     ? await engineCall<PageStatusResponse["route"]>({ type: "route-status", sourceLanguage: source, targetLanguage: target })
     : null;
-  return { page, route };
+  return { page, route, blocked };
 }
 
 async function handleUiRequest(request: UiRequest): Promise<unknown> {

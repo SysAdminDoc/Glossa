@@ -26,7 +26,7 @@ import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot
 // into the worker, fetches models through the store, and publishes download progress to any open
 // popup or options page.
 
-const CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
@@ -39,6 +39,9 @@ export class EngineHost {
   private readonly loadedRoutes = new Set<string>();
   private readonly routeLoads = new Map<string, Promise<string>>();
   private queue: Promise<unknown> = Promise.resolve();
+  // The refresh interval is a setting, and the host cannot read settings on Chrome, so each request
+  // brings the current value with it.
+  private catalogMaxAgeMs = DEFAULT_CATALOG_MAX_AGE_MS;
 
   async handle(request: EngineRequest): Promise<unknown> {
     // Which catalog records count depends on the platform and on whether the user asked for the
@@ -47,6 +50,9 @@ export class EngineHost {
       typeof navigator === "undefined" ? "" : navigator.userAgent,
       request.experimental === true
     );
+    if (typeof request.catalogMaxAgeMs === "number" && request.catalogMaxAgeMs > 0) {
+      this.catalogMaxAgeMs = request.catalogMaxAgeMs;
+    }
     switch (request.type) {
       case "ping":
         return { alive: true, engineLoaded: this.worker !== null };
@@ -87,7 +93,7 @@ export class EngineHost {
     targetLanguage: string,
     environment?: CatalogEnvironment
   ): Promise<RouteStatus> {
-    const catalog = await this.store.getCatalog({ maxAgeMs: CATALOG_MAX_AGE_MS });
+    const catalog = await this.store.getCatalog({ maxAgeMs: this.catalogMaxAgeMs });
     const base: RouteStatus = {
       sourceLanguage,
       targetLanguage,
@@ -117,7 +123,7 @@ export class EngineHost {
   }
 
   async modelsList(environment?: CatalogEnvironment): Promise<ModelsListResponse> {
-    const catalog = await this.store.getCatalog({ maxAgeMs: CATALOG_MAX_AGE_MS });
+    const catalog = await this.store.getCatalog({ maxAgeMs: this.catalogMaxAgeMs });
     const coverage = catalog ? languageCoverage(catalog.records, environment) : { sources: [], targets: [] };
     return {
       installed: await this.store.listInstalled(),
@@ -150,7 +156,7 @@ export class EngineHost {
     if (sourceLanguage === targetLanguage) {
       throw new Error("Source and target language are the same");
     }
-    const catalog = await this.store.getCatalog({ maxAgeMs: CATALOG_MAX_AGE_MS });
+    const catalog = await this.store.getCatalog({ maxAgeMs: this.catalogMaxAgeMs });
     if (!catalog) {
       throw new Error(this.store.catalogError ?? "The model catalog could not be loaded");
     }

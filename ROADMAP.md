@@ -124,13 +124,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P0
 
-- [ ] P0 — G-23 — Make every persisted setting act or remove its control
-  Why: the options page lets users add site rules and "languages you read", toggle the editable-field skip, and the catalog refresh interval, and none of them changes behaviour; `skipFormFields` is hardcoded `true`.
-  Evidence: grep of `siteRules`, `neverTranslateLanguages`, `catalogRefreshHours` (read only by settings.ts and options.ts); `content.ts` lines 160 and 279; simple-translate #137 (a kill switch that did not persist drew sustained complaints).
-  Touches: src/background/background.ts (refuse to inject or translate on a "never" host; skip pages detected in a never-translate language; pass `skipFormFields`), src/content/content.ts, src/engine/engine-host.ts (`CATALOG_MAX_AGE_MS` from settings), src/options/options.html
-  Acceptance: a "never" rule for the fixture host makes the popup say so and translate nothing; adding the detected language to "languages you read" disables the button; unchecking the editable-field skip translates the probe's `contenteditable` block; the catalog refresh honours the configured interval in a unit test.
-  Complexity: M
-
 ### P1
 
 - [ ] P1 — G-26 — Translate same-origin iframes without double injection
