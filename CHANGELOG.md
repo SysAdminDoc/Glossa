@@ -17,6 +17,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
 ### Fixed
+- Some sites rebuild a paragraph from what's on screen after Glossa translated it in place. Show original now still brings back the page's own text there, where before that paragraph stayed translated for good.
 - Showing the original after "In place of the original" puts every form field back exactly where it was, still holding what you typed or ticked. A checkbox inside a label, or a field inside a button or a link, used to be left off the page, and a bold word inside a link had the same problem.
 - With Chrome's translator selected, a block that's too long for it stays in its own language and the popup says why, instead of the rest of the page stopping there. The popup's count of translated blocks also leaves out blocks that weren't translated, and on Firefox a settings file that picked Chrome's translator no longer locks the popup.
 - Switching from your mirror back to Mozilla no longer treats the mirror's model files as Mozilla's, and a download that's running when you change the mirror setting finishes from the source it started with.

@@ -93,11 +93,11 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a manifest entry recorded under a different engine release is reported as not installed and re-downloaded; a unit test covers the mismatch.
   Complexity: S
 
-- [ ] P2 — G-50 — Keep a restore path for a unit the page re-renders in replace mode
-  Why: when the page replaces the children of a unit translated in replace mode, the recorded original nodes no longer belong in the tree, so the record is dropped and "show original" can never bring that block's source text back. Bilingual mode is unaffected.
-  Evidence: adversarial review 2026-09-10 (probe3 PROBE L); src/content/renderer.ts `reset` drops the record without restoring `originalChildren`.
-  Touches: src/content/renderer.ts (keep the original text per unit and offer it on restore even after a re-render), tests
-  Acceptance: a unit the page re-renders in replace mode still shows its pre-translation text after "show original", or the popup says plainly which blocks could not be restored.
+- [ ] P2 — G-53 — Handle a page that changes part of a unit translated in replace mode
+  Why: G-50 covers a page that renders a replaced unit again from what it reads on screen (the record is kept and "show original" still works). A page that changes only part of such a unit, adding a node or editing one of its own inside the translated text, still gets the record dropped, and the mixed text (translation plus the page's change) is then sent to the engine as if it were source text. Restoring the originals first would throw the page's change away, so this needs a decision rather than a quick fix: keep the page's nodes and restore around them, or report the block as not restorable.
+  Evidence: G-50 work 2026-09-10; `reset` in src/content/renderer.ts compares the unit's text with what was written and keeps the record only on an exact match.
+  Touches: src/content/renderer.ts (`reset`, restore), src/content/content.ts (count blocks that cannot be restored), src/popup/popup.ts (say so)
+  Acceptance: after a page edits a word inside a replaced unit, "show original" either brings back the original with the page's edit applied, or the popup names the blocks it could not restore; the edited text is never sent as source text.
   Complexity: M
 
 - [ ] P2 — G-43 — Progressive per-sentence rendering
