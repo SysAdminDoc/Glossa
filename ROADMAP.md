@@ -72,13 +72,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a fixture with a closed shadow root is translated in both browser smokes.
   Complexity: S
 
-- [ ] P2 — G-40 — Reset translation state on bfcache restore and cancel on page hide
-  Why: a page restored from the back-forward cache keeps stale detection and unit state, and an unloading page keeps engine work queued.
-  Evidence: translatelocally #17 (old page answered the new page's detection request); `content.ts` has no `pageshow`/`pagehide` handling.
-  Touches: src/content/content.ts (`pageshow` with `persisted` re-runs detection, `pagehide` bumps the generation and stops the observer)
-  Acceptance: navigating away and back on the fixture leaves the popup showing the correct language and state; no engine call arrives after `pagehide`.
-  Complexity: S
-
 - [ ] P2 — G-41 — Show per-pair quality and size before download
   Why: Bergamot trails Google by 4 COMET22 on average and by 7 to 9 on en-th, hi-en, en-ko, en-hi and en-lv; users on those pairs will blame the extension unless told first.
   Evidence: Mozilla eval DB (`db/db.sqlite`, 105 Release pairs, means Bergamot 84.8 vs Google 88.8) and registry `metrics.flores200-plus.comet22` in `models.json`.

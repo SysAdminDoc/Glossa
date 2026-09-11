@@ -128,6 +128,25 @@ function boot(): void {
     return true;
   });
 
+  // A page the browser keeps in its back-forward cache comes back with this script, and everything
+  // it held, intact. Leaving stops what is in flight: the bumped generation makes every waiting
+  // batch drop its answer and send nothing more, the observer stops, and nothing is left floating
+  // over the page. Coming back checks the language again, since the detection belongs to another
+  // visit, and a translated page starts following its changes again.
+  window.addEventListener("pagehide", () => {
+    controller.generation++;
+    // The translation's own cleanup only runs for the current generation, which this just ended.
+    controller.state.translating = false;
+    stopObserver(controller);
+    dismissPopover();
+    removeSelectionButton();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    void detect(controller);
+    if (controller.state.translated) startObserver(controller);
+  });
+
   // Detect early so the popup can show the page language before anything is translated.
   void detect(controller);
   void watchSelection(controller);
