@@ -7,7 +7,7 @@
 <p align="center">Translate web pages on your own device. No cloud, no account, no telemetry.</p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-7c6cf2" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-7c6cf2" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a6e3a1" />
   <img alt="Platform" src="https://img.shields.io/badge/platform-Chrome%20%7C%20Firefox-89b4fa" />
   <img alt="Engine" src="https://img.shields.io/badge/engine-Bergamot%20(MPL--2.0)-f9e2af" />

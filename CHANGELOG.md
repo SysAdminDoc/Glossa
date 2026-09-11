@@ -2,7 +2,7 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
-## [Unreleased]
+## [0.4.0] - 2026-09-11
 
 ### Added
 - You can run your own model mirror. `tools/mirror-models.mjs` copies the catalog and the model files for the pairs you pick, checking every hash on the way, and a new setting under Language models points Glossa at it. With a mirror set, nothing goes to Mozilla or Google, not even the catalog request.
