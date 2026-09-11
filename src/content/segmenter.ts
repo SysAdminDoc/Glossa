@@ -162,7 +162,7 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       walk(element, out, options);
       continue;
     }
-    const text = element.textContent ?? "";
+    const text = unitText(element);
     if (!LETTER.test(text)) continue;
     if (!isRenderable(element)) {
       options.deferred?.add(element);
@@ -291,13 +291,19 @@ function effectiveLang(start: Element | null): string | null {
 // back by index. Clone and original are walked with the same selector, so indexes line up.
 export function serializeUnit(element: Element): { html: string; holds: Hold[] } {
   stampIds(element);
-  const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR));
-  const source = element.textContent ?? "";
-  if (holds.length === 0 && !hasProtectedText(source)) {
+  // A field is never a hold, and neither is anything inside one: fields are emptied below, and
+  // original and clone have to be filtered the same way for the indexes to line up.
+  const outsideFields = (held: Element) => !held.closest(FORM_FIELD_SELECTOR);
+  const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR)).filter(outsideFields);
+  const hasFields = element.querySelector(FORM_FIELD_SELECTOR) !== null;
+  const source = unitText(element);
+  if (holds.length === 0 && !hasFields && !hasProtectedText(source)) {
     return { html: element.innerHTML, holds };
   }
   const clone = element.cloneNode(true) as Element;
-  const cloneHolds = Array.from(clone.querySelectorAll(HOLD_SELECTOR));
+  const cloneHolds = Array.from(clone.querySelectorAll(HOLD_SELECTOR)).filter(outsideFields);
+  // Before any placeholder or protected-text scan, so neither ever sees what is in a field.
+  emptyFields(clone);
   cloneHolds.forEach((held, index) => {
     // A protected element nested in another protected element is already covered by its parent.
     if (held.parentElement?.closest(HOLD_SELECTOR)) return;
@@ -313,6 +319,9 @@ export function serializeUnit(element: Element): { html: string; holds: Hold[] }
 function stampIds(element: Element): void {
   let index = 0;
   for (const child of element.querySelectorAll("*")) {
+    // What is inside a field (a select's options) is never sent and never comes back, so it is not
+    // numbered: a number left on the page's own option would outlive the translation.
+    if (child.parentElement?.closest(FORM_FIELD_SELECTOR)) continue;
     child.setAttribute(ID_ATTRIBUTE, String(index++));
   }
 }
@@ -424,16 +433,32 @@ export function shouldSkip(element: Element, options: SegmentOptions): boolean {
   return false;
 }
 
-// A form control is one of the page's live widgets. Inside a unit its content would go to the
-// engine (a textarea's text, every option of a select, whatever "never translate inside fields"
-// says), and bilingual mode would clone it, id and all, into the translation: a second control that
-// does nothing. So an element holding one is walked like a container. The words around the control
-// become segments of their own, which costs a sentence split by a dropdown some context and keeps
-// the control the page's own.
-const FORM_CONTROL_SELECTOR = "input, select, textarea, button";
+// A form field is one of the page's live widgets, and what is in it (typed text, the options of a
+// select, a hidden input's token) never goes to the engine. It stays in its sentence as an empty
+// element carrying nothing but its number, so the words around it keep their context and replace
+// mode can put the live field back where the engine left the slot. The renderer does the rest.
+export const FORM_FIELD_SELECTOR = "input, select, textarea";
+
+// What a unit says, leaving out anything typed or listed in its form fields.
+function unitText(element: Element): string {
+  if (!element.querySelector(FORM_FIELD_SELECTOR)) return element.textContent ?? "";
+  const clone = element.cloneNode(true) as Element;
+  emptyFields(clone);
+  return clone.textContent ?? "";
+}
+
+// A field goes to the engine as an empty element with its number and nothing else: no options, no
+// text, no value, no name.
+function emptyFields(root: Element): void {
+  for (const field of root.querySelectorAll(FORM_FIELD_SELECTOR)) {
+    field.replaceChildren();
+    for (const attribute of Array.from(field.attributes)) {
+      if (attribute.name !== ID_ATTRIBUTE) field.removeAttribute(attribute.name);
+    }
+  }
+}
 
 function isContainer(element: Element): boolean {
-  if (element.querySelector(FORM_CONTROL_SELECTOR)) return true;
   for (const child of element.children) {
     if (BLOCK_TAGS.has(child.tagName)) return true;
     if (child.shadowRoot) return true;

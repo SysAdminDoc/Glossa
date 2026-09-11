@@ -1,6 +1,7 @@
 import {
   attributeMarker,
   clearIds,
+  FORM_FIELD_SELECTOR,
   LABEL_MARKER,
   MARKER_SELECTOR,
   HOLD_ATTRIBUTE,
@@ -155,7 +156,11 @@ export class Renderer {
     const element = segment.element;
     if (!element.isConnected) return null;
     const applied = nodes.map((node) => node.textContent ?? "").join("");
-    const bilingual = options.displayMode === "bilingual" && wantsBilingual(element, segment.text);
+    // Replace mode puts the page's live fields back into the translation by number. If the engine
+    // dropped one, replacing would take a working control off the page, so that unit is shown the
+    // bilingual way instead, with the original left exactly as it was.
+    const bilingual =
+      (options.displayMode === "bilingual" && wantsBilingual(element, segment.text)) || !fieldsSurvive(nodes, element);
     if (bilingual) {
       const block = document.createElement(TRANSLATION_TAG.toLowerCase());
       block.className = TRANSLATION_CLASS;
@@ -165,6 +170,7 @@ export class Renderer {
       // numbering has no meaning inside it.
       clearIds(block);
       dropPageIds(block);
+      dropFormControls(block);
       hideDuplicateFromScreenReaders(block);
       ensureShadowStyle(element);
       element.append(block);
@@ -445,6 +451,19 @@ function mergeLiveElements(
       if (id === null) continue;
       const original = live.get(id);
       if (!original) continue;
+      if (original.matches(FORM_FIELD_SELECTOR)) {
+        // A field is the page's live widget: its options, what was typed in it and its listeners
+        // stay as they are. It went to the engine empty, so nothing that came back belongs inside
+        // it, and a second copy of it would be a control that does nothing.
+        if (used.has(id)) {
+          copy.remove();
+        } else {
+          used.add(id);
+          original.removeAttribute(ID_ATTRIBUTE);
+          copy.replaceWith(original);
+        }
+        continue;
+      }
       if (used.has(id)) {
         // The engine repeated this element. A shallow clone keeps the markup without pretending
         // the page's own element is in two places.
@@ -481,6 +500,29 @@ function dropPageIds(root: Element): void {
   for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
 }
 
+// The copy below the original is text to read. A field or a button in it would be a second control
+// that does nothing, so fields go and a button leaves only its label behind.
+function dropFormControls(block: Element): void {
+  for (const field of block.querySelectorAll(FORM_FIELD_SELECTOR)) field.remove();
+  for (const button of block.querySelectorAll("button")) button.replaceWith(...Array.from(button.childNodes));
+}
+
+// Whether every live field of the unit came back from the engine, by number.
+function fieldsSurvive(nodes: Node[], unit: Element): boolean {
+  const fields = Array.from(unit.querySelectorAll(FORM_FIELD_SELECTOR));
+  if (fields.length === 0) return true;
+  const returned = new Set<string>();
+  for (const node of nodes) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const element = node as Element;
+    for (const numbered of [element, ...Array.from(element.querySelectorAll(`[${ID_ATTRIBUTE}]`))]) {
+      const id = numbered.getAttribute(ID_ATTRIBUTE);
+      if (id !== null) returned.add(id);
+    }
+  }
+  return fields.every((field) => returned.has(field.getAttribute(ID_ATTRIBUTE) ?? ""));
+}
+
 // In bilingual mode the page says everything twice, and a screen reader reads it twice. The added
 // copy is the one to take out of the accessibility tree, but only when it holds nothing focusable:
 // aria-hidden does not remove anything from the tab order, so hiding a block with a link in it
@@ -510,6 +552,9 @@ function parseFragment(html: string, holds: Hold[]): Node[] {
   // a reference number) there is nothing left to recognise it by.
   repairInlineSpacing(doc.body);
   // Then put back what each placeholder stands for, byte for byte.
+  // A placeholder the engine repeated is put back as a second copy of the held element, and only the
+  // first may keep the page's ids.
+  const placed = new Set<number>();
   for (const placeholder of doc.body.querySelectorAll(`var[${HOLD_ATTRIBUTE}]`)) {
     const index = Number(placeholder.getAttribute(HOLD_ATTRIBUTE));
     const original = holds[index];
@@ -519,7 +564,12 @@ function parseFragment(html: string, holds: Hold[]): Node[] {
         const element = copy as Element;
         element.removeAttribute(ID_ATTRIBUTE);
         for (const nested of element.querySelectorAll(`[${ID_ATTRIBUTE}]`)) nested.removeAttribute(ID_ATTRIBUTE);
+        if (placed.has(index)) {
+          element.removeAttribute("id");
+          for (const nested of element.querySelectorAll("[id]")) nested.removeAttribute("id");
+        }
       }
+      placed.add(index);
       placeholder.replaceWith(copy);
     } else {
       placeholder.replaceWith(doc.createTextNode(placeholder.textContent ?? ""));

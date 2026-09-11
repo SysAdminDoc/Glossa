@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Window } from "happy-dom";
 
-// Form controls are the page's own live widgets. None of their content may reach the engine, a
-// bilingual copy must never hold a second, dead copy of one, and no copy may repeat a page id.
+// Form fields are the page's own live widgets. Nothing in them may reach the engine, the sentence
+// around them keeps its context and its protection, replace mode puts the live field back, and no
+// copy of anything may hold a second, dead control or repeat a page id.
 
 const window = new Window();
 const globals = globalThis as Record<string, unknown>;
@@ -30,46 +31,117 @@ function load(html: string) {
   return window.document.body as unknown as Element;
 }
 
+function byId(id: string) {
+  return window.document.getElementById(id) as unknown as HTMLElement;
+}
+
+function units(body: Element) {
+  return collectSegments(body, options).flatMap((segment) => (segment.kind === "element" ? [segment] : []));
+}
+
 // Every segment rendered with an answer that keeps the markup it was given, the way the engine
 // does, so what ends up in the page is exactly what the renderer builds from each unit.
-function translateAll(body: Element) {
+function translateAll(body: Element, mode = bilingual) {
   const segments = collectSegments(body, options);
   const renderer = new Renderer();
   for (const segment of segments) {
-    renderer.apply(segment, `EN ${segment.kind === "element" ? segment.html : segment.text}`, bilingual);
+    renderer.apply(segment, `EN ${segment.kind === "element" ? segment.html : segment.text}`, mode);
   }
-  return segments;
+  return { segments, renderer };
 }
 
 test("a paragraph holding nothing but a textarea sends nothing and copies nothing", () => {
   const body = load(`<p id="compose"><textarea id="message">Hola, quiero reservar una sala de lectura para el martes.</textarea></p>`);
-  const segments = translateAll(body);
+  const { segments } = translateAll(body);
   assert.ok(!segments.some((segment) => /reservar/.test(segment.text)), "the field's text went to the engine");
   assert.equal(window.document.querySelectorAll("textarea").length, 1, "the textarea was copied");
-  assert.equal(window.document.querySelector("textarea")?.textContent, "Hola, quiero reservar una sala de lectura para el martes.");
+  assert.equal(byId("message").textContent, "Hola, quiero reservar una sala de lectura para el martes.");
 });
 
-test("the words around a form control are translated and the control stays the page's own", () => {
+test("a sentence keeps its fields as empty numbered slots, with nothing of theirs sent", () => {
+  const body = load(
+    `<p id="attrs">Consulta los <a id="tip" href="#h">horarios</a> y elige una sala ` +
+      `<select id="room" name="sala"><option>Sala de lectura</option><option value="infantil">Sala infantil</option></select> ` +
+      `o busca <input id="search" type="search" name="q" value="texto del usuario" placeholder="Buscar en el catálogo"> ` +
+      `<input type="hidden" name="token" value="a1b2c3d4e5f6"> antes de <button id="go" type="button">Reservar la sala</button>.</p>`
+  );
+  const [unit, ...rest] = units(body);
+  assert.ok(unit, "the paragraph is still one unit");
+  assert.equal(rest.length, 0, "the sentence was split");
+  for (const secret of ["Sala de lectura", "texto del usuario", "a1b2c3d4e5f6", "Buscar en el catálogo"]) {
+    assert.ok(!unit.html.includes(secret), `"${secret}" went to the engine: ${unit.html}`);
+  }
+  // Field names and values are the form's, not prose ("sala" and "token" here), and go nowhere.
+  assert.ok(!/<(input|select|textarea)\b[^>]*\b(name|value|placeholder|type)=/i.test(unit.html), `a field kept its attributes: ${unit.html}`);
+  assert.match(unit.html, /<select data-glossa-id="\d+"><\/select>/, "the select is not an empty numbered slot");
+  assert.ok(!/Sala de lectura/.test(unit.text), "the unit's text counts the options");
+  assert.match(unit.html, /Reservar la sala/, "a button's label is prose and is sent");
+});
+
+test("a url, an address and a reference number stay protected in a sentence with a control", () => {
+  const body = load(
+    `<p id="contact">Escribe a info@ejemplo.es o visita https://ejemplo.es/catalogo?sala=3 con el expediente 2026123456 ` +
+      `<button type="button">Enviar</button></p>`
+  );
+  const [unit] = units(body);
+  assert.ok(unit, "the paragraph is not a unit");
+  assert.ok(unit.holds.length >= 3, `only ${unit.holds.length} protected runs`);
+  const outsideHolds = unit.html.replace(/<var [^>]*data-glossa-hold[^>]*>[\s\S]*?<\/var>/g, "");
+  for (const literal of ["info@ejemplo.es", "https://ejemplo.es", "2026123456"]) {
+    assert.ok(!outsideHolds.includes(literal), `${literal} reached the engine unprotected`);
+  }
+});
+
+test("bilingual copies hold no fields and no dead buttons, and the page's controls stay single", () => {
   const body = load(
     `<p id="attrs">Consulta los <a id="tip" href="#h">horarios de la biblioteca</a> y elige una sala para tu visita: ` +
-      `<select id="room"><option>Sala de lectura</option><option value="infantil">Sala infantil</option></select> ` +
-      `<input id="search" type="search" placeholder="Buscar en el catálogo"> ` +
+      `<select id="room"><option>Sala de lectura</option></select> <input id="search" type="search"> ` +
       `<button id="go" type="button">Reservar la sala</button></p>`
   );
-  const segments = translateAll(body);
-  for (const segment of segments) {
-    if (segment.kind === "element") {
-      assert.ok(!/<(select|input|textarea|button)\b/i.test(segment.html), `a unit carried a form control: ${segment.html}`);
-    }
-  }
+  translateAll(body);
   const doc = window.document;
   assert.equal(doc.querySelectorAll("select").length, 1, "the select was copied");
   assert.equal(doc.querySelectorAll("input").length, 1, "the input was copied");
   assert.equal(doc.querySelectorAll("button").length, 1, "the button was copied");
   assert.equal(doc.querySelectorAll("#tip").length, 1, "the link's id was repeated");
-  const text = doc.body.textContent ?? "";
-  assert.match(text, /EN Consulta los/, "the words before the control were not translated");
-  assert.match(text, /EN Reservar la sala/, "the button's own label was not translated");
+  const copy = doc.querySelector("glossa-translation");
+  assert.ok(copy, "no translation was shown");
+  assert.match(copy.textContent ?? "", /Reservar la sala/, "the button's label was lost from the copy");
+});
+
+test("replace mode puts the page's own select back, with its options and its choice", () => {
+  const body = load(
+    `<p id="q">Elige una sala <select id="room"><option>Sala de lectura</option><option value="infantil">Sala infantil</option></select> para tu visita de mañana.</p>`
+  );
+  const live = byId("room") as unknown as { value: string; options: { length: number } };
+  live.value = "infantil";
+  const [unit] = units(body);
+  assert.ok(unit);
+  const renderer = new Renderer();
+  const slot = /<select data-glossa-id="\d+"><\/select>/.exec(unit.html)?.[0] ?? "";
+  renderer.apply(unit, `Choose a room ${slot} for your visit tomorrow.`, replace);
+  assert.equal(byId("room") as unknown, live, "the select was replaced by a copy");
+  assert.equal(live.options.length, 2, "the select lost its options");
+  assert.equal(live.value, "infantil", "the reader's choice was lost");
+  assert.match(byId("q").textContent ?? "", /Choose a room/);
+  assert.equal(window.document.querySelectorAll("[data-glossa-id]").length, 0, "numbers were left on the page, inside the select");
+  renderer.restoreAll();
+  assert.equal(byId("room") as unknown, live);
+  assert.match(byId("q").textContent ?? "", /Elige una sala/);
+  assert.equal(live.value, "infantil");
+});
+
+test("when the engine drops a field, the unit is shown bilingually and the field stays", () => {
+  const body = load(
+    `<p id="q">Elige una sala <select id="room"><option>Sala de lectura</option></select> para tu visita de mañana por la tarde.</p>`
+  );
+  const live = byId("room");
+  const [unit] = units(body);
+  assert.ok(unit);
+  new Renderer().apply(unit, "Choose a room for your visit tomorrow afternoon.", replace);
+  assert.equal(byId("room"), live, "the page's select was taken off the page");
+  assert.match(byId("q").childNodes[0]?.textContent ?? "", /Elige una sala/, "the original was replaced anyway");
+  assert.ok(window.document.querySelector("#q glossa-translation"), "the translation was not shown");
 });
 
 test("a bilingual copy keeps its links but never repeats one of the page's ids", () => {
@@ -85,15 +157,24 @@ test("a bilingual copy keeps its links but never repeats one of the page's ids",
 
 test("an element the engine repeats in replace mode does not repeat the page's id", () => {
   const body = load(`<p id="r">Hola <b id="fuerte">mundo</b> y adiós a todos.</p>`);
-  const [segment] = collectSegments(body, options).filter((candidate) => candidate.kind === "element");
-  assert.ok(segment && segment.kind === "element");
-  const renderer = new Renderer();
-  renderer.apply(
-    segment,
+  const [unit] = units(body);
+  assert.ok(unit);
+  new Renderer().apply(
+    unit,
     'Hello <b id="fuerte" data-glossa-id="0">world</b> and <b id="fuerte" data-glossa-id="0">goodbye</b> everyone.',
     replace
   );
-  const doc = window.document;
-  assert.equal(doc.querySelectorAll("#r b").length, 2, "the repeated element was dropped");
-  assert.equal(doc.querySelectorAll("#fuerte").length, 1, "the repeated element carried the page's id");
+  assert.equal(window.document.querySelectorAll("#r b").length, 2, "the repeated element was dropped");
+  assert.equal(window.document.querySelectorAll("#fuerte").length, 1, "the repeated element carried the page's id");
+});
+
+test("a protected element the engine repeats in replace mode does not repeat the page's id", () => {
+  const body = load(`<p id="b">Nuestro patrocinador es <span translate="no" id="brand">Café Aurora</span>, en la plaza mayor.</p>`);
+  const [unit] = units(body);
+  assert.ok(unit && unit.holds.length === 1);
+  const placeholder = /<var [^>]*data-glossa-hold[^>]*>[\s\S]*?<\/var>/.exec(unit.html)?.[0] ?? "";
+  assert.ok(placeholder, "no placeholder in the unit");
+  new Renderer().apply(unit, `Our sponsor is ${placeholder}, yes ${placeholder}, in the main square.`, replace);
+  assert.equal(window.document.querySelectorAll("#b span").length, 2, "the repeated element was dropped");
+  assert.equal(window.document.querySelectorAll("#brand").length, 1, "the repeat carried the page's id");
 });
