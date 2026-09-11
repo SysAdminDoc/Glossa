@@ -36,6 +36,12 @@ const sent: Message[] = [];
 let onMessage: ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean) | null = null;
 // Every translate request waits on this until a test lets it through.
 let gate: Promise<void> = Promise.resolve();
+// What the engine answers. A test can swap it to leave blocks empty or give a notice.
+let answer = (fragments: string[]): Record<string, unknown> => ({
+  ok: true,
+  fragments: fragments.map((fragment) => `EN ${fragment}`),
+  inferenceMs: 1
+});
 
 globals.chrome = {
   runtime: {
@@ -49,8 +55,7 @@ globals.chrome = {
       if (message.type === "glossa:detect") return { language: "es", confident: true };
       if (message.type === "glossa:translate") {
         await gate;
-        const fragments = message["fragments"] as string[];
-        return { ok: true, fragments: fragments.map((fragment) => `EN ${fragment}`), inferenceMs: 1 };
+        return answer(message["fragments"] as string[]);
       }
       return undefined;
     }
@@ -113,4 +118,27 @@ test("an ordinary page load does not count as coming back", async () => {
   window.dispatchEvent(shown);
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.equal(count("glossa:detect"), before);
+});
+
+test("a block the engine refuses is not counted, and its reason is a notice rather than an error", async () => {
+  gate = Promise.resolve();
+  const refused = (fragment: string) => fragment.includes("número 3 de");
+  answer = (fragments) => ({
+    ok: true,
+    fragments: fragments.map((fragment) => (refused(fragment) ? "" : `EN ${fragment}`)),
+    inferenceMs: 1,
+    ...(fragments.some(refused) ? { notice: "One block was too long." } : {})
+  });
+  const state = (await command({
+    command: "translate",
+    targetLanguage: "en",
+    displayMode: "bilingual",
+    showOriginalOnHover: false,
+    skipFormFields: true
+  })) as unknown as { translated: boolean; blocksDone: number; blocksTotal: number; lastError: string | null; notice: string | null };
+  assert.equal(state.translated, true);
+  assert.equal(state.blocksTotal, 30);
+  assert.equal(state.blocksDone, 29, "the refused block was counted as translated");
+  assert.equal(state.notice, "One block was too long.");
+  assert.equal(state.lastError, null, "a refused block turned a translated page into an error");
 });

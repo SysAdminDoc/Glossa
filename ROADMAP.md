@@ -109,6 +109,13 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: with the mode on, a Wikipedia fixture translates the article before navigation and sidebars, and a setting disables it.
   Complexity: M
 
+- [ ] P3 — G-55 — Hold only the matched part of a partly matched inline tag
+  Why: a split-run hold must carry exactly the matched text, so when the tag at one end also holds other words (`https://ejemplo.<b>es y disfruta de la tienda</b>`) the run falls back to per-node protection. The prose stays translatable, but only the head of the address is protected, and the tail inside the tag reaches the engine as ordinary text.
+  Evidence: adversarial review 2026-09-10 (finding 1 on 848e4a8) and its fix; `protectRunsAcrossTags` in src/content/segmenter.ts.
+  Touches: src/content/segmenter.ts (split the partly matched element at the run boundary, cloning it the way Range.extractContents does, so the matched part is held and the rest stays prose), src/content/renderer.ts (put the split element back whole on restore), tests/split-protected.test.ts
+  Acceptance: in both review probes the neighbouring prose still reaches the engine and the whole address comes back byte for byte, in both display modes, with the page's tag intact after "show original".
+  Complexity: M
+
 - [ ] P3 — G-52 — Make the Firefox smoke's "page translated" wait independent of language groups
   Why: the smoke brings the page tab to the front until no unit is `pending`, but `translateByLanguage` marks one language group pending at a time, so on a profile with a second route installed the wait can pass between groups and the popup tab hides the page again mid-run. A fresh profile never has a second route, so it does not bite today.
   Evidence: adversarial review 2026-09-10 (finding 9); `select_tab` wait in tests/smoke/firefox.smoke.py.

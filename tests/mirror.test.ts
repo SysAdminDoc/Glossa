@@ -276,6 +276,32 @@ test("a file a mirror stored under Mozilla's record id is not taken for Mozilla'
   assert.deepEqual(calls.filter((url) => url.startsWith(MIRROR)), [], "the mirror was asked after switching away from it");
 });
 
+test("a download from the other source is not handed to a caller after the setting changes", async () => {
+  const store = freshStore(MIRROR);
+  let release: () => void = () => undefined;
+  holdMirrorFiles = new Promise((resolve) => {
+    release = resolve;
+  });
+  const fromMirror = store.ensurePair(PAIR as never, () => undefined);
+  while (!calls.some((url) => url.startsWith(MIRROR) && url.endsWith(".zst"))) await new Promise((resolve) => setTimeout(resolve, 1));
+  store.setMirror(null);
+  // Mozilla's catalog describes other bytes for the same record ids.
+  const OTHER = new Uint8Array(4096).fill(7);
+  const mozillaPair = {
+    ...PAIR,
+    records: {
+      model: { ...MIRROR_RECORDS[0], decompressedHash: sha256(OTHER) },
+      vocab: { ...MIRROR_RECORDS[1], decompressedHash: sha256(OTHER) }
+    }
+  };
+  const fromMozilla = store.ensurePair(mozillaPair as never, () => undefined);
+  release();
+  await fromMirror;
+  // Mozilla is unreachable in this test, so this could only resolve by sharing the mirror's download.
+  await assert.rejects(fromMozilla);
+  assert.ok(calls.some((url) => !url.startsWith(MIRROR)), "the caller after the switch never tried its own source");
+});
+
 test("a download keeps the source it started with when the setting changes halfway", async () => {
   const store = freshStore(MIRROR);
   let release: () => void = () => undefined;

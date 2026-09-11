@@ -86,6 +86,13 @@ test("a run inside one text node is held exactly as before", () => {
   assert.match(visible(unit.html), /^Visita\s+hoy mismo\.$/);
 });
 
+test("prose that shares a tag with part of an address still reaches the engine", () => {
+  const inBold = unitOf(`<p id="p">Visita https://ejemplo.<b>es y disfruta de nuestra tienda en línea</b> hoy mismo.</p>`);
+  assert.match(visible(inBold.html), /disfruta de nuestra tienda en línea/, `the words in the <b> were hidden: "${visible(inBold.html)}"`);
+  const inLink = unitOf(`<p id="p">Consulta <a href="/x">nuestro catálogo completo en https://ejemplo.</a>es antes de venir.</p>`);
+  assert.match(visible(inLink.html), /nuestro catálogo completo en/, `the link text was hidden: "${visible(inLink.html)}"`);
+});
+
 test("a split run the engine repeats does not repeat the page's ids", () => {
   const unit = unitOf(`<p id="p">Visita https://ejemplo.<b id="tail">es/catalogo</b> antes de venir a la biblioteca.</p>`);
   const placeholder = unit.html.match(PLACEHOLDER)?.[0] ?? "";

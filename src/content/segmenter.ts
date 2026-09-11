@@ -432,13 +432,12 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
       held.push(node);
       if (node === lastChild) break;
     }
-    // A placeholder inside a hold would never be swapped back; leave such a run as it was.
-    const nestsHold = held.some(
-      (node) =>
-        node.nodeType === Node.ELEMENT_NODE &&
-        ((node as Element).matches(`var[${HOLD_ATTRIBUTE}]`) || (node as Element).querySelector(`var[${HOLD_ATTRIBUTE}]`))
-    );
-    if (nestsHold) continue;
+    // Only a run whose nodes carry exactly the matched text is held. When the element at either end
+    // also holds other words (`https://ejemplo.<b>es y disfruta de la tienda</b>`, or a link whose
+    // text ends in half an address), holding it whole would hide that prose from the engine, so the
+    // run is left to the per-node pass, which protects the part inside one text node. This also
+    // keeps a placeholder from ever landing inside a hold: its text is a boundary no match crosses.
+    if (held.map((node) => node.textContent ?? "").join("") !== flat.slice(start, end)) continue;
     const before = firstChild.previousSibling?.textContent ?? "";
     const after = lastChild.nextSibling?.textContent ?? "";
     const placeholder = doc.createElement("var");
@@ -453,14 +452,28 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
 }
 
 // The text node holding a position of the joined text. An end position belongs to the node it
-// closes, a start position to the node it opens.
+// closes, a start position to the node it opens. The pieces are in document order, so this is a
+// binary search: a paragraph with thousands of split numbers would otherwise scan every piece for
+// every match.
 function locateInPieces(pieces: Array<{ node: Text; start: number }>, offset: number, end: boolean): { node: Text; at: number } | null {
-  for (const piece of pieces) {
-    const from = piece.start;
-    const to = piece.start + piece.node.data.length;
-    if (end ? offset > from && offset <= to : offset >= from && offset < to) return { node: piece.node, at: offset - from };
+  let low = 0;
+  let high = pieces.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const from = pieces[middle]!.start;
+    if (end ? from < offset : from <= offset) {
+      found = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
   }
-  return null;
+  if (found < 0) return null;
+  const piece = pieces[found]!;
+  const to = piece.start + piece.node.data.length;
+  if (end ? offset > to : offset >= to) return null;
+  return { node: piece.node, at: offset - piece.start };
 }
 
 // Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an

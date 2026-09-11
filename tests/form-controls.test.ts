@@ -238,6 +238,37 @@ test("a field slot the engine repeats in replace mode leaves one field, the page
   assert.equal(byId("room"), live);
 });
 
+// The engine is free to drop an element's tags and keep what was inside. Whatever was inside still
+// has to go back into it when the original is shown.
+function dropTagsThenRestore(html: string, tag: string): string {
+  load(html);
+  const original = byId("q").outerHTML;
+  const [unit] = units(window.document.body as unknown as Element);
+  assert.ok(unit, "the paragraph is not a unit");
+  const renderer = new Renderer();
+  const answer = unit.html.replace(new RegExp(`</?${tag}\\b[^>]*>`, "g"), "").replace(/^(\s*)(\S+)/, "$1EN");
+  renderer.apply(unit, answer, replace);
+  assert.match(byId("q").textContent ?? "", /^EN/, "replace mode did not run");
+  renderer.restoreAll();
+  return original;
+}
+
+test("a field whose label the engine dropped is back in its label after showing the original", () => {
+  const original = dropTagsThenRestore(
+    `<p id="q">Escribe <label id="l">tu nombre completo <input id="i" value="x"></label> para la reserva de mañana.</p>`,
+    "label"
+  );
+  assert.equal(byId("i").isConnected, true, "the field was left off the page");
+  assert.equal(byId("l").contains(byId("i")), true, "the field was left outside its label");
+  assert.equal(byId("q").outerHTML, original);
+});
+
+test("a bold word whose link the engine dropped is back in its link after showing the original", () => {
+  const original = dropTagsThenRestore(`<p id="q">Lee <a id="a" href="#m">el <b id="b">manual</b> completo</a> antes de empezar a trabajar.</p>`, "a");
+  assert.equal(byId("a").contains(byId("b")), true, "the bold word was left outside its link");
+  assert.equal(byId("q").outerHTML, original);
+});
+
 test("a protected element the engine repeats in replace mode does not repeat the page's id", () => {
   const body = load(`<p id="b">Nuestro patrocinador es <span translate="no" id="brand">Café Aurora</span>, en la plaza mayor.</p>`);
   const [unit] = units(body);

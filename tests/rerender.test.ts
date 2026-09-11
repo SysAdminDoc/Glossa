@@ -47,6 +47,23 @@ test("a page that renders the translation again from the screen still gets its o
   assert.equal(byId("q").outerHTML, original, "show original did not bring the page's own text back");
 });
 
+test("a unit kept after a re-render keeps its own translated tooltip", () => {
+  window.document.body.innerHTML = `<p id="q" title="Haz clic aquí para abrir la ficha">La biblioteca abre <a id="a" href="#h">todos los días</a> de la semana.</p>`;
+  const original = byId("q").outerHTML;
+  const renderer = new Renderer();
+  for (const segment of collectSegments(window.document.body as unknown as Element, options)) {
+    if (segment.kind === "element") renderer.apply(segment, segment.html.replace("La biblioteca abre", "The library opens"), replace);
+    else if (segment.kind === "attribute") renderer.apply(segment, "Click here to open the record", replace);
+  }
+  const unit = byId("q");
+  assert.equal(unit.getAttribute("title"), "Click here to open the record", "the tooltip was not translated");
+  unit.innerHTML = unit.innerHTML;
+  assert.equal(renderer.reset(unit as unknown as Element), false);
+  assert.equal(unit.getAttribute("title"), "Click here to open the record", "the kept unit's tooltip went back to the original");
+  renderer.restoreAll();
+  assert.equal(byId("q").outerHTML, original);
+});
+
 test("a page that writes new text of its own keeps it, and it is translated afresh", () => {
   const { renderer } = translateInPlace(`<p id="q">La biblioteca abre <a id="a" href="#h">todos los días</a> de la semana.</p>`);
   const unit = byId("q");

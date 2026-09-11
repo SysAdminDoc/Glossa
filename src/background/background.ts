@@ -147,7 +147,8 @@ function mergeStates(states: PageState[]): PageState | undefined {
     translating: states.some((state) => state.translating),
     blocksTotal: states.reduce((sum, state) => sum + state.blocksTotal, 0),
     blocksDone: states.reduce((sum, state) => sum + state.blocksDone, 0),
-    lastError: states.find((state) => state.lastError)?.lastError ?? null
+    lastError: states.find((state) => state.lastError)?.lastError ?? null,
+    notice: states.find((state) => state.notice)?.notice ?? null
   };
 }
 

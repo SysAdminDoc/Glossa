@@ -53,6 +53,9 @@ export interface PageState {
   blocksTotal: number;
   blocksDone: number;
   lastError: string | null;
+  // Why some blocks were left in their own language while the rest was translated, when the engine
+  // gave a reason. A warning beside the count, never an error in place of it.
+  notice: string | null;
 }
 
 // ---- popup / options <-> background ----

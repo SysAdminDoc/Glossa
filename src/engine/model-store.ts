@@ -212,6 +212,8 @@ export class ModelStore {
   private catalogPromiseSource: string | null = null;
   // One download per pair, however many callers ask for it, and a handle to stop it.
   private readonly downloads = new Map<string, Promise<PairBytes>>();
+  // Which source each running download fetches from: the mirror's address, or null for Mozilla.
+  private readonly downloadSources = new Map<string, string | null>();
   private readonly controllers = new Map<string, AbortController>();
   private readonly progressState = new Map<string, ActiveDownload>();
 
@@ -368,14 +370,25 @@ export class ModelStore {
   ensurePair(pair: PairFiles, progress: ProgressSink): Promise<PairBytes> {
     const key = pairKey(pair.sourceLanguage, pair.targetLanguage);
     const running = this.downloads.get(key);
-    if (running) return running;
+    if (running) {
+      if (this.downloadSources.get(key) === this.mirror) return running;
+      // A download from the other source is still going, and its bytes were checked against the
+      // other catalog, so they are not this caller's answer. Let it finish, then fetch from this one.
+      return running.then(
+        () => this.ensurePair(pair, progress),
+        () => this.ensurePair(pair, progress)
+      );
+    }
     const controller = new AbortController();
     this.controllers.set(key, controller);
     // The source is fixed for the whole download: a setting changed halfway applies to the next one.
-    const run = this.downloadPair(pair, key, progress, controller.signal, this.mirror).finally(() => {
+    const mirror = this.mirror;
+    this.downloadSources.set(key, mirror);
+    const run = this.downloadPair(pair, key, progress, controller.signal, mirror).finally(() => {
       this.downloads.delete(key);
       this.controllers.delete(key);
       this.progressState.delete(key);
+      this.downloadSources.delete(key);
     });
     this.downloads.set(key, run);
     return run;

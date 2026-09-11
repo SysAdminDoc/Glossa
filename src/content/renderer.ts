@@ -290,27 +290,27 @@ export class Renderer {
   // `lang` flipped. The bookkeeping for it is stale, so drop it and take our own output with it.
   // The caller re-collects the element afterwards, which translates it exactly once more.
   reset(target: Element): boolean {
+    // Some pages render a unit again from what they read on screen, which in replace mode is the
+    // translation. That is not new source text, and the engine is never asked for its own output
+    // again, so resetting would lose the way back to the original for good. The unit is left exactly
+    // as it is, the records of its own attributes included, and "show original" still puts the
+    // page's own text back. Only when the page really wrote new nodes, though: with the nodes Glossa
+    // wrote still in place, the unit went stale for another reason (its `lang` or `translate`
+    // changed) and has to be reset as usual.
+    const unitRecord = this.records.find((entry): entry is ElementRecord => entry.kind === "element" && entry.element === target);
+    if (
+      unitRecord &&
+      unitRecord.appended === null &&
+      !unitRecord.written.some((node) => target.contains(node)) &&
+      sameText(target.textContent ?? "", unitRecord.translatedText)
+    ) {
+      return false;
+    }
     let dropped = false;
-    let kept = false;
     for (let index = this.records.length - 1; index >= 0; index--) {
       const record = this.records[index]!;
       const owner = record.kind === "text" ? record.node.parentElement : record.element;
       if (owner !== target) continue;
-      // Some pages render a unit again from what they read on screen, which in replace mode is the
-      // translation. That is not new source text, and the engine is never asked for its own output
-      // again, so dropping the record would lose the way back to the original for good. It stays,
-      // and "show original" still puts the page's own text back. Only when the page really wrote
-      // new nodes, though: with the nodes Glossa wrote still in place, the unit went stale for
-      // another reason (its `lang` or `translate` changed) and has to be reset as usual.
-      if (
-        record.kind === "element" &&
-        record.appended === null &&
-        !record.written.some((node) => target.contains(node)) &&
-        sameText(target.textContent ?? "", record.translatedText)
-      ) {
-        kept = true;
-        continue;
-      }
       if (record.kind === "attribute") {
         // The unit is being re-collected, so this attribute has to go back to what the page said
         // before it can be translated again. Dropping only the record left the translation in
@@ -345,9 +345,6 @@ export class Renderer {
       this.records.splice(index, 1);
       dropped = true;
     }
-    // A unit whose record was kept above is still translated: its marker stays, and nothing about
-    // it needs collecting again.
-    if (kept) return false;
     // A unit still waiting on the engine has a marker but no record yet. Clearing it is what lets
     // the caller collect the element again, so report that as a reset too.
     const hadMarker = target.hasAttribute(UNIT_ATTRIBUTE);
@@ -515,6 +512,17 @@ function mergeLiveElements(
     }
   };
   visit(fragment);
+  // The engine may drop an element's tags and keep what was inside. That element is never reused,
+  // but the walk can still have moved one of its children, a field or a bold word, into the
+  // translation, and restoring has to give it those children back as well.
+  const reusedElements = new Set(reused.map((entry) => entry.element));
+  for (const [element, children] of before) {
+    if (reusedElements.has(element)) continue;
+    const now = element.childNodes;
+    if (now.length !== children.length || children.some((child, index) => now[index] !== child)) {
+      reused.push({ element, children });
+    }
+  }
   return { nodes: Array.from(fragment.childNodes), reused };
 }
 

@@ -17,6 +17,10 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
 ### Fixed
+- Show original puts a form field or a bold word back inside its label or link even when the engine left that label or link out of its answer. A translated tooltip on a paragraph the site rebuilt from the screen stays translated too.
+- With Chrome's translator, a block it refuses shows as a note next to the count of translated blocks, not as an error for a page that's otherwise done. The count leaves that block out.
+- A web address that shares a bold or link tag with other words no longer hides those words from the engine.
+- Switching between your mirror and Mozilla while a download is running no longer hands the new request the other source's files.
 - Soft hyphens, the invisible break points Wikipedia puts inside long words, no longer come back as garbage in the translation, and the spacing at the start and end of every block comes back exactly as the page had it. Japanese, Chinese and Korean text now gets a space between a full stop and an opening quote before it goes to the engine, the way Firefox prepares it, so the sentence splitter can find the break.
 - Leaving a page while it's being translated stops the work there, so nothing more goes to the engine for a page you've left. Coming back to it with the browser's Back button checks the page language again instead of trusting the earlier visit's guess, and a translated page keeps up with its changes again.
 - Each installed language remembers which engine it was installed for. When a future Glossa ships an engine that reads a new model format, languages installed for the old one download again instead of failing to load, and replacing a language's model no longer leaves the old files behind in storage.

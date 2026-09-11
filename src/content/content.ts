@@ -96,7 +96,8 @@ function boot(): void {
       targetLanguage: null,
       blocksTotal: 0,
       blocksDone: 0,
-      lastError: null
+      lastError: null,
+      notice: null
     },
     renderer: new Renderer(),
     options: null,
@@ -243,6 +244,7 @@ async function translatePage(
   controller.target = command.targetLanguage;
   controller.skipFormFields = command.skipFormFields;
   controller.state.lastError = null;
+  controller.state.notice = null;
   controller.options = {
     displayMode: command.displayMode,
     showOriginalOnHover: command.showOriginalOnHover,
@@ -407,8 +409,9 @@ async function translateSegments(
     // Only what was written counts. A block the engine left empty stays in its own language, and
     // the popup must not report it as translated.
     controller.state.blocksDone += written;
-    // The engine left some blocks alone for a reason it gave: say why, and carry on with the rest.
-    if (response.notice) controller.state.lastError = response.notice;
+    // The engine left some blocks alone for a reason it gave. That is a notice beside the count, not
+    // an error: the rest of the page is translated, and the translation carries on.
+    if (response.notice) controller.state.notice = response.notice;
     report(controller);
   }
   scheduler.stop();
@@ -435,6 +438,7 @@ function restore(controller: Controller): void {
   controller.state.blocksDone = 0;
   controller.state.blocksTotal = 0;
   controller.state.lastError = null;
+  controller.state.notice = null;
   report(controller);
 }
 

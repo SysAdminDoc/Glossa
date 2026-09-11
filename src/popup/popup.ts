@@ -64,6 +64,14 @@ function setStatus(text: string, tone: "" | "ok" | "warn" | "error" = "", lock =
   if (lock) statusLocked = true;
 }
 
+// A translated page, and the reason some blocks were left in their own language when the engine
+// gave one. That reason is a warning beside the count, not an error in place of it.
+function showTranslated(state: PageState): void {
+  const done = t("popupTranslatedBlocks", String(state.blocksDone));
+  if (state.notice) setStatus(`${done} ${state.notice}`, "warn");
+  else setStatus(done, "ok");
+}
+
 function fillLanguages(select: HTMLSelectElement, codes: string[], selected: string | null, includeUnknown: boolean): void {
   select.replaceChildren();
   if (includeUnknown) {
@@ -263,7 +271,7 @@ async function loadPage(): Promise<void> {
     } else if (page.lastError) {
       setStatus(page.lastError, "error");
     } else if (page.translated) {
-      setStatus(t("popupTranslatedBlocks", String(page.blocksDone)), "ok");
+      showTranslated(page);
     }
   } else {
     page = null;
@@ -337,7 +345,7 @@ async function onAction(): Promise<void> {
     if (page?.lastError) {
       setStatus(page.lastError, "error");
     } else if (page?.translated) {
-      setStatus(t("popupTranslatedBlocks", String(page.blocksDone)), "ok");
+      showTranslated(page);
     }
     await refreshRoute();
   } catch (error) {
