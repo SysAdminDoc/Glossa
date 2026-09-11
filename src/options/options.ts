@@ -42,7 +42,7 @@ function fillLanguages(select: HTMLSelectElement, codes: string[], selected?: st
 
 async function persist(patch: Partial<Settings>): Promise<void> {
   settings = await saveSettings(patch);
-  toast("Saved", "ok");
+  toast(t("optionsSaved"), "ok");
 }
 
 function renderModes(): void {
@@ -61,7 +61,7 @@ function renderNever(): void {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "×";
-    remove.setAttribute("aria-label", `Remove ${languageName(code)}`);
+    remove.setAttribute("aria-label", t("optionsRemoveLanguage", languageName(code)));
     remove.addEventListener("click", () => {
       void persist({ neverTranslateLanguages: settings.neverTranslateLanguages.filter((c) => c !== code) }).then(renderNever);
     });
@@ -218,17 +218,20 @@ api.runtime.onMessage.addListener((message: unknown) => {
   const event = message as ProgressEvent;
   if (!event || event.type !== "glossa:progress") return;
   if (event.phase === "download") {
-    showProgress(event.totalBytes ? event.loadedBytes / event.totalBytes : null, `Downloading ${event.pairKey}: ${formatBytes(event.loadedBytes)} of ${formatBytes(event.totalBytes)}`);
+    showProgress(
+      event.totalBytes ? event.loadedBytes / event.totalBytes : null,
+      t("popupDownloading", event.pairKey, formatBytes(event.loadedBytes), formatBytes(event.totalBytes))
+    );
   } else if (event.phase === "store") {
-    showProgress(null, `Verifying ${event.file ?? ""}…`);
+    showProgress(null, t("popupVerifying", event.file ?? event.pairKey));
   } else if (event.phase === "load") {
-    showProgress(null, `Loading ${event.pairKey}…`);
+    showProgress(null, t("popupLoadingEngine", event.pairKey));
   } else if (event.phase === "done") {
     hideProgress();
     void refreshModels();
   } else if (event.phase === "error") {
     hideProgress();
-    toast(event.error ?? "Download failed", "error");
+    toast(event.error ?? t("popupDownloadFailed"), "error");
   }
 });
 
@@ -396,7 +399,7 @@ async function init(): Promise<void> {
     const button = $<HTMLButtonElement>("install");
     button.disabled = true;
     downloading = `${from}->${to}`;
-    showProgress(0, "Starting download…");
+    showProgress(0, t("popupStartingDownload"));
     try {
       await sendUi({ type: "glossa:models:install", sourceLanguage: from, targetLanguage: to });
       toast(t("optionsPairReady", languageName(from), languageName(to)), "ok");

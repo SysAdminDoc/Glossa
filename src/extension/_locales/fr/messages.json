@@ -457,5 +457,14 @@
   },
   "popupGrantMirror": {
     "message": "Glossa a besoin de la permission de joindre votre miroir de modèles sur $1 avant de pouvoir télécharger une langue."
+  },
+  "optionsSaved": {
+    "message": "Enregistré"
+  },
+  "optionsRemoveLanguage": {
+    "message": "Retirer $1"
+  },
+  "optionsRulesHint": {
+    "message": "« Jamais » empêche Glossa de toucher à un site. « Toujours » le traduit à chaque visite, dès que vous autorisez Glossa à lire ce site."
   }
 }

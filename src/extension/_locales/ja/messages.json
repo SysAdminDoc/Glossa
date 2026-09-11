@@ -457,5 +457,14 @@
   },
   "popupGrantMirror": {
     "message": "言語をダウンロードするには、$1 のモデルミラーにアクセスする許可が必要です。"
+  },
+  "optionsSaved": {
+    "message": "保存しました"
+  },
+  "optionsRemoveLanguage": {
+    "message": "$1 を削除"
+  },
+  "optionsRulesHint": {
+    "message": "「翻訳しない」を選ぶと、Glossa はそのサイトに一切触れません。「常に翻訳」を選ぶと、そのサイトの読み取りを許可した後は、訪問するたびに翻訳します。"
   }
 }

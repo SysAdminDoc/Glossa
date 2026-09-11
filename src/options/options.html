@@ -32,7 +32,7 @@
         </div>
         <div class="field">
           <span class="field-label" data-i18n="optionsShowLabel">Show translations</span>
-          <div class="segmented" role="group" aria-label="Display mode">
+          <div class="segmented" role="group" aria-label="Display mode" data-i18n-attr="aria-label=popupModeGroup">
             <button type="button" data-mode="bilingual" id="mode-bilingual" data-i18n="optionsModeBilingual">Below the original</button>
             <button type="button" data-mode="replace" id="mode-replace" data-i18n="optionsModeReplace">In place of the original</button>
           </div>
@@ -54,7 +54,7 @@
 
       <section class="panel">
         <h2 data-i18n="optionsRulesSection">Site rules</h2>
-        <p class="hint">"Never" stops Glossa from touching a site. "Always" translates it on every visit once the all-sites permission is granted.</p>
+        <p class="hint" data-i18n="optionsRulesHint">"Never" stops Glossa from touching a site. "Always" translates it on every visit, once you allow Glossa to read that site.</p>
         <table class="table" id="rules">
           <thead><tr><th data-i18n="optionsRulesHost">Host</th><th data-i18n="optionsRulesRule">Rule</th><th></th></tr></thead>
           <tbody></tbody>

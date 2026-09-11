@@ -457,5 +457,14 @@
   },
   "popupGrantMirror": {
     "message": "Glossa necesita permiso para acceder a tu réplica de modelos en $1 antes de descargar un idioma."
+  },
+  "optionsSaved": {
+    "message": "Guardado"
+  },
+  "optionsRemoveLanguage": {
+    "message": "Quitar $1"
+  },
+  "optionsRulesHint": {
+    "message": "«Nunca» impide que Glossa toque un sitio. «Siempre» lo traduce en cada visita, en cuanto permitas a Glossa leer ese sitio."
   }
 }

@@ -457,5 +457,14 @@
   },
   "popupGrantMirror": {
     "message": "Glossa braucht die Erlaubnis, deinen Modell-Spiegel unter $1 zu erreichen, bevor es eine Sprache herunterladen kann."
+  },
+  "optionsSaved": {
+    "message": "Gespeichert"
+  },
+  "optionsRemoveLanguage": {
+    "message": "$1 entfernen"
+  },
+  "optionsRulesHint": {
+    "message": "„Nie“ hält Glossa ganz von einer Website fern. „Immer“ übersetzt sie bei jedem Besuch, sobald du Glossa erlaubst, diese Website zu lesen."
   }
 }

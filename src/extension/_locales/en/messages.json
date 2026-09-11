@@ -598,5 +598,17 @@
   "popupGrantMirror": {
     "message": "Glossa needs permission to reach your model mirror at $1 before it can download a language.",
     "description": "Popup notice; $1 is the mirror's host name"
+  },
+  "optionsSaved": {
+    "message": "Saved",
+    "description": "Toast after a setting is saved"
+  },
+  "optionsRemoveLanguage": {
+    "message": "Remove $1",
+    "description": "Accessible label of the button that removes a language you read; $1 is the language name"
+  },
+  "optionsRulesHint": {
+    "message": "\"Never\" stops Glossa from touching a site. \"Always\" translates it on every visit, once you allow Glossa to read that site.",
+    "description": "Hint under site rules; the quoted words are the two rule options, optionsRuleNever and optionsRuleAlways"
   }
 }

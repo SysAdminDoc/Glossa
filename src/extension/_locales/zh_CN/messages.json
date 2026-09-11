@@ -457,5 +457,14 @@
   },
   "popupGrantMirror": {
     "message": "Glossa 需要获得访问 $1 上模型镜像的权限，才能下载语言。"
+  },
+  "optionsSaved": {
+    "message": "已保存"
+  },
+  "optionsRemoveLanguage": {
+    "message": "移除$1"
+  },
+  "optionsRulesHint": {
+    "message": "“从不”会让 Glossa 完全不碰该网站。“总是”会在你允许 Glossa 读取该网站后，每次访问时自动翻译。"
   }
 }
