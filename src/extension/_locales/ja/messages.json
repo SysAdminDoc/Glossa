@@ -424,5 +424,8 @@
   },
   "pageChromeUnavailable": {
     "message": "このブラウザーでは Chrome の組み込み翻訳を利用できません。Glossa の設定でエンジンを Bergamot に戻してください。"
+  },
+  "pageChromeTooLong": {
+    "message": "このページのこの部分は Chrome の組み込み翻訳には長すぎます。翻訳するにはエンジンを Bergamot に戻してください。"
   }
 }

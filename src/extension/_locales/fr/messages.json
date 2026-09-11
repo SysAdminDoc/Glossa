@@ -424,5 +424,8 @@
   },
   "pageChromeUnavailable": {
     "message": "Le traducteur intégré de Chrome n'est pas disponible dans ce navigateur. Revenez à Bergamot dans les réglages de Glossa."
+  },
+  "pageChromeTooLong": {
+    "message": "Cette partie de la page est trop longue pour le traducteur intégré de Chrome. Revenez à Bergamot pour la traduire."
   }
 }

@@ -51,7 +51,11 @@ globals.Translator = {
       sourceLanguage,
       targetLanguage,
       inputQuota: null,
-      translate: async (input: string) => `EN[${input}]`,
+      translate: async (input: string) => {
+        if (input.includes("TOO LONG")) throw refusal("QuotaExceededError", "The input is too large.");
+        if (input.includes("FLAKY")) throw refusal("UnknownError", "Other generic failures occurred.");
+        return `EN[${input}]`;
+      },
       destroy: () => {
         destroyed++;
       }
@@ -60,7 +64,7 @@ globals.Translator = {
 };
 
 const { EngineHost } = await import("../src/engine/engine-host.ts");
-const { ChromeEngine, CHROME_NEEDS_DOWNLOAD, CHROME_UNAVAILABLE } = await import("../src/engine/chrome-translator.ts");
+const { ChromeEngine, CHROME_NEEDS_DOWNLOAD, CHROME_TOO_LONG, CHROME_UNAVAILABLE } = await import("../src/engine/chrome-translator.ts");
 const { defaultSettings, mergeSettings } = await import("../src/shared/settings.ts");
 const { ENGINE_TARGET } = await import("../src/shared/messages.ts");
 
@@ -147,7 +151,7 @@ test("going idle destroys Chrome's translators along with everything else", asyn
   reset();
   availability.set("fr->en", "available");
   const { host } = chromeHost();
-  await host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "ensure-route", sourceLanguage: "fr", targetLanguage: "en" });
+  await host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "translate", sourceLanguage: "fr", targetLanguage: "en", fragments: ["Bonjour"] });
   await host.shutdown();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(destroyed, 1);
@@ -177,6 +181,48 @@ test("without the browser's Translator there is no route, and translating says s
   } finally {
     globals.Translator = saved;
   }
+});
+
+test("one block Chrome refuses stays as it was and the rest of the batch is translated", async () => {
+  reset();
+  availability.set("fr->en", "available");
+  const { host } = chromeHost();
+  const answer = (await host.handle({
+    target: ENGINE_TARGET,
+    engine: "chrome",
+    type: "translate",
+    sourceLanguage: "fr",
+    targetLanguage: "en",
+    fragments: ["Bonjour", "TOO LONG un très long tableau", "Au revoir"]
+  })) as { fragments: string[] };
+  assert.deepEqual(answer.fragments, ["EN[Bonjour]", "", "EN[Au revoir]"]);
+  await host.shutdown();
+});
+
+test("a batch Chrome refuses entirely says why", async () => {
+  reset();
+  availability.set("fr->en", "available");
+  const { host } = chromeHost();
+  const request = (fragments: string[]) =>
+    host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "translate", sourceLanguage: "fr", targetLanguage: "en", fragments });
+  await assert.rejects(request(["TOO LONG"]), (error: Error) => error.message === CHROME_TOO_LONG);
+  await assert.rejects(request(["FLAKY", "  "]), /Other generic failures/);
+  await host.shutdown();
+});
+
+test("the options page's Download still reaches Bergamot with Chrome selected", async () => {
+  reset();
+  availability.set("fr->en", "available");
+  const { host, catalogCalls } = chromeHost();
+  // The store above refuses an online catalog read, which is exactly where Bergamot's download
+  // starts. Reaching it proves the request went to Bergamot; Chrome's engine would have answered.
+  await assert.rejects(
+    host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "ensure-route", sourceLanguage: "fr", targetLanguage: "en" }),
+    /fetched in Chrome mode/
+  );
+  assert.deepEqual(catalogCalls, [{ maxAgeMs: 24 * 60 * 60 * 1000 }]);
+  assert.deepEqual(created, [], "Chrome's translator was asked for a Bergamot download");
+  await host.shutdown();
 });
 
 test("the engine is Bergamot unless the user picked Chrome", () => {

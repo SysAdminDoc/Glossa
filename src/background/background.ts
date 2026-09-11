@@ -20,7 +20,7 @@ import { blockedReason, catalogMaxAgeMs, hostOf, loadSettings } from "../shared/
 import { languageName } from "../shared/languages.ts";
 import { t } from "../shared/i18n.ts";
 import { EngineHost } from "../engine/engine-host.ts";
-import { CHROME_NEEDS_DOWNLOAD, CHROME_UNAVAILABLE } from "../engine/chrome-translator.ts";
+import { CHROME_NEEDS_DOWNLOAD, CHROME_TOO_LONG, CHROME_UNAVAILABLE } from "../engine/chrome-translator.ts";
 
 // Background: routes messages between the content script, the UI pages, and the engine. On Chrome
 // this is a service worker and the engine sits in an offscreen document; on Firefox this is a
@@ -227,6 +227,7 @@ function engineErrorText(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
   if (text === CHROME_NEEDS_DOWNLOAD) return t("pageChromeNeedsDownload");
   if (text === CHROME_UNAVAILABLE) return t("pageChromeUnavailable");
+  if (text === CHROME_TOO_LONG) return t("pageChromeTooLong");
   return text;
 }
 

@@ -16,6 +16,13 @@ import type { TranslatorConstructor, TranslatorInstance } from "../shared/transl
 // chrome.i18n, so it cannot say these itself.
 export const CHROME_NEEDS_DOWNLOAD = "glossa:chrome-needs-download";
 export const CHROME_UNAVAILABLE = "glossa:chrome-unavailable";
+export const CHROME_TOO_LONG = "glossa:chrome-too-long";
+
+function describeFailure(error: unknown): Error {
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === "QuotaExceededError") return new Error(CHROME_TOO_LONG);
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 function translatorApi(): TranslatorConstructor | null {
   const candidate = (globalThis as { Translator?: TranslatorConstructor }).Translator;
@@ -70,16 +77,19 @@ export class ChromeEngine {
     const translator = await this.translator(sourceLanguage, targetLanguage);
     // Each fragment is one block of HTML. Chrome keeps inline tags and their attributes in place,
     // including the ids the renderer uses to put text back into the page's own elements.
-    const out = await Promise.all(
+    // One block Chrome refuses (too long for it, or a passing failure) must not take the page down
+    // with it: a failed block comes back empty, which the renderer leaves in its original language.
+    // Only a batch in which every block failed is an error.
+    const settled = await Promise.allSettled(
       fragments.map((fragment) => (fragment.trim() ? translator.translate(fragment) : Promise.resolve(fragment)))
     );
-    return { fragments: out, inferenceMs: Math.round(performance.now() - started) };
-  }
-
-  // Ready the pair without translating anything: what "download this pair" means for this engine.
-  async ensure(sourceLanguage: string, targetLanguage: string): Promise<string> {
-    await this.translator(sourceLanguage, targetLanguage);
-    return `${sourceLanguage}->${targetLanguage}`;
+    const attempted = fragments.filter((fragment) => fragment.trim()).length;
+    const failures = settled.flatMap((result) => (result.status === "rejected" ? [result.reason as unknown] : []));
+    if (attempted > 0 && failures.length === attempted) throw describeFailure(failures[0]);
+    return {
+      fragments: settled.map((result) => (result.status === "fulfilled" ? result.value : "")),
+      inferenceMs: Math.round(performance.now() - started)
+    };
   }
 
   private translator(sourceLanguage: string, targetLanguage: string): Promise<TranslatorInstance> {

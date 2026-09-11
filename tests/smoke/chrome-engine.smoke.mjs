@@ -138,6 +138,14 @@ try {
   );
   assert(linked, "inline links were lost in the translation");
 
+  // Addresses and reference numbers travel as `var` placeholders that Bergamot copies verbatim.
+  // Chrome's translator has to hand them back intact too, or they come back translated or gone.
+  const contact = await page.$eval("#contact glossa-translation", (node) => node.textContent ?? "");
+  for (const literal of ["info@ejemplo.es", "https://ejemplo.es/catalogo?sala=3", "2026123456"]) {
+    assert(contact.includes(literal), `"${literal}" did not survive Chrome's translation: "${contact}"`);
+  }
+  console.info(`smoke:chrome-engine: protected text kept ("${contact.trim().slice(0, 90)}")`);
+
   // With the pack on disk, a later translation needs no gesture: restore, then translate again from
   // the worker, which is how an "always" site and the context menu reach the engine.
   await popup.click("#action");

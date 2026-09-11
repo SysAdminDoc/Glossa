@@ -107,15 +107,14 @@ export class EngineHost {
   private async dispatch(request: EngineRequest, environment: CatalogEnvironment): Promise<unknown> {
     // Everything a page translation asks for goes to Chrome's engine when it is selected, and none
     // of it may touch the catalog or the model hosts. Managing Bergamot's own models from the
-    // options page still works as before: that is the user asking for Mozilla's files by name.
+    // options page still goes to Bergamot, ensure-route included (its only caller is that page's
+    // Download button): that is the user asking for Mozilla's files by name.
     if (request.engine === "chrome") {
       switch (request.type) {
         case "translate":
           return this.chrome.translate(request.sourceLanguage, request.targetLanguage, request.fragments);
         case "route-status":
           return this.chrome.routeStatus(request.sourceLanguage, request.targetLanguage);
-        case "ensure-route":
-          return { routeKey: await this.chrome.ensure(request.sourceLanguage, request.targetLanguage) };
         case "models-list":
           return this.modelsList(environment, true);
         default:

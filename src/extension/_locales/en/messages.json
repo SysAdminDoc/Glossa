@@ -560,5 +560,9 @@
   },
   "pageChromeUnavailable": {
     "message": "Chrome's built-in translator is not available in this browser. Switch the engine back to Bergamot in Glossa's settings."
+  },
+  "pageChromeTooLong": {
+    "message": "This part of the page is too long for Chrome's built-in translator. Switch the engine back to Bergamot to translate it.",
+    "description": "Page error when every block of a batch was too long for Chrome's Translator"
   }
 }

@@ -424,5 +424,8 @@
   },
   "pageChromeUnavailable": {
     "message": "此浏览器不支持 Chrome 内置翻译。请在 Glossa 设置中将引擎改回 Bergamot。"
+  },
+  "pageChromeTooLong": {
+    "message": "页面的这一部分对 Chrome 内置翻译来说太长。请将引擎改回 Bergamot 来翻译。"
   }
 }

@@ -388,6 +388,12 @@ async function init(): Promise<void> {
   } catch {
     // Fall back to the static list; the route check will surface the real error.
   }
+  // Chrome's translator was chosen, but this browser does not have it (an older Chrome, or the API
+  // switched off). Say so, rather than the "no model" an empty route would otherwise produce.
+  if (settings.engine === "chrome" && !chromeEngine) {
+    engineSupported = false;
+    setStatus(t("pageChromeUnavailable"), "error", true);
+  }
   fillLanguages(sourceSelect, codes, null, true);
   fillLanguages(targetSelect, codes, settings.targetLanguage, false);
 
