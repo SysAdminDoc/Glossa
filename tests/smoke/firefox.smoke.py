@@ -102,6 +102,23 @@ def main() -> None:
                     origins,
                 )
 
+        def select_tab(prefix):
+            """Bring a tab to the front the way a click on it would. switch_to.window only moves
+            WebDriver's focus and leaves the other tab selected, so the page it talks to stays
+            hidden, and a hidden page asks the engine for nothing."""
+            with driver.context(driver.CONTEXT_CHROME):
+                found = driver.execute_script(
+                    """
+                    const prefix = arguments[0];
+                    const tab = Array.from(gBrowser.tabs).find((t) => t.linkedBrowser.currentURI.spec.startsWith(prefix));
+                    if (tab) gBrowser.selectedTab = tab;
+                    return Boolean(tab);
+                    """,
+                    prefix,
+                )
+            if not found:
+                fail(f"no tab starts with {prefix}")
+
         # Firefox 155 does grant a temporary MV3 add-on the host permissions in its manifest (probed
         # 2026-09-10: WebExtensionPolicy.allowedOrigins lists them with nothing granted by hand). What
         # a user can still do is switch them off in about:addons, which is what this removes.
@@ -181,11 +198,29 @@ def main() -> None:
         )
         print(f'smoke(firefox): action button reads "{driver.find_element(By.ID, "action").text}"')
         driver.find_element(By.ID, "action").click()
+        # A real popup is a panel over the page, and the page stays visible while it translates.
+        # Opened as a tab here, the popup hides the page, and a hidden page sends the engine nothing
+        # (the visible-first scheduler). Firefox then ends the idle background page after about 30
+        # seconds and the popup's request loses its receiver. So the page is brought to the front,
+        # as a user would see it, until every block has been handled.
+        select_tab(fixture_url)
+        driver.switch_to.window(page_handle)
+        wait_for(
+            driver,
+            lambda d: d.execute_script(
+                "return document.querySelector('#intro glossa-translation') !== null"
+                " && document.querySelectorAll('[data-glossa-unit=\"pending\"]').length === 0"
+            ),
+            240,
+            "the page to be translated",
+        )
+        select_tab(popup_url.split("?")[0])
+        driver.switch_to.window(popup_handle)
         wait_for(
             driver,
             lambda d: d.find_element(By.ID, "action").text == "Show original"
             or "error" in d.find_element(By.ID, "status").get_attribute("class"),
-            240,
+            60,
             "translation to finish",
         )
         status = driver.find_element(By.ID, "status").text
@@ -193,6 +228,8 @@ def main() -> None:
         if driver.find_element(By.ID, "action").text != "Show original":
             fail(f"translation did not complete: {status}")
 
+        # Content added later is translated by the observer, which also waits for a visible page.
+        select_tab(fixture_url)
         driver.switch_to.window(page_handle)
         intro = driver.execute_script(
             """
@@ -240,6 +277,7 @@ def main() -> None:
         )
         print(f"smoke(firefox): dynamic paragraph: {dynamic}")
 
+        select_tab(popup_url.split("?")[0])
         driver.switch_to.window(popup_handle)
         driver.find_element(By.ID, "action").click()
         wait_for(driver, lambda d: d.find_element(By.ID, "action").text == "Translate page", 30, "restore")
