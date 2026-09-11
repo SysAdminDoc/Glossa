@@ -194,19 +194,29 @@ test("one block Chrome refuses stays as it was and the rest of the batch is tran
     sourceLanguage: "fr",
     targetLanguage: "en",
     fragments: ["Bonjour", "TOO LONG un très long tableau", "Au revoir"]
-  })) as { fragments: string[] };
+  })) as { fragments: string[]; notice?: string };
   assert.deepEqual(answer.fragments, ["EN[Bonjour]", "", "EN[Au revoir]"]);
+  assert.equal(answer.notice, CHROME_TOO_LONG, "the page was not told why a block was left alone");
   await host.shutdown();
 });
 
-test("a batch Chrome refuses entirely says why", async () => {
+test("a block Chrome refuses on its own, the way a long one is sent, does not stop the page", async () => {
   reset();
   availability.set("fr->en", "available");
   const { host } = chromeHost();
   const request = (fragments: string[]) =>
-    host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "translate", sourceLanguage: "fr", targetLanguage: "en", fragments });
-  await assert.rejects(request(["TOO LONG"]), (error: Error) => error.message === CHROME_TOO_LONG);
-  await assert.rejects(request(["FLAKY", "  "]), /Other generic failures/);
+    host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "translate", sourceLanguage: "fr", targetLanguage: "en", fragments }) as Promise<{
+      fragments: string[];
+      notice?: string;
+    }>;
+  const tooLong = await request(["TOO LONG"]);
+  assert.deepEqual(tooLong.fragments, [""]);
+  assert.equal(tooLong.notice, CHROME_TOO_LONG);
+  const flaky = await request(["FLAKY", "  "]);
+  assert.deepEqual(flaky.fragments, ["", "  "]);
+  assert.match(flaky.notice ?? "", /Other generic failures/);
+  const clean = await request(["Merci"]);
+  assert.equal(clean.notice, undefined, "a batch with nothing refused carried a notice");
   await host.shutdown();
 });
 

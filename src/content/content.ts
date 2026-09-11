@@ -371,6 +371,7 @@ async function translateSegments(
       report(controller);
       return;
     }
+    let written = 0;
     withObserverPaused(controller, batch, () => {
       batch.forEach((segment, slot) => {
         // A unit that lost its marker while the batch was in flight was reset or restored under us;
@@ -378,10 +379,17 @@ async function translateSegments(
         if (segment.kind === "element" && segment.element.getAttribute(UNIT_ATTRIBUTE) !== "pending") return;
         const translated = response.fragments[slot] ?? "";
         const applied = controller.renderer.apply(segment, translated, controller.options!);
-        if (applied) controller.output.remember(applied);
+        if (applied) {
+          controller.output.remember(applied);
+          written++;
+        }
       });
     });
-    controller.state.blocksDone += batch.length;
+    // Only what was written counts. A block the engine left empty stays in its own language, and
+    // the popup must not report it as translated.
+    controller.state.blocksDone += written;
+    // The engine left some blocks alone for a reason it gave: say why, and carry on with the rest.
+    if (response.notice) controller.state.lastError = response.notice;
     report(controller);
   }
   scheduler.stop();

@@ -211,13 +211,18 @@ async function detectLanguage(request: DetectRequest): Promise<DetectResponse> {
 
 async function translateFragments(request: TranslateRequest): Promise<TranslateResponse> {
   try {
-    const result = await engineCall<{ fragments: string[]; inferenceMs: number }>({
+    const result = await engineCall<{ fragments: string[]; inferenceMs: number; notice?: string }>({
       type: "translate",
       sourceLanguage: request.sourceLanguage,
       targetLanguage: request.targetLanguage,
       fragments: request.fragments
     });
-    return { ok: true, fragments: result.fragments, inferenceMs: result.inferenceMs };
+    return {
+      ok: true,
+      fragments: result.fragments,
+      inferenceMs: result.inferenceMs,
+      ...(result.notice ? { notice: engineErrorText(result.notice) } : {})
+    };
   } catch (error) {
     return { ok: false, error: engineErrorText(error) };
   }

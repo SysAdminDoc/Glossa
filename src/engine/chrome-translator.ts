@@ -72,23 +72,23 @@ export class ChromeEngine {
     sourceLanguage: string,
     targetLanguage: string,
     fragments: string[]
-  ): Promise<{ fragments: string[]; inferenceMs: number }> {
+  ): Promise<{ fragments: string[]; inferenceMs: number; notice?: string }> {
     const started = performance.now();
     const translator = await this.translator(sourceLanguage, targetLanguage);
     // Each fragment is one block of HTML. Chrome keeps inline tags and their attributes in place,
     // including the ids the renderer uses to put text back into the page's own elements.
-    // One block Chrome refuses (too long for it, or a passing failure) must not take the page down
-    // with it: a failed block comes back empty, which the renderer leaves in its original language.
-    // Only a batch in which every block failed is an error.
+    // A block Chrome refuses (too long for it, or a passing failure) must not take the page down
+    // with it, not even when it is the only block in its batch, which is how the scheduler sends a
+    // long one. It comes back empty, the renderer leaves it in its own language, and the notice says
+    // why while the rest of the page carries on.
     const settled = await Promise.allSettled(
       fragments.map((fragment) => (fragment.trim() ? translator.translate(fragment) : Promise.resolve(fragment)))
     );
-    const attempted = fragments.filter((fragment) => fragment.trim()).length;
     const failures = settled.flatMap((result) => (result.status === "rejected" ? [result.reason as unknown] : []));
-    if (attempted > 0 && failures.length === attempted) throw describeFailure(failures[0]);
     return {
       fragments: settled.map((result) => (result.status === "fulfilled" ? result.value : "")),
-      inferenceMs: Math.round(performance.now() - started)
+      inferenceMs: Math.round(performance.now() - started),
+      ...(failures.length > 0 ? { notice: describeFailure(failures[0]).message } : {})
     };
   }
 

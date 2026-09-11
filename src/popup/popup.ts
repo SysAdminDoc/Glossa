@@ -1,4 +1,4 @@
-import { api } from "../shared/api.ts";
+import { api, hasOffscreenApi } from "../shared/api.ts";
 import { MODEL_ORIGINS, mirrorPermissionPattern } from "../shared/catalog.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { localize, t } from "../shared/i18n.ts";
@@ -124,6 +124,14 @@ function render(): void {
 
   // Chrome's own packs do not come from Mozilla's hosts, so their permission does not matter then.
   grantRow.hidden = modelHostsGranted || chromeEngine;
+  // Showing the original needs no engine, no permission and no model, so nothing below may take
+  // that button away from a translated page.
+  if (page?.translated) {
+    actionButton.textContent = t("popupShowOriginal");
+    actionButton.classList.add("secondary");
+    actionButton.disabled = busy;
+    return;
+  }
   if (!engineSupported) {
     actionButton.textContent = t("popupUnsupportedButton");
     actionButton.disabled = true;
@@ -141,12 +149,6 @@ function render(): void {
   }
   if (!injected) {
     actionButton.textContent = t("popupTranslate");
-    actionButton.disabled = busy;
-    return;
-  }
-  if (page?.translated) {
-    actionButton.textContent = t("popupShowOriginal");
-    actionButton.classList.add("secondary");
     actionButton.disabled = busy;
     return;
   }
@@ -398,9 +400,10 @@ async function init(): Promise<void> {
   } catch {
     // Fall back to the static list; the route check will surface the real error.
   }
-  // Chrome's translator was chosen, but this browser does not have it (an older Chrome, or the API
+  // Chrome's translator was chosen, but this Chrome does not have it (an older one, or the API
   // switched off). Say so, rather than the "no model" an empty route would otherwise produce.
-  if (settings.engine === "chrome" && !chromeEngine) {
+  // Firefox is not this case: the background uses Bergamot there whatever the setting says.
+  if (settings.engine === "chrome" && hasOffscreenApi && !chromeEngine) {
     engineSupported = false;
     setStatus(t("pageChromeUnavailable"), "error", true);
   }

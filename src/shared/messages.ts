@@ -28,7 +28,9 @@ export interface TranslateRequest {
   fragments: string[];
 }
 export type TranslateResponse =
-  | { ok: true; fragments: string[]; inferenceMs: number }
+  // `notice` says why some blocks came back empty and were left in their own language. The rest of
+  // the batch, and the page, carry on.
+  | { ok: true; fragments: string[]; inferenceMs: number; notice?: string }
   | { ok: false; error: string };
 
 export type PageCommand =
