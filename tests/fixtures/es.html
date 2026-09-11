@@ -30,12 +30,12 @@
       <div id="editable" contenteditable="true">Este texto se puede editar en la página y queda fuera de la traducción.</div>
       <p id="rtl" lang="ar" dir="rtl">&#1607;&#1584;&#1575; &#1575;&#1604;&#1606;&#1589; &#1605;&#1603;&#1578;&#1608;&#1576; &#1576;&#1575;&#1604;&#1604;&#1594;&#1577; &#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;.</p>
       <iframe id="frm" src="frame.html" width="400" height="80" title="Comentarios de los lectores"></iframe>
-      <p id="compose"><textarea id="message" rows="3" cols="40">Hola, quiero reservar una sala de lectura para el martes por la tarde.</textarea></p>
+      <p id="compose"><textarea id="message" rows="3" cols="40" aria-label="Tu mensaje">Hola, quiero reservar una sala de lectura para el martes por la tarde.</textarea></p>
       <p id="attrs">
         <img id="photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Fachada de la biblioteca municipal" width="1" height="1" />
         <input id="search" type="search" placeholder="Buscar en el catálogo" aria-label="Buscar libros por título" />
         <a id="tip" href="#horarios" title="Consulta los horarios de apertura">Horarios</a>
-        <select id="room">
+        <select id="room" aria-label="Sala que quieres reservar">
           <option>Sala de lectura</option>
           <option value="infantil">Sala infantil</option>
         </select>

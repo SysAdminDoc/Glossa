@@ -424,7 +424,16 @@ export function shouldSkip(element: Element, options: SegmentOptions): boolean {
   return false;
 }
 
+// A form control is one of the page's live widgets. Inside a unit its content would go to the
+// engine (a textarea's text, every option of a select, whatever "never translate inside fields"
+// says), and bilingual mode would clone it, id and all, into the translation: a second control that
+// does nothing. So an element holding one is walked like a container. The words around the control
+// become segments of their own, which costs a sentence split by a dropdown some context and keeps
+// the control the page's own.
+const FORM_CONTROL_SELECTOR = "input, select, textarea, button";
+
 function isContainer(element: Element): boolean {
+  if (element.querySelector(FORM_CONTROL_SELECTOR)) return true;
   for (const child of element.children) {
     if (BLOCK_TAGS.has(child.tagName)) return true;
     if (child.shadowRoot) return true;

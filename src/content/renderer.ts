@@ -164,6 +164,7 @@ export class Renderer {
       // The original stays where it is in this mode, so the translation is a copy and the page's
       // numbering has no meaning inside it.
       clearIds(block);
+      dropPageIds(block);
       hideDuplicateFromScreenReaders(block);
       ensureShadowStyle(element);
       element.append(block);
@@ -449,6 +450,7 @@ function mergeLiveElements(
         // the page's own element is in two places.
         const clone = original.cloneNode(false) as Element;
         clone.removeAttribute(ID_ATTRIBUTE);
+        clone.removeAttribute("id");
         clone.replaceChildren(...Array.from(copy.childNodes));
         copy.replaceWith(clone);
         continue;
@@ -470,6 +472,13 @@ function mergeLiveElements(
 function labelLanguage(element: Element, language: string): void {
   element.setAttribute("lang", language);
   element.setAttribute("dir", isRtlLanguage(language) ? "rtl" : "ltr");
+}
+
+// A copy must not repeat the page's ids. Two elements with one id is invalid, and whatever looks an
+// element up by it (a label's `for`, an in-page link, the page's own scripts) would find the original
+// only by luck of document order.
+function dropPageIds(root: Element): void {
+  for (const element of root.querySelectorAll("[id]")) element.removeAttribute("id");
 }
 
 // In bilingual mode the page says everything twice, and a screen reader reads it twice. The added
