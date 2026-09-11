@@ -267,7 +267,7 @@ export class ModelStore {
         cache: "no-store"
       });
     } catch (error) {
-      throw await describeNetworkFailure(error, this.mirror);
+      throw await describeNetworkFailure(error, source === MOZILLA_SOURCE ? null : source);
     }
     if (!response.ok) {
       throw new HttpError(`Catalog request failed: HTTP ${response.status}`, response.status);
@@ -312,7 +312,15 @@ export class ModelStore {
     const have = [...entry.recordIds].sort();
     if (wanted.length !== have.length || wanted.some((id, index) => id !== have[index])) return false;
     const cache = await caches.open(CACHE_NAME);
-    return this.entryIsComplete(cache, entry);
+    for (const record of Object.values(pair.records)) {
+      const hit = await cache.match(recordKey(record.id));
+      if (!hit) return false;
+      // The same record id with other bytes is a mirror's file under Mozilla's catalog, or the
+      // reverse: not installed for this catalog, whatever the manifest says.
+      const stored = hit.headers.get("x-glossa-hash");
+      if (stored && record.decompressedHash && stored !== record.decompressedHash) return false;
+    }
+    return true;
   }
 
   // What is downloading right now, for any UI that opens mid-download.
@@ -345,7 +353,8 @@ export class ModelStore {
     if (running) return running;
     const controller = new AbortController();
     this.controllers.set(key, controller);
-    const run = this.downloadPair(pair, key, progress, controller.signal).finally(() => {
+    // The source is fixed for the whole download: a setting changed halfway applies to the next one.
+    const run = this.downloadPair(pair, key, progress, controller.signal, this.mirror).finally(() => {
       this.downloads.delete(key);
       this.controllers.delete(key);
       this.progressState.delete(key);
@@ -358,7 +367,8 @@ export class ModelStore {
     pair: PairFiles,
     key: string,
     progress: ProgressSink,
-    signal: AbortSignal
+    signal: AbortSignal,
+    mirror: string | null
   ): Promise<PairBytes> {
     const cache = await caches.open(CACHE_NAME);
     const bytes: PairBytes = {};
@@ -375,7 +385,12 @@ export class ModelStore {
         // A cached file that is not the size the catalog says was cut short somewhere: a damaged
         // disk, or a partial that outlived a crash. Handed to the engine it aborts the worker with
         // nothing to show for it, so it is dropped and fetched again like a missing one.
-        if (record.decompressedSize === undefined || buffer.byteLength === record.decompressedSize) {
+        // Files are keyed by record id, which a mirror's catalog may share with Mozilla's while
+        // holding other bytes, so the hash recorded at download time has to match this catalog too.
+        // Files cached before the hash was recorded are trusted as before.
+        const storedHash = cached.headers.get("x-glossa-hash");
+        const sameFile = !storedHash || !record.decompressedHash || storedHash === record.decompressedHash;
+        if (sameFile && (record.decompressedSize === undefined || buffer.byteLength === record.decompressedSize)) {
           bytes[fileType] = buffer;
           loadedBefore += record.attachment.size;
           this.progressState.set(key, { pairKey: key, loadedBytes: loadedBefore, totalBytes });
@@ -384,7 +399,7 @@ export class ModelStore {
         await cache.delete(recordKey(record.id));
       }
       this.askForPersistence();
-      const data = await this.downloadRecord(pair, fileType, record, signal, (loaded) => {
+      const data = await this.downloadRecord(pair, fileType, record, signal, mirror, (loaded) => {
         this.progressState.set(key, { pairKey: key, loadedBytes: loadedBefore + loaded, totalBytes });
         progress({ pairKey: key, phase: "download", file: record.name, loadedBytes: loadedBefore + loaded, totalBytes });
       });
@@ -395,7 +410,9 @@ export class ModelStore {
           headers: {
             "content-type": "application/octet-stream",
             "content-length": String(data.byteLength),
-            "x-glossa-record": record.id
+            "x-glossa-record": record.id,
+            // What the catalog said these bytes are, so another catalog cannot mistake them for its own.
+            "x-glossa-hash": record.decompressedHash ?? ""
           }
         })
       );
@@ -444,23 +461,24 @@ export class ModelStore {
     fileType: ModelFileType,
     record: ModelRecord,
     signal: AbortSignal,
+    mirror: string | null,
     onLoaded: (loaded: number) => void
   ): Promise<Uint8Array> {
     if (!record.decompressedHash || !record.decompressedSize) {
       throw new Error(`Catalog record ${record.name} carries no decompressed hash; refusing to download unverifiable data`);
     }
     let data: Uint8Array | null = null;
-    if (this.mirror) {
+    if (mirror) {
       // The user's own mirror holds Mozilla's zstd files under their catalog locations, and it is
       // the only place asked: a file missing there is an error, never a quiet trip to Mozilla.
-      const compressed = await this.fetchBytes(mirrorFileUrl(this.mirror, record), record.attachment.size, record.id, signal, onLoaded);
+      const compressed = await this.fetchBytes(mirrorFileUrl(mirror, record), record.attachment.size, record.id, signal, onLoaded, mirror);
       if ((await sha256Hex(compressed)) !== record.attachment.hash) {
         throw new Error(`Download of ${record.name} from the mirror failed its hash check`);
       }
       data = await decompress(compressed, "zstd", record.decompressedSize);
     } else if (!(await this.cdnRefused())) {
       try {
-        const compressed = await this.fetchBytes(attachmentUrl(record), record.attachment.size, record.id, signal, onLoaded);
+        const compressed = await this.fetchBytes(attachmentUrl(record), record.attachment.size, record.id, signal, onLoaded, null);
         const compressedHash = await sha256Hex(compressed);
         if (compressedHash !== record.attachment.hash) {
           throw new Error(`Download of ${record.name} failed its hash check`);
@@ -477,7 +495,7 @@ export class ModelStore {
     }
     if (!data) {
       const url = await this.gcsUrlFor(pair, fileType, record);
-      const compressed = await this.fetchBytes(url, null, record.id, signal, onLoaded);
+      const compressed = await this.fetchBytes(url, null, record.id, signal, onLoaded, null);
       data = await decompress(compressed, "gzip");
     }
     const hash = await sha256Hex(data);
@@ -498,14 +516,15 @@ export class ModelStore {
     expectedSize: number | null,
     recordId: string,
     signal: AbortSignal,
-    onLoaded: (loaded: number) => void
+    onLoaded: (loaded: number) => void,
+    mirror: string | null
   ): Promise<Uint8Array> {
     let lastError: unknown = null;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       if (signal.aborted) throw new CancelledError(recordId);
       const partial = await readPartial(recordId);
       try {
-        const bytes = await this.fetchOnce(url, partial, recordId, signal, onLoaded);
+        const bytes = await this.fetchOnce(url, partial, recordId, signal, onLoaded, mirror);
         if (expectedSize !== null && bytes.byteLength > expectedSize) {
           // More than the catalog says the file holds: this is not the file we asked for.
           await dropPartial(recordId);
@@ -536,7 +555,8 @@ export class ModelStore {
     partial: Uint8Array | null,
     recordId: string,
     signal: AbortSignal,
-    onLoaded: (loaded: number) => void
+    onLoaded: (loaded: number) => void,
+    mirror: string | null
   ): Promise<Uint8Array> {
     const headers: Record<string, string> = {};
     if (partial && partial.byteLength > 0) headers["range"] = `bytes=${partial.byteLength}-`;
@@ -545,7 +565,7 @@ export class ModelStore {
       response = await fetch(url, { cache: "no-store", signal, headers });
     } catch (error) {
       if (isAbort(error) || signal.aborted) throw new CancelledError(recordId);
-      throw await describeNetworkFailure(error, this.mirror);
+      throw await describeNetworkFailure(error, mirror);
     }
     if (!response.ok) {
       // The server ignored the range, or the partial is stale: start over rather than splice

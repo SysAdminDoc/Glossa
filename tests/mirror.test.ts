@@ -14,11 +14,13 @@ class FakeResponse {
   readonly headers: { get(name: string): string | null };
   private readonly bytes: Uint8Array;
 
-  constructor(bytes: Uint8Array, status = 200) {
+  constructor(bytes: Uint8Array, status = 200, extra: Record<string, string> = {}) {
     this.bytes = bytes;
     this.status = status;
     this.ok = status >= 200 && status < 300;
-    this.headers = { get: (name: string) => (name.toLowerCase() === "content-length" ? String(bytes.byteLength) : null) };
+    this.headers = {
+      get: (name: string) => (name.toLowerCase() === "content-length" ? String(bytes.byteLength) : (extra[name.toLowerCase()] ?? null))
+    };
   }
 
   async arrayBuffer(): Promise<ArrayBuffer> {
@@ -30,14 +32,22 @@ class FakeResponse {
   }
 }
 
+// Keeps each entry's headers as well as its bytes, the way the real Cache API does.
 class FakeCache {
-  readonly store = new Map<string, Uint8Array>();
+  readonly store = new Map<string, { bytes: Uint8Array; headers: Record<string, string> }>();
   async match(key: string): Promise<FakeResponse | undefined> {
     const value = this.store.get(key);
-    return value ? new FakeResponse(value) : undefined;
+    return value ? new FakeResponse(value.bytes, 200, value.headers) : undefined;
   }
-  async put(key: string, response: { arrayBuffer(): Promise<ArrayBuffer> }): Promise<void> {
-    this.store.set(key, new Uint8Array(await response.arrayBuffer()));
+  async put(
+    key: string,
+    response: { arrayBuffer(): Promise<ArrayBuffer>; headers?: { forEach(callback: (value: string, name: string) => void): void } }
+  ): Promise<void> {
+    const headers: Record<string, string> = {};
+    response.headers?.forEach((value, name) => {
+      headers[name.toLowerCase()] = value;
+    });
+    this.store.set(key, { bytes: new Uint8Array(await response.arrayBuffer()), headers });
   }
   async delete(key: string): Promise<boolean> {
     return this.store.delete(key);
@@ -100,6 +110,8 @@ let tamper = false;
 let unreachable = false;
 // Set to hold Mozilla's catalog answer back, so a request to it can be caught in flight.
 let holdMozilla: Promise<void> | null = null;
+// Set to hold the mirror's model files back, so a download can be caught halfway.
+let holdMirrorFiles: Promise<void> | null = null;
 
 function json(value: unknown) {
   return new FakeResponse(new TextEncoder().encode(JSON.stringify(value)));
@@ -110,6 +122,7 @@ globals.fetch = async (url: string) => {
   if (unreachable) throw new TypeError("Failed to fetch");
   if (url === `${MIRROR}records.json`) return json({ data: MIRROR_RECORDS });
   if (url.startsWith(MIRROR)) {
+    if (holdMirrorFiles) await holdMirrorFiles;
     const bytes = ZSTD.slice();
     if (tamper) bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 0xff;
     return new FakeResponse(bytes);
@@ -133,6 +146,7 @@ function reset(): void {
   tamper = false;
   unreachable = false;
   holdMozilla = null;
+  holdMirrorFiles = null;
   grantedOrigins = null;
 }
 
@@ -240,4 +254,40 @@ test("a stored mirror address goes through the same check as a typed one", () =>
   assert.equal(mergeSettings({ mirrorUrl: "https://models.example.org/glossa" }, "en-US").mirrorUrl, "https://models.example.org/glossa/");
   assert.equal(mergeSettings({ mirrorUrl: "http://models.example.org/" }, "en-US").mirrorUrl, "");
   assert.equal(mergeSettings({}, "en-US").mirrorUrl, "");
+});
+
+test("a file a mirror stored under Mozilla's record id is not taken for Mozilla's", async () => {
+  const store = freshStore(MIRROR);
+  await store.ensurePair(PAIR as never, () => undefined);
+  // Mozilla's catalog names the same record ids with other bytes behind them.
+  const OTHER = new Uint8Array(4096).fill(3);
+  const mozillaPair = {
+    ...PAIR,
+    records: {
+      model: { ...MIRROR_RECORDS[0], decompressedHash: sha256(OTHER) },
+      vocab: { ...MIRROR_RECORDS[1], decompressedHash: sha256(OTHER) }
+    }
+  };
+  store.setMirror(null);
+  assert.equal(await store.isPairInstalled(mozillaPair as never), false, "the mirror's files count as Mozilla's");
+  calls.length = 0;
+  // Mozilla is unreachable in this test, so the only way this resolves is with the mirror's bytes.
+  await assert.rejects(store.ensurePair(mozillaPair as never, () => undefined));
+  assert.deepEqual(calls.filter((url) => url.startsWith(MIRROR)), [], "the mirror was asked after switching away from it");
+});
+
+test("a download keeps the source it started with when the setting changes halfway", async () => {
+  const store = freshStore(MIRROR);
+  let release: () => void = () => undefined;
+  holdMirrorFiles = new Promise((resolve) => {
+    release = resolve;
+  });
+  const running = store.ensurePair(PAIR as never, () => undefined);
+  while (!calls.some((url) => url.startsWith(MIRROR) && url.endsWith(".zst"))) await new Promise((resolve) => setTimeout(resolve, 1));
+  store.setMirror(null);
+  release();
+  await running;
+  const files = calls.filter((url) => url.endsWith(".zst") || url.endsWith(".gz"));
+  assert.equal(files.length, 2);
+  assert.deepEqual(files.filter((url) => !url.startsWith(MIRROR)), [], "the download changed source halfway");
 });
