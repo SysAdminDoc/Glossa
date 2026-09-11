@@ -20,6 +20,7 @@ import {
 } from "../shared/messages.ts";
 import { ModelStore, type PairBytes } from "./model-store.ts";
 import { ChromeEngine } from "./chrome-translator.ts";
+import { prepareForEngine, restoreEdges } from "./text-prep.ts";
 import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot.worker.ts";
 
 // The engine host runs wherever a Worker can live long enough to keep a 40 MB model warm:
@@ -107,14 +108,13 @@ export class EngineHost {
   }
 
   private async dispatch(request: EngineRequest, environment: CatalogEnvironment): Promise<unknown> {
+    if (request.type === "translate") return this.translatePrepared(request, environment);
     // Everything a page translation asks for goes to Chrome's engine when it is selected, and none
     // of it may touch the catalog or the model hosts. Managing Bergamot's own models from the
     // options page still goes to Bergamot, ensure-route included (its only caller is that page's
     // Download button): that is the user asking for Mozilla's files by name.
     if (request.engine === "chrome") {
       switch (request.type) {
-        case "translate":
-          return this.chrome.translate(request.sourceLanguage, request.targetLanguage, request.fragments);
         case "route-status":
           return this.chrome.routeStatus(request.sourceLanguage, request.targetLanguage);
         case "models-list":
@@ -126,8 +126,6 @@ export class EngineHost {
     switch (request.type) {
       case "ping":
         return { alive: true, engineLoaded: this.worker !== null };
-      case "translate":
-        return this.translate(request.sourceLanguage, request.targetLanguage, request.fragments, environment);
       case "ensure-route":
         return { routeKey: await this.ensureRoute(request.sourceLanguage, request.targetLanguage, environment) };
       case "route-status":
@@ -149,6 +147,30 @@ export class EngineHost {
         return { fetchedAt: catalog?.fetchedAt ?? null, error: this.store.catalogError };
       }
     }
+  }
+
+  // Every page translation, whichever engine does it: the text goes out cleaned (text-prep.ts) and
+  // comes back with the page's own leading and trailing whitespace.
+  private async translatePrepared(
+    request: Extract<EngineRequest, { type: "translate" }>,
+    environment: CatalogEnvironment
+  ): Promise<{ fragments: string[]; inferenceMs: number; notice?: string }> {
+    const prepared = request.fragments.map((fragment) => prepareForEngine(fragment, request.sourceLanguage));
+    // A block with nothing left once its edges are set aside is sent to neither engine: Bergamot's
+    // decoder crashes on empty input, and an empty answer is how the renderer knows to leave a
+    // block alone. Its slot comes back empty whichever engine is selected.
+    const slots = prepared.flatMap((entry, index) => (entry.core ? [index] : []));
+    const texts = slots.map((slot) => prepared[slot]!.core);
+    const fragments = new Array<string>(prepared.length).fill("");
+    if (texts.length === 0) return { fragments, inferenceMs: 0 };
+    const result =
+      request.engine === "chrome"
+        ? await this.chrome.translate(request.sourceLanguage, request.targetLanguage, texts)
+        : await this.translate(request.sourceLanguage, request.targetLanguage, texts, environment);
+    slots.forEach((slot, position) => {
+      fragments[slot] = restoreEdges(result.fragments[position] ?? "", prepared[slot]!);
+    });
+    return { ...result, fragments };
   }
 
   async translate(

@@ -213,6 +213,12 @@ try {
   assert(split.text.includes("https://ejemplo.es/descargas"), `the split address did not survive translation: "${split.text}"`);
   assert(split.bold === "es", `the <b> inside the split address was lost: ${JSON.stringify(split)}`);
 
+  // Soft hyphens are invisible on the page, but the engine reads them as characters.
+  const shy = await page.$eval("#shy glossa-translation", (block) => block.textContent ?? "");
+  console.info(`smoke: soft-hyphen paragraph: ${shy}`);
+  assert(/library/i.test(shy), `the soft-hyphen paragraph was not translated: "${shy}"`);
+  assert(!/[­Ã]/.test(shy), `the soft-hyphen paragraph came back with artefacts: "${shy}"`);
+
   const shadow = await page.evaluate(() => {
     const root = document.getElementById("host")?.shadowRoot;
     const block = root?.querySelector("glossa-translation");

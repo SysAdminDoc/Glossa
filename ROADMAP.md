@@ -58,11 +58,11 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
 
 ### P2
 
-- [ ] P2 — G-38 — Normalise text before submission: soft hyphens, curly quotes, CJK punctuation spacing, edge whitespace
-  Why: soft hyphens (pervasive on Wikipedia) become garbage, curly quotes change output, CJK sentence splitting fails at full-width punctuation before a quote, and leading or trailing whitespace confuses the model.
-  Evidence: bergamot-translator #337; mozilla/translations #977; Firefox worker `cleanText()` (strips U+00AD, `FULL_WIDTH_PUNCTUATION_REGEX` for ja/ko/zh, preserves edge whitespace).
-  Touches: src/engine/bergamot.worker.ts or src/content/segmenter.ts (normalise on the way in, re-attach edge whitespace on the way out), tests
-  Acceptance: a fixture paragraph containing U+00AD translates without `Ã` artefacts; a Japanese sentence ending in `。“` splits correctly; leading and trailing whitespace of every unit is byte-identical after translation.
+- [ ] P2 — G-54 — Decide whether curly quotes should be normalised before translation
+  Why: G-38 (soft hyphens, CJK punctuation before a quote, edge whitespace) left curly quotes alone. mozilla/translations #977 reports that they change the output, but nothing in hand says which rewrite helps (straight quotes in, curly back out? only in some languages?), and rewriting quotes blind can damage text that uses them on purpose.
+  Evidence: mozilla/translations #977; G-38 work 2026-09-10 (src/engine/text-prep.ts).
+  Touches: src/engine/text-prep.ts, a comparison script under tools/ that translates a sample with and without the rewrite and reports the difference
+  Acceptance: a measured comparison on at least three language pairs decides it; if a rewrite wins, it lands with tests, otherwise this item records why not.
   Complexity: S
 
 - [ ] P2 — G-39 — Walk closed shadow roots with the extension DOM API

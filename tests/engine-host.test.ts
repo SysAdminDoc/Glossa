@@ -256,3 +256,25 @@ test("a failure that is not the worker dying does not spend the retry budget", a
     await host.shutdown();
   }
 });
+
+test("a page translation reaches the engine cleaned and comes back with the page's own edges", async () => {
+  workers.length = 0;
+  const host = new EngineHost();
+  fakeStore(host as unknown as { store: Record<string, unknown> });
+  const { ENGINE_TARGET } = await import("../src/shared/messages.ts");
+  try {
+    const result = (await host.handle({
+      target: ENGINE_TARGET,
+      type: "translate",
+      sourceLanguage: "es",
+      targetLanguage: "en",
+      fragments: ["  La biblio­teca\n", "\t"]
+    })) as { fragments: string[] };
+    const asked = workers[0]?.seen.find((request) => request.type === "translate");
+    // Cleaned, and the whitespace-only block not sent at all: the real decoder crashes on empty input.
+    assert.deepEqual(asked?.fragments, ["La biblioteca"], "the engine was handed the raw text");
+    assert.deepEqual(result.fragments, ["  EN(La biblioteca)\n", ""]);
+  } finally {
+    await host.shutdown();
+  }
+});

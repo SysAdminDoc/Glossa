@@ -124,7 +124,9 @@ test("translating keeps one translator per pair and the fragments in order", asy
       fragments: string[];
     }>;
   const first = await request(["Bonjour", "  ", 'Le <b data-glossa-id="0">livre</b>']);
-  assert.deepEqual(first.fragments, ["EN[Bonjour]", "  ", 'EN[Le <b data-glossa-id="0">livre</b>]']);
+  // A block of nothing but whitespace is sent to neither engine and comes back empty, which the
+  // renderer already treats as "leave this block alone".
+  assert.deepEqual(first.fragments, ["EN[Bonjour]", "", 'EN[Le <b data-glossa-id="0">livre</b>]']);
   await request(["Merci"]);
   assert.deepEqual(created, ["fr->en"], "the second batch reused the first translator");
   assert.deepEqual(fetches, []);
@@ -213,7 +215,8 @@ test("a block Chrome refuses on its own, the way a long one is sent, does not st
   assert.deepEqual(tooLong.fragments, [""]);
   assert.equal(tooLong.notice, CHROME_TOO_LONG);
   const flaky = await request(["FLAKY", "  "]);
-  assert.deepEqual(flaky.fragments, ["", "  "]);
+  // The refused block and the whitespace-only one both come back empty; only the first was sent.
+  assert.deepEqual(flaky.fragments, ["", ""]);
   assert.match(flaky.notice ?? "", /Other generic failures/);
   const clean = await request(["Merci"]);
   assert.equal(clean.notice, undefined, "a batch with nothing refused carried a notice");
