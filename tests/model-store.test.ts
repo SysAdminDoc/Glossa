@@ -261,3 +261,46 @@ test("a CDN failure that is not a refusal is reported rather than silently rerou
     refuseCdnWith = null;
   }
 });
+
+test("a cached file cut short is fetched again instead of reaching the engine", async () => {
+  const store = freshStore();
+  await store.ensurePair(pair() as never, () => undefined);
+  // Damage the cached model the way a truncated entry looks: right key, too few bytes.
+  const models = caches_.get("glossa-models-v1");
+  const key = [...(models?.store.keys() ?? [])].find((entry) => entry.endsWith("/models/m1"));
+  assert.ok(models && key, "the model was not cached");
+  models.store.set(key, models.store.get(key)!.subarray(0, 100));
+  plan = { calls: [] };
+  const bytes = await store.ensurePair(pair() as never, () => undefined);
+  assert.equal(bytes.model?.byteLength, PLAIN.byteLength, "the short file reached the engine");
+  assert.equal(plan.calls.filter((call) => call.url.endsWith("model.bin.gz")).length, 1, "the short model was not fetched again");
+  assert.equal(plan.calls.filter((call) => call.url.endsWith("vocab.bin.gz")).length, 0, "an intact file was fetched again");
+  assert.equal(models.store.get(key)?.byteLength, PLAIN.byteLength, "the cache still holds the short file");
+});
+
+test("persistent storage is asked for once, when the first file is downloaded", async () => {
+  const store = freshStore();
+  let asked = 0;
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      storage: {
+        persist: async () => {
+          asked++;
+          return true;
+        }
+      }
+    }
+  });
+  try {
+    await store.ensurePair(pair() as never, () => undefined);
+    assert.equal(asked, 1, "the first download did not ask to keep its storage");
+    // Everything is cached now: loading it again downloads nothing and asks nothing.
+    await store.ensurePair(pair() as never, () => undefined);
+    assert.equal(asked, 1);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "navigator", original);
+    else Reflect.deleteProperty(globalThis, "navigator");
+  }
+});

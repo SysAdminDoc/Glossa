@@ -86,13 +86,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: the popup shows the label for the detected pair before download; the ten weakest pairs from RESEARCH.md show "lower".
   Complexity: S
 
-- [ ] P2 — G-42 — Verify cached model bytes on load and request persistent storage
-  Why: a truncated cache entry aborts the WASM with no explanation, and Cache API storage for extension origins can in principle be evicted on Firefox.
-  Evidence: `model-store.ts` `ensurePair` returns cached bytes without a size check; MDN storage quotas (persistence semantics differ per browser); Bugzilla 1861489 (partial model files surviving cleanup).
-  Touches: src/engine/model-store.ts (compare `byteLength` with `decompressedSize` on read, evict and re-download on mismatch, call `navigator.storage.persist()` once)
-  Acceptance: a deliberately truncated cache entry is re-downloaded instead of crashing the worker; a unit test covers the mismatch path.
-  Complexity: S
-
 - [ ] P2 — G-47 — Engine and model major-version upgrade path
   Why: the engine is pinned to Remote Settings wasm 4.0 and models to major 3; when Mozilla publishes wasm 5.0 or models 4.x, installed 3.x models must be invalidated and re-downloaded, and at HEAD a6cce06 nothing handles that beyond a constant and a cache name.
   Evidence: `TranslationsParent.sys.mjs` L764-791 (version ladder: 1.x tiny, 2.x CJK and base, 3.x zstd; `LANGUAGE_MODEL_MAJOR_VERSION_MIN/MAX` both 3; `BERGAMOT_MAJOR_VERSION` 4); `src/shared/catalog.ts` `MODEL_MAJOR_VERSION`; `src/engine/model-store.ts` `CACHE_NAME = "glossa-models-v1"`.

@@ -205,6 +205,19 @@ export class ModelStore {
     this.mirror = mirror;
   }
 
+  // Asked once, the first time a file is actually downloaded. The models are tens of megabytes
+  // each, and storage the browser may evict under pressure takes every one of them with it.
+  // Extensions holding unlimitedStorage are normally granted this without a prompt; a browser that
+  // says no still works, it only keeps the right to evict.
+  private persistenceAsked = false;
+
+  private askForPersistence(): void {
+    if (this.persistenceAsked) return;
+    this.persistenceAsked = true;
+    const storage = (globalThis as { navigator?: { storage?: { persist?: () => Promise<boolean> } } }).navigator?.storage;
+    void storage?.persist?.().catch(() => false);
+  }
+
   private catalogSource(): string {
     return this.mirror ?? MOZILLA_SOURCE;
   }
@@ -358,11 +371,19 @@ export class ModelStore {
     for (const [fileType, record] of records) {
       const cached = await cache.match(recordKey(record.id));
       if (cached) {
-        bytes[fileType] = await cached.arrayBuffer();
-        loadedBefore += record.attachment.size;
-        this.progressState.set(key, { pairKey: key, loadedBytes: loadedBefore, totalBytes });
-        continue;
+        const buffer = await cached.arrayBuffer();
+        // A cached file that is not the size the catalog says was cut short somewhere: a damaged
+        // disk, or a partial that outlived a crash. Handed to the engine it aborts the worker with
+        // nothing to show for it, so it is dropped and fetched again like a missing one.
+        if (record.decompressedSize === undefined || buffer.byteLength === record.decompressedSize) {
+          bytes[fileType] = buffer;
+          loadedBefore += record.attachment.size;
+          this.progressState.set(key, { pairKey: key, loadedBytes: loadedBefore, totalBytes });
+          continue;
+        }
+        await cache.delete(recordKey(record.id));
       }
+      this.askForPersistence();
       const data = await this.downloadRecord(pair, fileType, record, signal, (loaded) => {
         this.progressState.set(key, { pairKey: key, loadedBytes: loadedBefore + loaded, totalBytes });
         progress({ pairKey: key, phase: "download", file: record.name, loadedBytes: loadedBefore + loaded, totalBytes });
