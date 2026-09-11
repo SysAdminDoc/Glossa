@@ -251,6 +251,45 @@ export function attachmentUrl(record: ModelRecord): string {
   return REMOTE_SETTINGS.attachmentBaseUrl + record.attachment.location;
 }
 
+// A model mirror the user runs (tools/mirror-models.mjs builds one): a base address that the
+// catalog name and each file's catalog location are appended to. Only https is accepted, except on
+// the loopback interface, where a server on the same machine is plain http. The address comes back
+// with no query, no fragment, no credentials and exactly one trailing slash, or null when it is not
+// usable.
+export function normalizeMirrorUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return null;
+  if (url.username || url.password) return null;
+  url.search = "";
+  url.hash = "";
+  return url.href.endsWith("/") ? url.href : `${url.href}/`;
+}
+
+export function mirrorCatalogUrl(mirror: string): string {
+  return `${mirror}records.json`;
+}
+
+// The mirror keeps Mozilla's layout, so a record's location works there unchanged. Appending to a
+// base that already names a host can only ever produce a path on that host.
+export function mirrorFileUrl(mirror: string, record: ModelRecord): string {
+  return mirror + record.attachment.location;
+}
+
+// The match pattern the browser is asked to grant for a mirror. A pattern carries no port, so a
+// mirror on http://127.0.0.1:8080/ is asked for as http://127.0.0.1/*.
+export function mirrorPermissionPattern(mirror: string): string {
+  const url = new URL(mirror);
+  return `${url.protocol}//${url.hostname}/*`;
+}
+
 // Normalise a BCP-47 tag from a page or the detector to the catalog's spelling.
 // The catalog uses bare codes ("de", "pt") except for Chinese, which is script-tagged.
 export function normalizeLanguageTag(tag: string | null | undefined): string | null {

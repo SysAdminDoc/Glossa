@@ -427,5 +427,35 @@
   },
   "pageChromeTooLong": {
     "message": "页面的这一部分对 Chrome 内置翻译来说太长。请将引擎改回 Bergamot 来翻译。"
+  },
+  "optionsMirrorLabel": {
+    "message": "模型镜像（可选）"
+  },
+  "optionsMirrorSave": {
+    "message": "使用此镜像"
+  },
+  "optionsMirrorClear": {
+    "message": "改回 Mozilla"
+  },
+  "optionsMirrorHint": {
+    "message": "从你自己的服务器而不是 Mozilla 获取目录和模型。用源代码包中的 tools/mirror-models.mjs 生成镜像，并通过 HTTPS 提供。Glossa 仍会用镜像目录中的哈希校验每个文件，所以请只使用你信任的镜像。"
+  },
+  "optionsMirrorInvalid": {
+    "message": "这不是 https:// 地址。"
+  },
+  "optionsMirrorSaved": {
+    "message": "模型现在来自 $1。"
+  },
+  "optionsMirrorCleared": {
+    "message": "模型重新来自 Mozilla。"
+  },
+  "optionsMirrorNoAccess": {
+    "message": "Glossa 未获准访问 $1，因此不会使用该镜像。"
+  },
+  "optionsSourceMirrorName": {
+    "message": "位于 $1 的镜像"
+  },
+  "popupGrantMirror": {
+    "message": "Glossa 需要获得访问 $1 上模型镜像的权限，才能下载语言。"
   }
 }

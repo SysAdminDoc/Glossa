@@ -73,6 +73,15 @@
           <span id="catalog-status"></span>
           <button type="button" class="btn small" id="catalog-refresh" data-i18n="optionsRefreshCatalog">Refresh catalog</button>
         </div>
+        <div class="field">
+          <label for="mirror" data-i18n="optionsMirrorLabel">Model mirror (optional)</label>
+          <div class="inline-form">
+            <input type="url" id="mirror" placeholder="https://models.example.org/glossa/" spellcheck="false" autocomplete="off" />
+            <button type="button" class="btn" id="mirror-save" data-i18n="optionsMirrorSave">Use this mirror</button>
+            <button type="button" class="btn small" id="mirror-clear" data-i18n="optionsMirrorClear">Back to Mozilla</button>
+          </div>
+          <p class="hint" data-i18n="optionsMirrorHint">Fetch the catalog and model files from a server you run instead of from Mozilla. Build one with tools/mirror-models.mjs from the source archive and serve it over HTTPS. Glossa still checks every file against the hashes in the mirror's catalog, so only use a mirror you trust.</p>
+        </div>
         <label class="check"><input type="checkbox" id="experimental-models" /> <span data-i18n="optionsExperimental">Offer Mozilla's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk). Quality is untested and Firefox ships them to its nightly channel only.</span></label>
         <table class="table" id="models">
           <thead><tr><th data-i18n="optionsModelsPair">Pair</th><th data-i18n="optionsModelsVersion">Version</th><th data-i18n="optionsModelsSize">Size</th><th></th></tr></thead>
@@ -91,7 +100,7 @@
           <div class="progress-text" id="progress-text"></div>
           <button type="button" class="btn small" id="cancel-download" data-i18n="optionsCancelDownload">Cancel download</button>
         </div>
-        <p class="hint">
+        <p class="hint" id="source-hint">
           <span data-i18n="optionsSourceHint">Model files come from Mozilla's attachment CDN, or from Mozilla's model bucket when the CDN refuses this browser.</span>
           <button type="button" class="btn small" id="reset-source" data-i18n="optionsResetSource">Try the CDN again</button>
         </p>

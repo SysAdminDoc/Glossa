@@ -3,6 +3,9 @@ import {
   attachmentUrl,
   MODEL_ORIGINS,
   MODEL_SOURCES,
+  mirrorCatalogUrl,
+  mirrorFileUrl,
+  mirrorPermissionPattern,
   pairKey,
   REMOTE_SETTINGS,
   type ModelFileType,
@@ -27,10 +30,14 @@ import type { InstalledPair, ProgressEvent } from "../shared/messages.ts";
 //   2. Mozilla's public model registry bucket on Google Cloud Storage (gzip), which serves anyone.
 // The Remote Settings catalog is always the hash authority: every file from either source is
 // checked against the catalog's decompressed hash and size before it is stored.
+// A user who runs their own mirror (tools/mirror-models.mjs) replaces all of this: the catalog and
+// every file come from that server only, verified the same way against the mirror's catalog.
 
 const CACHE_NAME = "glossa-models-v1";
 const META_CACHE_NAME = "glossa-meta-v1";
 const CATALOG_KEY = "catalog";
+// The source recorded for Mozilla's own catalog. A mirror's catalog is recorded under its address.
+const MOZILLA_SOURCE = "mozilla";
 const INSTALLED_KEY = "installedPairs";
 const SOURCE_KEY = "byteSource";
 const GCS_REGISTRY_KEY = "gcsRegistry";
@@ -97,6 +104,8 @@ function isAbort(error: unknown): boolean {
 interface StoredCatalog {
   fetchedAt: number;
   records: ModelRecord[];
+  // Which source served it. Entries written before mirrors existed have none and are Mozilla's.
+  source?: string;
 }
 
 interface InstalledManifestEntry extends InstalledPair {
@@ -154,10 +163,15 @@ const MISSING_PERMISSION_MESSAGE =
   "Glossa has no permission to reach Mozilla's model hosts yet. Open the Glossa popup and choose " +
   "\"Allow model downloads\".";
 
-async function describeNetworkFailure(error: unknown): Promise<Error> {
+const MISSING_MIRROR_PERMISSION_MESSAGE =
+  "Glossa has no permission to reach your model mirror. Open Glossa's options and click \"Use this mirror\" " +
+  "again to allow it.";
+
+async function describeNetworkFailure(error: unknown, mirror: string | null): Promise<Error> {
   try {
-    const granted = await api.permissions.contains({ origins: [...MODEL_ORIGINS] });
-    if (!granted) return new Error(MISSING_PERMISSION_MESSAGE);
+    const origins = mirror ? [mirrorPermissionPattern(mirror)] : [...MODEL_ORIGINS];
+    const granted = await api.permissions.contains({ origins });
+    if (!granted) return new Error(mirror ? MISSING_MIRROR_PERMISSION_MESSAGE : MISSING_PERMISSION_MESSAGE);
   } catch {
     // A browser that cannot answer leaves the original error in place.
   }
@@ -174,6 +188,10 @@ export class ModelStore {
   private catalogPromise: Promise<StoredCatalog> | null = null;
   private lastCatalogError: string | null = null;
   private sourceState: SourceState | null = null;
+  // The user's own mirror, or null for Mozilla. Set from every engine request.
+  private mirror: string | null = null;
+  // Which source the catalog request in flight is for, so a switch never reuses the wrong one.
+  private catalogPromiseSource: string | null = null;
   // One download per pair, however many callers ask for it, and a handle to stop it.
   private readonly downloads = new Map<string, Promise<PairBytes>>();
   private readonly controllers = new Map<string, AbortController>();
@@ -181,6 +199,14 @@ export class ModelStore {
 
   get catalogError(): string | null {
     return this.lastCatalogError;
+  }
+
+  setMirror(mirror: string | null): void {
+    this.mirror = mirror;
+  }
+
+  private catalogSource(): string {
+    return this.mirror ?? MOZILLA_SOURCE;
   }
 
   // Serve the stored catalog when it is fresh enough; refresh it otherwise. A failed refresh
@@ -194,10 +220,13 @@ export class ModelStore {
     if (stored && !options.force && age < options.maxAgeMs) {
       return stored;
     }
-    if (!this.catalogPromise) {
-      this.catalogPromise = this.fetchCatalog().finally(() => {
-        this.catalogPromise = null;
+    const source = this.catalogSource();
+    if (!this.catalogPromise || this.catalogPromiseSource !== source) {
+      this.catalogPromiseSource = source;
+      const promise: Promise<StoredCatalog> = this.fetchCatalog(source).finally(() => {
+        if (this.catalogPromise === promise) this.catalogPromise = null;
       });
+      this.catalogPromise = promise;
     }
     try {
       const fresh = await this.catalogPromise;
@@ -212,15 +241,20 @@ export class ModelStore {
   private async readStoredCatalog(): Promise<StoredCatalog | null> {
     const value = await readMeta<StoredCatalog>(CATALOG_KEY);
     if (!value || !Array.isArray(value.records) || typeof value.fetchedAt !== "number") return null;
+    // A catalog from another source says nothing about this one: switching to a mirror, or back to
+    // Mozilla, must not offer pairs the new source cannot serve.
+    if ((value.source ?? MOZILLA_SOURCE) !== this.catalogSource()) return null;
     return value;
   }
 
-  private async fetchCatalog(): Promise<StoredCatalog> {
+  private async fetchCatalog(source: string): Promise<StoredCatalog> {
     let response: Response;
     try {
-      response = await fetch(REMOTE_SETTINGS.recordsUrl, { cache: "no-store" });
+      response = await fetch(source === MOZILLA_SOURCE ? REMOTE_SETTINGS.recordsUrl : mirrorCatalogUrl(source), {
+        cache: "no-store"
+      });
     } catch (error) {
-      throw await describeNetworkFailure(error);
+      throw await describeNetworkFailure(error, this.mirror);
     }
     if (!response.ok) {
       throw new HttpError(`Catalog request failed: HTTP ${response.status}`, response.status);
@@ -233,7 +267,7 @@ export class ModelStore {
     if (records.length === 0) {
       throw new Error("Catalog response contained no usable records");
     }
-    const catalog: StoredCatalog = { fetchedAt: Date.now(), records };
+    const catalog: StoredCatalog = { fetchedAt: Date.now(), records, source };
     await writeMeta(CATALOG_KEY, catalog);
     return catalog;
   }
@@ -379,7 +413,8 @@ export class ModelStore {
   }
 
   // Which byte source the next download will try first. Exposed for the options page.
-  async activeSource(): Promise<"mozilla-cdn" | "mozilla-gcs"> {
+  async activeSource(): Promise<"mozilla-cdn" | "mozilla-gcs" | "mirror"> {
+    if (this.mirror) return "mirror";
     return (await this.cdnRefused()) ? "mozilla-gcs" : "mozilla-cdn";
   }
 
@@ -394,7 +429,15 @@ export class ModelStore {
       throw new Error(`Catalog record ${record.name} carries no decompressed hash; refusing to download unverifiable data`);
     }
     let data: Uint8Array | null = null;
-    if (!(await this.cdnRefused())) {
+    if (this.mirror) {
+      // The user's own mirror holds Mozilla's zstd files under their catalog locations, and it is
+      // the only place asked: a file missing there is an error, never a quiet trip to Mozilla.
+      const compressed = await this.fetchBytes(mirrorFileUrl(this.mirror, record), record.attachment.size, record.id, signal, onLoaded);
+      if ((await sha256Hex(compressed)) !== record.attachment.hash) {
+        throw new Error(`Download of ${record.name} from the mirror failed its hash check`);
+      }
+      data = await decompress(compressed, "zstd", record.decompressedSize);
+    } else if (!(await this.cdnRefused())) {
       try {
         const compressed = await this.fetchBytes(attachmentUrl(record), record.attachment.size, record.id, signal, onLoaded);
         const compressedHash = await sha256Hex(compressed);
@@ -481,7 +524,7 @@ export class ModelStore {
       response = await fetch(url, { cache: "no-store", signal, headers });
     } catch (error) {
       if (isAbort(error) || signal.aborted) throw new CancelledError(recordId);
-      throw await describeNetworkFailure(error);
+      throw await describeNetworkFailure(error, this.mirror);
     }
     if (!response.ok) {
       // The server ignored the range, or the partial is stale: start over rather than splice

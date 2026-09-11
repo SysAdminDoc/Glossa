@@ -427,5 +427,35 @@
   },
   "pageChromeTooLong": {
     "message": "Dieser Teil der Seite ist zu lang für den integrierten Übersetzer von Chrome. Stelle wieder Bergamot ein, um ihn zu übersetzen."
+  },
+  "optionsMirrorLabel": {
+    "message": "Modell-Spiegel (optional)"
+  },
+  "optionsMirrorSave": {
+    "message": "Diesen Spiegel verwenden"
+  },
+  "optionsMirrorClear": {
+    "message": "Zurück zu Mozilla"
+  },
+  "optionsMirrorHint": {
+    "message": "Lädt Katalog und Modelle von einem eigenen Server statt von Mozilla. Erstelle ihn mit tools/mirror-models.mjs aus dem Quellarchiv und stelle ihn über HTTPS bereit. Glossa prüft weiterhin jede Datei gegen die Hashes im Katalog des Spiegels, verwende also nur einen Spiegel, dem du vertraust."
+  },
+  "optionsMirrorInvalid": {
+    "message": "Das ist keine https://-Adresse."
+  },
+  "optionsMirrorSaved": {
+    "message": "Modelle kommen jetzt von $1."
+  },
+  "optionsMirrorCleared": {
+    "message": "Modelle kommen wieder von Mozilla."
+  },
+  "optionsMirrorNoAccess": {
+    "message": "Glossa durfte $1 nicht erreichen, daher wird der Spiegel nicht verwendet."
+  },
+  "optionsSourceMirrorName": {
+    "message": "deinem Spiegel unter $1"
+  },
+  "popupGrantMirror": {
+    "message": "Glossa braucht die Erlaubnis, deinen Modell-Spiegel unter $1 zu erreichen, bevor es eine Sprache herunterladen kann."
   }
 }

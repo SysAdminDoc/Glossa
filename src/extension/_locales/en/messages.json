@@ -564,5 +564,39 @@
   "pageChromeTooLong": {
     "message": "This part of the page is too long for Chrome's built-in translator. Switch the engine back to Bergamot to translate it.",
     "description": "Page error when every block of a batch was too long for Chrome's Translator"
+  },
+  "optionsMirrorLabel": {
+    "message": "Model mirror (optional)"
+  },
+  "optionsMirrorSave": {
+    "message": "Use this mirror"
+  },
+  "optionsMirrorClear": {
+    "message": "Back to Mozilla"
+  },
+  "optionsMirrorHint": {
+    "message": "Fetch the catalog and model files from a server you run instead of from Mozilla. Build one with tools/mirror-models.mjs from the source archive and serve it over HTTPS. Glossa still checks every file against the hashes in the mirror's catalog, so only use a mirror you trust."
+  },
+  "optionsMirrorInvalid": {
+    "message": "That is not an https:// address."
+  },
+  "optionsMirrorSaved": {
+    "message": "Models now come from $1.",
+    "description": "Toast after saving a mirror; $1 is its host name"
+  },
+  "optionsMirrorCleared": {
+    "message": "Models come from Mozilla again."
+  },
+  "optionsMirrorNoAccess": {
+    "message": "Glossa was not allowed to reach $1, so the mirror is not in use.",
+    "description": "Toast when the permission for the mirror host was refused; $1 is its host name"
+  },
+  "optionsSourceMirrorName": {
+    "message": "your mirror at $1",
+    "description": "Fills $4 of optionsCatalogLine after 'come from'; $1 is the mirror's host name"
+  },
+  "popupGrantMirror": {
+    "message": "Glossa needs permission to reach your model mirror at $1 before it can download a language.",
+    "description": "Popup notice; $1 is the mirror's host name"
   }
 }

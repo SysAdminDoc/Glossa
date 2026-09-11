@@ -1,6 +1,7 @@
 import { api } from "../shared/api.ts";
 import { localize, t } from "../shared/i18n.ts";
 import { formatBytes } from "../shared/hash.ts";
+import { mirrorPermissionPattern, normalizeMirrorUrl } from "../shared/catalog.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type { ModelsListResponse, ProgressEvent } from "../shared/messages.ts";
 import { loadSettings, saveSettings, type DisplayMode, type Settings, type SiteRule } from "../shared/settings.ts";
@@ -123,6 +124,8 @@ function renderModels(): void {
   const body = $<HTMLTableElement>("models").tBodies[0]!;
   body.replaceChildren();
   const status = $("catalog-status");
+  // Mozilla's two sources, and the button that retries the CDN, mean nothing while a mirror serves.
+  $("source-hint").hidden = Boolean(settings.mirrorUrl);
   if (!models) {
     status.textContent = t("optionsCatalogLoading");
     return;
@@ -130,7 +133,10 @@ function renderModels(): void {
   if (models.catalogFetchedAt) {
     const age = Math.max(0, Date.now() - models.catalogFetchedAt);
     const hours = Math.round(age / 3_600_000);
-    const source = t(models.byteSource === "mozilla-gcs" ? "optionsSourceBucketName" : "optionsSourceCdnName");
+    const source =
+      models.byteSource === "mirror" && settings.mirrorUrl
+        ? t("optionsSourceMirrorName", new URL(settings.mirrorUrl).host)
+        : t(models.byteSource === "mozilla-gcs" ? "optionsSourceBucketName" : "optionsSourceCdnName");
     status.textContent = t(
       "optionsCatalogLine",
       String(models.sources.length),
@@ -317,6 +323,39 @@ async function init(): Promise<void> {
   experimental.addEventListener("change", async () => {
     await persist({ experimentalModels: experimental.checked });
     // The language lists and every route depend on which records the catalog gate lets through.
+    await refreshModels();
+  });
+
+  // A mirror is the user's own server. Its host is asked for from this click, because both browsers
+  // refuse a permission request anywhere else, and only a granted one is saved: a mirror Glossa may
+  // not reach would turn every download into a bare network error.
+  const mirror = $<HTMLInputElement>("mirror");
+  mirror.value = settings.mirrorUrl;
+  $("mirror-save").addEventListener("click", () => {
+    const url = normalizeMirrorUrl(mirror.value);
+    if (!url) {
+      toast(t("optionsMirrorInvalid"), "error");
+      return;
+    }
+    const host = new URL(url).host;
+    api.permissions.request({ origins: [mirrorPermissionPattern(url)] }).then(
+      async (granted) => {
+        if (!granted) {
+          toast(t("optionsMirrorNoAccess", host), "error");
+          return;
+        }
+        settings = await saveSettings({ mirrorUrl: url });
+        mirror.value = url;
+        toast(t("optionsMirrorSaved", host), "ok");
+        await refreshModels();
+      },
+      () => toast(t("optionsMirrorNoAccess", host), "error")
+    );
+  });
+  $("mirror-clear").addEventListener("click", async () => {
+    settings = await saveSettings({ mirrorUrl: "" });
+    mirror.value = "";
+    toast(t("optionsMirrorCleared"), "ok");
     await refreshModels();
   });
 

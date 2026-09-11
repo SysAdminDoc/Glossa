@@ -19,7 +19,7 @@ Glossa is a browser extension that translates pages without sending the text any
 
 Every popular translator extension, including the ones marketed on privacy, ships with a cloud engine as the default. The one that leads the market keeps its source closed and had a public data leak in 2025. Browser built-in translators are convenient but you're trusting the vendor's word about what gets uploaded.
 
-Glossa takes the opposite approach. There is no cloud engine in the code at all, so there is nothing to opt out of. The extension holds no permission to read websites on its own. It touches a page only when you ask, and the only hosts it can ever contact are the three Mozilla-operated locations that serve the language models. On Chrome you can go further and switch to Chrome's own on-device translator, and then translating a page makes no request at all.
+Glossa takes the opposite approach. There is no cloud engine in the code at all, so there is nothing to opt out of. The extension holds no permission to read websites on its own. It touches a page only when you ask, and the only hosts it can ever contact are the three Mozilla-operated locations that serve the language models, or a mirror of them that you run yourself. On Chrome you can go further and switch to Chrome's own on-device translator, and then translating a page makes no request at all.
 
 <p align="center">
   <img src="docs/screenshots/page-bilingual.png" width="720" alt="A Spanish page with English translations shown under each block" />
@@ -101,6 +101,8 @@ npm run build           # writes dist/chrome, dist/firefox, and one ZIP per targ
 
 `npm run smoke:chrome-engine` needs Chrome itself (138 or newer), because Chromium builds don't ship the built-in translator. Chrome ignores `--load-extension`, so the test loads the build over the DevTools protocol, switches the engine, downloads a pack from a real click in the popup, and fails if any request reaches a Mozilla host.
 
+`npm run smoke:mirror` builds a small Spanish to English mirror under `.tmp/mirror` the first time, serves it from the loopback server, and translates the fixture through it. It fails if any request reaches a Mozilla or Google host, and also if the mirror's own files are missing from what the extension fetched.
+
 `npm run verify:release` runs everything: the checks above, every browser smoke and the axe pass. `GLOSSA_SMOKE_PIVOT=1` adds a Spanish to French run, which goes through English and downloads a second model. `npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
 
 `npm run bump 0.3.0` moves every version string and dates the changelog heading. `npm run release`
@@ -127,7 +129,8 @@ machine. It does nothing else.
   model catalog, `firefox-settings-attachments.cdn.mozilla.net` and Mozilla's model bucket on
   `storage.googleapis.com` for the model files themselves.
 - `<all_urls>` is optional and never requested at install. It is asked for, from a click, only when
-  a user adds an "always translate" rule for a site, and only for that site.
+  a user adds an "always translate" rule for a site, and only for that site, or when they point
+  Glossa at their own model mirror, and only for that host.
 
 **About the model files.** The engine is a WebAssembly binary inside the package; it is never
 fetched at runtime. What is fetched is data: the language model files Mozilla publishes for its own
@@ -169,9 +172,24 @@ The engine binary ships inside the package. Models are data. The catalog at `fir
 
 - Translation happens in a Web Worker inside the extension. No page text is sent anywhere.
 - The extension has no host permission for websites. It injects its script only into the tab you invoke it on.
-- Network access is limited to three Mozilla-operated locations, and only for model downloads. You can verify this in the manifest and in the browser's network log. On Chromium browsers the model bytes come from a Mozilla bucket hosted on Google Cloud Storage, so Google's edge sees a download of a static file for a language pair. A self-hosted mirror option is on the roadmap for people who want to avoid even that.
+- Network access is limited to three Mozilla-operated locations, and only for model downloads. You can verify this in the manifest and in the browser's network log. On Chromium browsers the model bytes come from a Mozilla bucket hosted on Google Cloud Storage, so Google's edge sees a download of a static file for a language pair. If you'd rather avoid even that, run your own mirror (next section).
 - With Chrome's built-in translator selected, Glossa itself fetches nothing to translate a page. Chrome downloads its language packs through its own component updater, so that traffic is between you and Google, the same as for any site that uses the API.
 - No analytics, no crash reporting, no account, no update checks beyond what the browser does for any extension.
+
+## Running your own model mirror
+
+Glossa can take its catalog and model files from a server you control instead of Mozilla's. Build the mirror from a checkout or from the source archive:
+
+```bash
+node tools/mirror-models.mjs --out ./glossa-mirror --pairs es:en,en:es
+node tools/mirror-models.mjs --out ./glossa-mirror --all      # every pair, several GB
+```
+
+The tool downloads each file from Mozilla once, checks it against the hashes in Mozilla's catalog, and writes a `records.json` that lists only what you mirrored. A pair that goes through English (`es:fr`) pulls in both halves. Run it again later and it skips every file that's already there and correct.
+
+Serve the directory over HTTPS with any static file server. Then paste its address into Glossa's options, under Language models, and click Use this mirror. The browser asks you once for permission to reach that host. From then on the catalog and every model download come from your mirror, and nothing goes to Mozilla or Google. The server needs no CORS headers, since an extension's requests to a host it has permission for aren't subject to CORS.
+
+The mirror's catalog becomes the authority for the hashes. A mirror someone else runs could serve models that match its own catalog, so only use one you trust.
 
 ## Licenses
 

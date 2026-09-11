@@ -427,5 +427,35 @@
   },
   "pageChromeTooLong": {
     "message": "Cette partie de la page est trop longue pour le traducteur intégré de Chrome. Revenez à Bergamot pour la traduire."
+  },
+  "optionsMirrorLabel": {
+    "message": "Miroir des modèles (facultatif)"
+  },
+  "optionsMirrorSave": {
+    "message": "Utiliser ce miroir"
+  },
+  "optionsMirrorClear": {
+    "message": "Revenir à Mozilla"
+  },
+  "optionsMirrorHint": {
+    "message": "Récupère le catalogue et les modèles sur un serveur à vous plutôt que chez Mozilla. Créez-le avec tools/mirror-models.mjs depuis l'archive des sources et servez-le en HTTPS. Glossa vérifie toujours chaque fichier avec les hashes du catalogue du miroir, alors n'utilisez qu'un miroir de confiance."
+  },
+  "optionsMirrorInvalid": {
+    "message": "Ce n'est pas une adresse https://."
+  },
+  "optionsMirrorSaved": {
+    "message": "Les modèles viennent maintenant de $1."
+  },
+  "optionsMirrorCleared": {
+    "message": "Les modèles viennent de nouveau de Mozilla."
+  },
+  "optionsMirrorNoAccess": {
+    "message": "Glossa n'a pas été autorisé à joindre $1, donc le miroir n'est pas utilisé."
+  },
+  "optionsSourceMirrorName": {
+    "message": "votre miroir sur $1"
+  },
+  "popupGrantMirror": {
+    "message": "Glossa a besoin de la permission de joindre votre miroir de modèles sur $1 avant de pouvoir télécharger une langue."
   }
 }

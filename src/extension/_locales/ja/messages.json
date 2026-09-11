@@ -427,5 +427,35 @@
   },
   "pageChromeTooLong": {
     "message": "このページのこの部分は Chrome の組み込み翻訳には長すぎます。翻訳するにはエンジンを Bergamot に戻してください。"
+  },
+  "optionsMirrorLabel": {
+    "message": "モデルのミラー（任意）"
+  },
+  "optionsMirrorSave": {
+    "message": "このミラーを使う"
+  },
+  "optionsMirrorClear": {
+    "message": "Mozilla に戻す"
+  },
+  "optionsMirrorHint": {
+    "message": "カタログとモデルを Mozilla ではなく自分のサーバーから取得します。ソースアーカイブの tools/mirror-models.mjs で作成し、HTTPS で公開してください。Glossa はミラーのカタログにあるハッシュで各ファイルを確認するので、信頼できるミラーだけを使ってください。"
+  },
+  "optionsMirrorInvalid": {
+    "message": "https:// のアドレスではありません。"
+  },
+  "optionsMirrorSaved": {
+    "message": "モデルの取得元を $1 に変更しました。"
+  },
+  "optionsMirrorCleared": {
+    "message": "モデルの取得元を Mozilla に戻しました。"
+  },
+  "optionsMirrorNoAccess": {
+    "message": "$1 へのアクセスが許可されなかったため、ミラーは使用されません。"
+  },
+  "optionsSourceMirrorName": {
+    "message": "$1 のミラー"
+  },
+  "popupGrantMirror": {
+    "message": "言語をダウンロードするには、$1 のモデルミラーにアクセスする許可が必要です。"
   }
 }

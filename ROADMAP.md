@@ -2,21 +2,12 @@
 
 Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) and from what the first scaffold left unfinished. Ordered by priority, then by root-cause fixes before polish.
 
-## P1
-
-- [ ] G-09 — Mirror the model catalog and files to the project's own release host
-  Why: on Chromium browsers the model bytes come from a Mozilla bucket on Google Cloud Storage because the Remote Settings CDN refuses Chrome user agents (RESEARCH.md findings). Privacy-community users check the network tab, and the HN reaction to Firefox Translations hosting models on Google's infrastructure is the precedent. A self-hosted mirror also survives a catalog move (the v1 collection is already deprecated).
-  Evidence: live 406 from `firefox-settings-attachments.cdn.mozilla.net` with a Chrome UA on 2026-09-10; HN thread 33792447.
-  Touches: tools/mirror-models.mjs (new), src/shared/catalog.ts (mirror base URL setting with Mozilla as fallback), manifest host permissions
-  Acceptance: a setting selects the mirror; with it set, no request goes to a Mozilla host and hashes still verify.
-  Complexity: M
-
 ## P2
 
 - [ ] G-10 — Persist detected language and translation state across the popup closing during a download
-  Why: closing the popup mid-download hides progress; the download continues but the user has no way to see it.
-  Touches: src/popup/popup.ts (query engine for in-flight downloads on open), src/engine/engine-host.ts (expose active downloads)
-  Acceptance: reopening the popup during a download shows the live progress bar.
+  Why: closing the popup mid-download hides progress; the download continues but the user has no way to see it. With Chrome's engine it is worse: the popup starts the language pack download itself, so closing it before the pack arrives means the page is never translated until Translate is clicked again (adversarial review 2026-09-10, finding 7).
+  Touches: src/popup/popup.ts (query engine for in-flight downloads on open; for Chrome's engine, hand the translate request to the background before the pack finishes), src/engine/engine-host.ts (expose active downloads)
+  Acceptance: reopening the popup during a download shows the live progress bar, and a Chrome pack download that finishes after the popup closed still translates the page.
   Complexity: S
 
 - [ ] G-11 — Per-page glossary and never-translate terms
@@ -145,6 +136,13 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Touches: src/content/segmenter.ts (optional Readability pass to rank units), src/options
   Acceptance: with the mode on, a Wikipedia fixture translates the article before navigation and sidebars, and a setting disables it.
   Complexity: M
+
+- [ ] P3 — G-52 — Make the Firefox smoke's "page translated" wait independent of language groups
+  Why: the smoke brings the page tab to the front until no unit is `pending`, but `translateByLanguage` marks one language group pending at a time, so on a profile with a second route installed the wait can pass between groups and the popup tab hides the page again mid-run. A fresh profile never has a second route, so it does not bite today.
+  Evidence: adversarial review 2026-09-10 (finding 9); `select_tab` wait in tests/smoke/firefox.smoke.py.
+  Touches: tests/smoke/firefox.smoke.py (wait on a completion signal the content script exposes, or read the popup's state from the chrome context without selecting its tab)
+  Acceptance: the smoke passes with an Arabic to English model already installed.
+  Complexity: S
 
 - [ ] P3 — G-46 — Learner hover delay for the selection popover
   Why: a configurable delay before the translation appears lets a learner guess first; it is the one idea in the hover-translator category with sustained praise.

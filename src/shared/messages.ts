@@ -165,7 +165,7 @@ export interface ModelsListResponse {
   engineSupported: boolean;
   // Where the next model download will come from. Chrome browsers end up on the registry bucket
   // because Mozilla's attachment CDN refuses their user agent.
-  byteSource: "mozilla-cdn" | "mozilla-gcs";
+  byteSource: "mozilla-cdn" | "mozilla-gcs" | "mirror";
 }
 
 // The engine host has no access to storage on Chrome (an offscreen document gets no
@@ -179,6 +179,8 @@ interface EngineEnvelope {
   // Which engine translates. "chrome" routes translate, route-status, ensure-route and models-list
   // to Chrome's built-in Translator, and none of those may reach Mozilla's hosts.
   engine?: "bergamot" | "chrome";
+  // The user's own model mirror. With it set, the catalog and every file come from there only.
+  mirror?: string;
 }
 
 export type EngineRequest =

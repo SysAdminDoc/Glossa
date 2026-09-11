@@ -1,5 +1,5 @@
 import { api } from "../shared/api.ts";
-import { MODEL_ORIGINS } from "../shared/catalog.ts";
+import { MODEL_ORIGINS, mirrorPermissionPattern } from "../shared/catalog.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { localize, t } from "../shared/i18n.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
@@ -49,6 +49,8 @@ let busy = false;
 // The user chose Chrome's built-in translator and this browser has it. Its packs are downloaded
 // from here, because only a click on the extension's own page can start that download.
 let chromeEngine = false;
+// The user's own model mirror, when there is one. Downloads need that host and none of Mozilla's.
+let mirrorUrl = "";
 
 // Set once the engine reports it cannot run here. Nothing else may write over that: a status line
 // saying "model ready" under a button saying "not supported on this computer" is a contradiction,
@@ -179,10 +181,15 @@ function render(): void {
   actionButton.disabled = busy;
 }
 
+// The hosts downloads will come from: the user's mirror when there is one, Mozilla's otherwise.
+function modelOrigins(): string[] {
+  return mirrorUrl ? [mirrorPermissionPattern(mirrorUrl)] : [...MODEL_ORIGINS];
+}
+
 // A permission check, not a request: asking may only happen from a click handler.
 async function checkModelHosts(): Promise<void> {
   try {
-    modelHostsGranted = await api.permissions.contains({ origins: [...MODEL_ORIGINS] });
+    modelHostsGranted = await api.permissions.contains({ origins: modelOrigins() });
   } catch {
     // A browser that cannot answer is treated as granted; the download error will say otherwise.
     modelHostsGranted = true;
@@ -372,6 +379,9 @@ async function init(): Promise<void> {
   const settings = await loadSettings();
   setMode(settings.displayMode);
   chromeEngine = settings.engine === "chrome" && typeof self.Translator?.create === "function";
+  mirrorUrl = settings.mirrorUrl;
+  // The permission notice names the host that is missing, which with a mirror is the user's own.
+  if (mirrorUrl) $("grant-text").textContent = t("popupGrantMirror", new URL(mirrorUrl).host);
 
   let codes = knownLanguageCodes();
   try {
@@ -450,7 +460,7 @@ async function init(): Promise<void> {
   }
   // The request has to happen inside the click handler: both browsers refuse it otherwise.
   grantButton.addEventListener("click", () => {
-    api.permissions.request({ origins: [...MODEL_ORIGINS] }).then(
+    api.permissions.request({ origins: modelOrigins() }).then(
       async (granted) => {
         modelHostsGranted = granted;
         if (granted) {

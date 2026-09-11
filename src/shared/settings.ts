@@ -1,5 +1,6 @@
 import { api } from "./api.ts";
 import { t } from "./i18n.ts";
+import { normalizeMirrorUrl } from "./catalog.ts";
 
 export type DisplayMode = "bilingual" | "replace";
 export type SiteRule = "always" | "never";
@@ -31,6 +32,9 @@ export interface Settings {
   // Mozilla gates them to its nightly channel, so they are off by default here too.
   experimentalModels: boolean;
   engine: EngineChoice;
+  // A model mirror the user runs, as a normalised base address ending in "/", or "" for Mozilla's
+  // hosts. With one set, the catalog and every model file come from there and nowhere else.
+  mirrorUrl: string;
 }
 
 export const SETTINGS_KEY = "settings";
@@ -49,7 +53,8 @@ export function defaultSettings(uiLanguage?: string): Settings {
     catalogRefreshHours: 24,
     sourceLanguages: {},
     experimentalModels: false,
-    engine: "bergamot"
+    engine: "bergamot",
+    mirrorUrl: ""
   };
 }
 
@@ -81,6 +86,9 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   if (typeof input.skipFormFields === "boolean") out.skipFormFields = input.skipFormFields;
   if (typeof input.experimentalModels === "boolean") out.experimentalModels = input.experimentalModels;
   if (input.engine === "bergamot" || input.engine === "chrome") out.engine = input.engine;
+  // Whatever is stored goes through the same check as what is typed: an imported settings blob
+  // with a plain-http or credential-bearing address gets Mozilla's hosts, not that address.
+  if (typeof input.mirrorUrl === "string") out.mirrorUrl = normalizeMirrorUrl(input.mirrorUrl) ?? "";
   if (typeof input.catalogRefreshHours === "number" && input.catalogRefreshHours >= 1) {
     out.catalogRefreshHours = Math.min(input.catalogRefreshHours, 24 * 30);
   }

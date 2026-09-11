@@ -95,6 +95,8 @@ export class EngineHost {
     if (typeof request.catalogMaxAgeMs === "number" && request.catalogMaxAgeMs > 0) {
       this.catalogMaxAgeMs = request.catalogMaxAgeMs;
     }
+    // Set or cleared on every request, for the same reason: the host cannot read settings.
+    this.store.setMirror(request.mirror ?? null);
     this.busy++;
     try {
       return await this.dispatch(request, environment);

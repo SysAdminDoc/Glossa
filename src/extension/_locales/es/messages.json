@@ -427,5 +427,35 @@
   },
   "pageChromeTooLong": {
     "message": "Esta parte de la página es demasiado larga para el traductor integrado de Chrome. Vuelve a elegir Bergamot para traducirla."
+  },
+  "optionsMirrorLabel": {
+    "message": "Réplica de modelos (opcional)"
+  },
+  "optionsMirrorSave": {
+    "message": "Usar esta réplica"
+  },
+  "optionsMirrorClear": {
+    "message": "Volver a Mozilla"
+  },
+  "optionsMirrorHint": {
+    "message": "Descarga el catálogo y los modelos desde un servidor tuyo en lugar de Mozilla. Crea uno con tools/mirror-models.mjs del archivo de código fuente y sírvelo por HTTPS. Glossa sigue comprobando cada archivo con los hashes del catálogo de la réplica, así que usa solo una réplica de confianza."
+  },
+  "optionsMirrorInvalid": {
+    "message": "Esa no es una dirección https://."
+  },
+  "optionsMirrorSaved": {
+    "message": "Los modelos ahora vienen de $1."
+  },
+  "optionsMirrorCleared": {
+    "message": "Los modelos vuelven a venir de Mozilla."
+  },
+  "optionsMirrorNoAccess": {
+    "message": "Glossa no recibió permiso para acceder a $1, así que la réplica no se usa."
+  },
+  "optionsSourceMirrorName": {
+    "message": "tu réplica en $1"
+  },
+  "popupGrantMirror": {
+    "message": "Glossa necesita permiso para acceder a tu réplica de modelos en $1 antes de descargar un idioma."
   }
 }
