@@ -522,5 +522,43 @@
   "optionsCatalogLoading": {
     "message": "Loading catalog…",
     "description": "Catalog line while it loads"
+  },
+  "optionsEngineLabel": {
+    "message": "Translation engine",
+    "description": "Options: label of the engine choice"
+  },
+  "optionsEngineBergamot": {
+    "message": "Bergamot (bundled with Glossa)"
+  },
+  "optionsEngineChrome": {
+    "message": "Chrome's built-in translator"
+  },
+  "optionsEngineHint": {
+    "message": "Both run on this device. Chrome's translator gets its language packs from Google through Chrome's own updater and needs 22 GB of free disk. While it is selected, translating a page sends nothing to Mozilla's servers.",
+    "description": "Options: what the Chrome engine choice means"
+  },
+  "popupChromeDownloadAndTranslate": {
+    "message": "Download language pack and translate"
+  },
+  "popupChromeDownloading": {
+    "message": "Downloading Chrome's language pack: $1%",
+    "description": "Popup progress; $1 is a percentage number"
+  },
+  "popupChromePackNeeded": {
+    "message": "Chrome downloads the $1 language pack the first time.",
+    "description": "Popup status; $1 is a language pair such as Spanish → English"
+  },
+  "popupChromeReady": {
+    "message": "Chrome's language pack is ready. Translation runs on this device."
+  },
+  "popupChromeNoPair": {
+    "message": "Chrome's built-in translator has no pack for $1 to $2.",
+    "description": "Popup status; $1 and $2 are language names"
+  },
+  "pageChromeNeedsDownload": {
+    "message": "Chrome needs its language pack first. Open Glossa's popup on this page and click the button to download it."
+  },
+  "pageChromeUnavailable": {
+    "message": "Chrome's built-in translator is not available in this browser. Switch the engine back to Bergamot in Glossa's settings."
   }
 }

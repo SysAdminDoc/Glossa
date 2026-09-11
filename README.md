@@ -19,7 +19,7 @@ Glossa is a browser extension that translates pages without sending the text any
 
 Every popular translator extension, including the ones marketed on privacy, ships with a cloud engine as the default. The one that leads the market keeps its source closed and had a public data leak in 2025. Browser built-in translators are convenient but you're trusting the vendor's word about what gets uploaded.
 
-Glossa takes the opposite approach. There is no cloud engine in the code at all, so there is nothing to opt out of. The extension holds no permission to read websites on its own. It touches a page only when you ask, and the only hosts it can ever contact are the three Mozilla-operated locations that serve the language models.
+Glossa takes the opposite approach. There is no cloud engine in the code at all, so there is nothing to opt out of. The extension holds no permission to read websites on its own. It touches a page only when you ask, and the only hosts it can ever contact are the three Mozilla-operated locations that serve the language models. On Chrome you can go further and switch to Chrome's own on-device translator, and then translating a page makes no request at all.
 
 <p align="center">
   <img src="docs/screenshots/page-bilingual.png" width="720" alt="A Spanish page with English translations shown under each block" />
@@ -43,6 +43,7 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 - Translates a selection from the context menu, and translates what you have typed into a text box from the same menu.
 - Per-site rules. Turn Glossa off for a host and it will not even look at its pages. List the languages you read and those pages are never offered.
 - Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
+- Can use Chrome's built-in translator instead (Chrome 138 or newer, on a desktop with 22 GB of free disk). It runs on your device too. Chrome fetches its language packs from Google the first time you click Translate for a pair, and Glossa sends nothing to Mozilla while it's selected. Bergamot stays the default, and Firefox doesn't offer the choice.
 
 Glossa's own interface follows your browser's language: English, Spanish, German, French, Japanese and Chinese are included, and anything missing falls back to English.
 
@@ -98,7 +99,9 @@ npm run build           # writes dist/chrome, dist/firefox, and one ZIP per targ
 
 `npm run verify` runs the typecheck, lint, unit tests, and build. `npm run smoke` builds a test variant with a loopback host permission and runs the headless Chromium test, which downloads the Spanish to English model and translates a fixture page through the real popup. `npm run smoke:firefox` does the same in the system Firefox through Selenium (`pip install selenium`; geckodriver is fetched automatically). `npm run screenshots` refreshes the images above the same way. If your firewall blocks outbound traffic per binary, point the smoke at a Chromium build it does allow with `GLOSSA_CHROMIUM_PATH`.
 
-`npm run verify:release` runs everything: the checks above, both browser smokes and the axe pass. `GLOSSA_SMOKE_PIVOT=1` adds a Spanish to French run, which goes through English and downloads a second model. `npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
+`npm run smoke:chrome-engine` needs Chrome itself (138 or newer), because Chromium builds don't ship the built-in translator. Chrome ignores `--load-extension`, so the test loads the build over the DevTools protocol, switches the engine, downloads a pack from a real click in the popup, and fails if any request reaches a Mozilla host.
+
+`npm run verify:release` runs everything: the checks above, every browser smoke and the axe pass. `GLOSSA_SMOKE_PIVOT=1` adds a Spanish to French run, which goes through English and downloads a second model. `npm run smoke:a11y` runs axe against the popup, the options page and a translated page, and fails on any violation.
 
 `npm run bump 0.3.0` moves every version string and dates the changelog heading. `npm run release`
 builds the artifacts with their SHA-256 sidecars and a CRX; `npm run release:publish` also tags the
@@ -133,7 +136,9 @@ whichever of the two sources served it, and nothing is fetched until a user asks
 
 **What is sent.** Nothing but those model requests. Page text is translated in a Web Worker inside
 the extension and never leaves the machine. There is no analytics, no telemetry, no account, no
-remote configuration and no error reporting.
+remote configuration and no error reporting. With the optional Chrome engine selected, translation goes
+through the browser's own on-device Translator API instead, and the extension makes no model
+requests at all.
 
 **Rebuilding the package.** Every release carries `glossa-source-vX.Y.Z.zip` with the full source,
 the lockfile, and a `BUILDING.txt` naming the exact steps and the engine hashes. The packages are
@@ -153,6 +158,7 @@ page  ──(activeTab click)──▶  content script
                                  │
                         Web Worker running Bergamot (WASM, SIMD, single thread)
                                  │  models from Cache storage
+                                 │  (or Chrome's own Translator, if you picked it)
                                  ▼
                        translated HTML fragments back into the page
 ```
@@ -164,6 +170,7 @@ The engine binary ships inside the package. Models are data. The catalog at `fir
 - Translation happens in a Web Worker inside the extension. No page text is sent anywhere.
 - The extension has no host permission for websites. It injects its script only into the tab you invoke it on.
 - Network access is limited to three Mozilla-operated locations, and only for model downloads. You can verify this in the manifest and in the browser's network log. On Chromium browsers the model bytes come from a Mozilla bucket hosted on Google Cloud Storage, so Google's edge sees a download of a static file for a language pair. A self-hosted mirror option is on the roadmap for people who want to avoid even that.
+- With Chrome's built-in translator selected, Glossa itself fetches nothing to translate a page. Chrome downloads its language packs through its own component updater, so that traffic is between you and Google, the same as for any site that uses the API.
 - No analytics, no crash reporting, no account, no update checks beyond what the browser does for any extension.
 
 ## Licenses

@@ -22,6 +22,14 @@
           <label for="target" data-i18n="optionsTargetLabel">Translate pages into</label>
           <select id="target"></select>
         </div>
+        <div class="field" id="engine-field" hidden>
+          <label for="engine" data-i18n="optionsEngineLabel">Translation engine</label>
+          <select id="engine">
+            <option value="bergamot" data-i18n="optionsEngineBergamot">Bergamot (bundled with Glossa)</option>
+            <option value="chrome" data-i18n="optionsEngineChrome">Chrome's built-in translator</option>
+          </select>
+          <p class="hint" data-i18n="optionsEngineHint">Both run on this device. Chrome's translator gets its language packs from Google through Chrome's own updater and needs 22 GB of free disk. While it is selected, translating a page sends nothing to Mozilla's servers.</p>
+        </div>
         <div class="field">
           <span class="field-label" data-i18n="optionsShowLabel">Show translations</span>
           <div class="segmented" role="group" aria-label="Display mode">

@@ -180,7 +180,7 @@ Commercial and adjacent
 
 ## Open Questions
 
-- Does Chrome's Translator API instantiate inside an offscreen document (a Window, but undocumented)? Decides where G-06 hosts it. Needs a live run on Chrome 138+ with a qualifying GPU.
+- Answered 2026-09-10 on Chrome 152 (headless, CDP-loaded extension): yes, the offscreen document gets `Translator`. Its availability is per origin, and the extension origin reports "available" once any extension page (the popup, from a click) has created a translator for the pair. After that the offscreen document creates one with no gesture, and HTML fragments come back with their inline tags, attributes and entities intact. A content script is the wrong host: it answers for the page's origin, which keeps reporting "downloadable" and throws NotAllowedError without a gesture in the page. G-06 shipped on that design.
 - Does a signed (non-temporary) Firefox install on 128 ESR grant the manifest host permissions at install, and does the GCS pattern widen there too? Needs the signed build from G-05.
 - Does Brave with default shields load the engine, and does the "disable V8 optimizer" content setting explain Linguist #603? Needs a Brave smoke run.
 - Will AMO or Chrome Web Store reviewers treat runtime-fetched model weights as remote code? No primary source answers it; only a submission does.

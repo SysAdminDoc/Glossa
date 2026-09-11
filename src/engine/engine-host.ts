@@ -19,6 +19,7 @@ import {
   type RouteStatus
 } from "../shared/messages.ts";
 import { ModelStore, type PairBytes } from "./model-store.ts";
+import { ChromeEngine } from "./chrome-translator.ts";
 import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot.worker.ts";
 
 // The engine host runs wherever a Worker can live long enough to keep a 40 MB model warm:
@@ -63,6 +64,8 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 
 export class EngineHost {
   readonly store = new ModelStore();
+  // Chrome's built-in Translator, used instead of Bergamot when the user picked it.
+  readonly chrome = new ChromeEngine();
   // Called when the engine has been idle long enough to release everything it holds.
   onIdle: (() => void) | null = null;
   private worker: Worker | null = null;
@@ -102,6 +105,23 @@ export class EngineHost {
   }
 
   private async dispatch(request: EngineRequest, environment: CatalogEnvironment): Promise<unknown> {
+    // Everything a page translation asks for goes to Chrome's engine when it is selected, and none
+    // of it may touch the catalog or the model hosts. Managing Bergamot's own models from the
+    // options page still works as before: that is the user asking for Mozilla's files by name.
+    if (request.engine === "chrome") {
+      switch (request.type) {
+        case "translate":
+          return this.chrome.translate(request.sourceLanguage, request.targetLanguage, request.fragments);
+        case "route-status":
+          return this.chrome.routeStatus(request.sourceLanguage, request.targetLanguage);
+        case "ensure-route":
+          return { routeKey: await this.chrome.ensure(request.sourceLanguage, request.targetLanguage) };
+        case "models-list":
+          return this.modelsList(environment, true);
+        default:
+          break;
+      }
+    }
     switch (request.type) {
       case "ping":
         return { alive: true, engineLoaded: this.worker !== null };
@@ -186,6 +206,7 @@ export class EngineHost {
     this.worker = null;
     this.workerReady = null;
     this.loadedRoutes.clear();
+    this.chrome.release();
     // Anything still waiting on the worker has to be told, or its caller waits for an answer that
     // can never come and the queue behind it never moves again.
     const stopped = new Error("The translation engine was shut down");
@@ -233,8 +254,10 @@ export class EngineHost {
     return { ...base, hops, installed: hops.every((hop) => hop.installed), downloadBytes };
   }
 
-  async modelsList(environment?: CatalogEnvironment): Promise<ModelsListResponse> {
-    const catalog = await this.store.getCatalog({ maxAgeMs: this.catalogMaxAgeMs });
+  // With Chrome's engine selected the catalog is read from disk only, and the processor check does
+  // not apply: Bergamot is not what will run.
+  async modelsList(environment?: CatalogEnvironment, chrome = false): Promise<ModelsListResponse> {
+    const catalog = await this.store.getCatalog({ maxAgeMs: this.catalogMaxAgeMs, offline: chrome });
     const coverage = catalog ? languageCoverage(catalog.records, environment) : { sources: [], targets: [] };
     return {
       installed: await this.store.listInstalled(),
@@ -243,7 +266,7 @@ export class EngineHost {
       catalogFetchedAt: catalog?.fetchedAt ?? null,
       catalogError: this.store.catalogError,
       engineLoaded: this.worker !== null,
-      engineSupported: supportsSimd(),
+      engineSupported: chrome || supportsSimd(),
       byteSource: await this.store.activeSource()
     };
   }

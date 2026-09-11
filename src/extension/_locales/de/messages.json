@@ -391,5 +391,38 @@
   },
   "optionsCatalogLoading": {
     "message": "Katalog wird geladen…"
+  },
+  "optionsEngineLabel": {
+    "message": "Übersetzungsmodul"
+  },
+  "optionsEngineBergamot": {
+    "message": "Bergamot (in Glossa enthalten)"
+  },
+  "optionsEngineChrome": {
+    "message": "Integrierter Übersetzer von Chrome"
+  },
+  "optionsEngineHint": {
+    "message": "Beide laufen auf diesem Gerät. Der Übersetzer von Chrome lädt seine Sprachpakete über den Chrome-eigenen Updater von Google und braucht 22 GB freien Speicher. Solange er ausgewählt ist, geht beim Übersetzen einer Seite nichts an Server von Mozilla."
+  },
+  "popupChromeDownloadAndTranslate": {
+    "message": "Sprachpaket laden und übersetzen"
+  },
+  "popupChromeDownloading": {
+    "message": "Sprachpaket von Chrome wird geladen: $1 %"
+  },
+  "popupChromePackNeeded": {
+    "message": "Chrome lädt das Sprachpaket $1 beim ersten Mal herunter."
+  },
+  "popupChromeReady": {
+    "message": "Das Sprachpaket von Chrome ist bereit. Die Übersetzung läuft auf diesem Gerät."
+  },
+  "popupChromeNoPair": {
+    "message": "Der integrierte Übersetzer von Chrome hat kein Paket für $1 nach $2."
+  },
+  "pageChromeNeedsDownload": {
+    "message": "Chrome braucht zuerst sein Sprachpaket. Öffne das Glossa-Fenster auf dieser Seite und klicke auf die Schaltfläche, um es herunterzuladen."
+  },
+  "pageChromeUnavailable": {
+    "message": "Der integrierte Übersetzer von Chrome ist in diesem Browser nicht verfügbar. Stelle in den Glossa-Einstellungen wieder Bergamot ein."
   }
 }

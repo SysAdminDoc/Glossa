@@ -5,6 +5,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ## [Unreleased]
 
 ### Added
+- On Chrome 138 and later you can switch the engine to Chrome's own built-in translator in the settings. It also runs on your device, gets its language packs from Google through Chrome's updater, and while it's selected, translating a page sends nothing to Mozilla. The first page in a new language downloads the pack when you click Translate in the popup. After that, "always" sites and the context menu work without it. Bergamot stays the default, and Firefox doesn't show the choice at all.
 - The part of the page you are looking at is translated first, and it keeps up as you scroll: what comes into view moves to the front of the queue. A tab in the background stops asking the engine for anything until you come back to it.
 - Text inside a frame on the same site is translated too, exactly once, and the block count in the popup covers every frame. A page carrying fifty empty frames costs nothing extra (measured: 510 ms against 3.2 s for a page with real text in it).
 - Write in your language and send in theirs: right-click inside a text box and Glossa translates what you have written, in place. The browser's own undo puts your text back.

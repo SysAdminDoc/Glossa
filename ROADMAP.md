@@ -4,14 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P1
 
-- [ ] G-06 — Chrome built-in Translator API as an optional second engine
-  Why: on Chrome 138+ and Edge 148+ the on-device Translator API needs no model download from a third party and covers a few languages Bergamot lacks. It must stay opt-in: the packs come from Google's component updater.
-  Evidence: research pass section 2; Linguist issue #611 asks for the same.
-  Research note 2026-09-10: the spec is `[Exposed=Window]`, so the API is not callable from the service worker at all; the offscreen document is a Window but running it there is undocumented (open question in RESEARCH.md), so host it in the popup or options page first. Hardware gate is 22 GB free disk and over 4 GB VRAM, desktop only. `@types/chrome` 0.2.9 has no typings; hand-write declarations. Do not add the expired `aiLanguageModelOriginTrial` permission.
-  Touches: src/engine/ (new engine interface with Bergamot and Chrome implementations), src/popup or src/options (hosts the API call, needs user activation for the first download), src/options
-  Acceptance: an "Engine" setting with Bergamot as default; choosing Chrome built-in translates a page with no request to the Mozilla hosts; Firefox hides the option.
-  Complexity: M
-
 - [ ] G-09 — Mirror the model catalog and files to the project's own release host
   Why: on Chromium browsers the model bytes come from a Mozilla bucket on Google Cloud Storage because the Remote Settings CDN refuses Chrome user agents (RESEARCH.md findings). Privacy-community users check the network tab, and the HN reaction to Firefox Translations hosting models on Google's infrastructure is the precedent. A self-hosted mirror also survives a catalog move (the v1 collection is already deprecated).
   Evidence: live 406 from `firefox-settings-attachments.cdn.mozilla.net` with a Chrome UA on 2026-09-10; HN thread 33792447.

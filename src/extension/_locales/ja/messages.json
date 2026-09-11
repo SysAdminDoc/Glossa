@@ -391,5 +391,38 @@
   },
   "optionsCatalogLoading": {
     "message": "カタログを読み込み中…"
+  },
+  "optionsEngineLabel": {
+    "message": "翻訳エンジン"
+  },
+  "optionsEngineBergamot": {
+    "message": "Bergamot（Glossa に同梱）"
+  },
+  "optionsEngineChrome": {
+    "message": "Chrome の組み込み翻訳"
+  },
+  "optionsEngineHint": {
+    "message": "どちらもこの端末上で動作します。Chrome の翻訳は言語パックを Chrome のアップデーター経由で Google から取得し、22 GB の空き容量が必要です。選択中は、ページを翻訳しても Mozilla のサーバーには何も送信されません。"
+  },
+  "popupChromeDownloadAndTranslate": {
+    "message": "言語パックをダウンロードして翻訳"
+  },
+  "popupChromeDownloading": {
+    "message": "Chrome の言語パックをダウンロード中: $1%"
+  },
+  "popupChromePackNeeded": {
+    "message": "初回のみ Chrome が $1 の言語パックをダウンロードします。"
+  },
+  "popupChromeReady": {
+    "message": "Chrome の言語パックの準備ができました。翻訳はこの端末上で行われます。"
+  },
+  "popupChromeNoPair": {
+    "message": "Chrome の組み込み翻訳には $1 から $2 へのパックがありません。"
+  },
+  "pageChromeNeedsDownload": {
+    "message": "先に Chrome の言語パックが必要です。このページで Glossa のポップアップを開き、ボタンを押してダウンロードしてください。"
+  },
+  "pageChromeUnavailable": {
+    "message": "このブラウザーでは Chrome の組み込み翻訳を利用できません。Glossa の設定でエンジンを Bergamot に戻してください。"
   }
 }

@@ -46,6 +46,9 @@ let engineSupported = true;
 let pageHost: string | null = null;
 let displayMode: DisplayMode = "bilingual";
 let busy = false;
+// The user chose Chrome's built-in translator and this browser has it. Its packs are downloaded
+// from here, because only a click on the extension's own page can start that download.
+let chromeEngine = false;
 
 // Set once the engine reports it cannot run here. Nothing else may write over that: a status line
 // saying "model ready" under a button saying "not supported on this computer" is a contradiction,
@@ -117,7 +120,8 @@ function render(): void {
   const target = targetSelect.value;
   actionButton.classList.remove("secondary");
 
-  grantRow.hidden = modelHostsGranted;
+  // Chrome's own packs do not come from Mozilla's hosts, so their permission does not matter then.
+  grantRow.hidden = modelHostsGranted || chromeEngine;
   if (!engineSupported) {
     actionButton.textContent = t("popupUnsupportedButton");
     actionButton.disabled = true;
@@ -128,7 +132,7 @@ function render(): void {
     actionButton.disabled = true;
     return;
   }
-  if (!modelHostsGranted && !page?.translated) {
+  if (!modelHostsGranted && !chromeEngine && !page?.translated) {
     actionButton.textContent = t("popupGrantFirst");
     actionButton.disabled = true;
     return;
@@ -165,7 +169,9 @@ function render(): void {
     return;
   }
   if (route && !route.installed) {
-    actionButton.textContent = t("popupDownloadAndTranslate", formatBytes(route.downloadBytes));
+    actionButton.textContent = chromeEngine
+      ? t("popupChromeDownloadAndTranslate")
+      : t("popupDownloadAndTranslate", formatBytes(route.downloadBytes));
     actionButton.disabled = busy;
     return;
   }
@@ -198,6 +204,17 @@ async function refreshRoute(): Promise<void> {
     return;
   }
   route = await sendUi<RouteStatus>({ type: "glossa:route-status", sourceLanguage: source, targetLanguage: target });
+  if (chromeEngine) {
+    if (route.hops === null) {
+      setStatus(t("popupChromeNoPair", languageName(source), languageName(target)), "warn");
+    } else if (!route.installed) {
+      setStatus(t("popupChromePackNeeded", `${languageName(source)} → ${languageName(target)}`));
+    } else {
+      setStatus(t("popupChromeReady"), "ok");
+    }
+    render();
+    return;
+  }
   if (route.catalogError && route.hops === null) {
     setStatus(t("popupCatalogUnavailable", route.catalogError ?? ""), "error");
   } else if (route.hops === null) {
@@ -252,6 +269,24 @@ async function loadPage(): Promise<void> {
   render();
 }
 
+// Chrome's pack for the pair, downloaded here with the click as the gesture Chrome asks for. The
+// translator made for it is thrown away: the offscreen document makes its own for the page, and
+// with the pack on disk it needs no gesture to do that.
+async function downloadChromePack(source: string, target: string): Promise<void> {
+  const translatorApi = self.Translator;
+  if (!translatorApi) throw new Error(t("pageChromeUnavailable"));
+  const translator = await translatorApi.create({
+    sourceLanguage: source,
+    targetLanguage: target,
+    monitor(monitor) {
+      monitor.addEventListener("downloadprogress", (event) => {
+        showProgress(event.loaded, t("popupChromeDownloading", String(Math.round(event.loaded * 100))));
+      });
+    }
+  });
+  translator.destroy();
+}
+
 async function onAction(): Promise<void> {
   if (tabId === null || busy) return;
   busy = true;
@@ -266,8 +301,17 @@ async function onAction(): Promise<void> {
     }
     const source = sourceSelect.value || undefined;
     const target = targetSelect.value;
+    // Chrome starts a pack download only inside a user gesture, and this click is the one there is,
+    // so the download begins before the first await while the click still counts.
+    const packSource = source ?? page?.detectedLanguage ?? null;
+    const packDownload = chromeEngine && route && !route.installed && packSource ? downloadChromePack(packSource, target) : null;
+    packDownload?.catch(() => undefined);
+    if (packDownload) showProgress(0, t("popupChromeDownloading", "0"));
     await saveSettings({ targetLanguage: target, displayMode });
-    if (route && !route.installed) {
+    if (packDownload) {
+      await packDownload;
+      showProgress(null, t("popupTranslating"));
+    } else if (route && !route.installed) {
       showProgress(0, t("popupStartingDownload"));
     } else {
       showProgress(null, t("popupTranslating"));
@@ -327,6 +371,7 @@ async function init(): Promise<void> {
 
   const settings = await loadSettings();
   setMode(settings.displayMode);
+  chromeEngine = settings.engine === "chrome" && typeof self.Translator?.create === "function";
 
   let codes = knownLanguageCodes();
   try {
@@ -335,8 +380,9 @@ async function init(): Promise<void> {
     if (!engineSupported) {
       setStatus(t("popupUnsupportedCpu"), "error", true);
     }
-    if (models.targets.length > 0) codes = Array.from(new Set([...models.sources, ...models.targets]));
-    if (models.catalogError && models.targets.length === 0) {
+    // Chrome's engine covers its own set of languages, which the Mozilla catalog knows nothing about.
+    if (models.targets.length > 0 && !chromeEngine) codes = Array.from(new Set([...models.sources, ...models.targets]));
+    if (models.catalogError && models.targets.length === 0 && !chromeEngine) {
       setStatus(t("popupCatalogUnavailable", models.catalogError ?? ""), "error");
     }
   } catch {

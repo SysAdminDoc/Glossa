@@ -391,5 +391,38 @@
   },
   "optionsCatalogLoading": {
     "message": "Chargement du catalogue…"
+  },
+  "optionsEngineLabel": {
+    "message": "Moteur de traduction"
+  },
+  "optionsEngineBergamot": {
+    "message": "Bergamot (fourni avec Glossa)"
+  },
+  "optionsEngineChrome": {
+    "message": "Traducteur intégré de Chrome"
+  },
+  "optionsEngineHint": {
+    "message": "Les deux fonctionnent sur cet appareil. Le traducteur de Chrome récupère ses packs de langue chez Google via le système de mise à jour de Chrome et demande 22 Go d'espace libre. Tant qu'il est sélectionné, traduire une page n'envoie rien aux serveurs de Mozilla."
+  },
+  "popupChromeDownloadAndTranslate": {
+    "message": "Télécharger le pack de langue et traduire"
+  },
+  "popupChromeDownloading": {
+    "message": "Téléchargement du pack de langue de Chrome : $1 %"
+  },
+  "popupChromePackNeeded": {
+    "message": "Chrome télécharge le pack de langue $1 la première fois."
+  },
+  "popupChromeReady": {
+    "message": "Le pack de langue de Chrome est prêt. La traduction se fait sur cet appareil."
+  },
+  "popupChromeNoPair": {
+    "message": "Le traducteur intégré de Chrome n'a pas de pack de $1 vers $2."
+  },
+  "pageChromeNeedsDownload": {
+    "message": "Chrome a d'abord besoin de son pack de langue. Ouvrez la fenêtre de Glossa sur cette page et cliquez sur le bouton pour le télécharger."
+  },
+  "pageChromeUnavailable": {
+    "message": "Le traducteur intégré de Chrome n'est pas disponible dans ce navigateur. Revenez à Bergamot dans les réglages de Glossa."
   }
 }

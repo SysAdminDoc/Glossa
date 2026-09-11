@@ -391,5 +391,38 @@
   },
   "optionsCatalogLoading": {
     "message": "正在加载目录…"
+  },
+  "optionsEngineLabel": {
+    "message": "翻译引擎"
+  },
+  "optionsEngineBergamot": {
+    "message": "Bergamot（随 Glossa 附带）"
+  },
+  "optionsEngineChrome": {
+    "message": "Chrome 内置翻译"
+  },
+  "optionsEngineHint": {
+    "message": "两者都在本设备上运行。Chrome 的翻译器通过 Chrome 自带的更新程序从 Google 获取语言包，并需要 22 GB 可用磁盘空间。选中它时，翻译网页不会向 Mozilla 的服务器发送任何内容。"
+  },
+  "popupChromeDownloadAndTranslate": {
+    "message": "下载语言包并翻译"
+  },
+  "popupChromeDownloading": {
+    "message": "正在下载 Chrome 语言包：$1%"
+  },
+  "popupChromePackNeeded": {
+    "message": "Chrome 首次使用时会下载 $1 语言包。"
+  },
+  "popupChromeReady": {
+    "message": "Chrome 语言包已就绪。翻译在本设备上进行。"
+  },
+  "popupChromeNoPair": {
+    "message": "Chrome 内置翻译没有从 $1 到 $2 的语言包。"
+  },
+  "pageChromeNeedsDownload": {
+    "message": "Chrome 需要先下载语言包。请在此页面打开 Glossa 弹出窗口，点击按钮下载。"
+  },
+  "pageChromeUnavailable": {
+    "message": "此浏览器不支持 Chrome 内置翻译。请在 Glossa 设置中将引擎改回 Bergamot。"
   }
 }

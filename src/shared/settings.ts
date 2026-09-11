@@ -3,6 +3,9 @@ import { t } from "./i18n.ts";
 
 export type DisplayMode = "bilingual" | "replace";
 export type SiteRule = "always" | "never";
+// Bergamot is bundled and works everywhere. Chrome's built-in Translator is Chrome 138+ on desktop
+// only, with packs from Google's component updater, so it is never the default.
+export type EngineChoice = "bergamot" | "chrome";
 
 export interface Settings {
   schemaVersion: 1;
@@ -27,6 +30,7 @@ export interface Settings {
   // Offer the catalog's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk).
   // Mozilla gates them to its nightly channel, so they are off by default here too.
   experimentalModels: boolean;
+  engine: EngineChoice;
 }
 
 export const SETTINGS_KEY = "settings";
@@ -44,7 +48,8 @@ export function defaultSettings(uiLanguage?: string): Settings {
     skipFormFields: true,
     catalogRefreshHours: 24,
     sourceLanguages: {},
-    experimentalModels: false
+    experimentalModels: false,
+    engine: "bergamot"
   };
 }
 
@@ -75,6 +80,7 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   if (typeof input.selectionPopup === "boolean") out.selectionPopup = input.selectionPopup;
   if (typeof input.skipFormFields === "boolean") out.skipFormFields = input.skipFormFields;
   if (typeof input.experimentalModels === "boolean") out.experimentalModels = input.experimentalModels;
+  if (input.engine === "bergamot" || input.engine === "chrome") out.engine = input.engine;
   if (typeof input.catalogRefreshHours === "number" && input.catalogRefreshHours >= 1) {
     out.catalogRefreshHours = Math.min(input.catalogRefreshHours, 24 * 30);
   }

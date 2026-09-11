@@ -185,8 +185,11 @@ export class ModelStore {
 
   // Serve the stored catalog when it is fresh enough; refresh it otherwise. A failed refresh
   // keeps the stale copy, so a machine that is offline still translates with what it has.
-  async getCatalog(options: { maxAgeMs: number; force?: boolean }): Promise<StoredCatalog | null> {
+  // `offline` serves whatever is stored, however old, and never fetches: Chrome's built-in engine
+  // lists languages from it, and that is not a reason to contact Mozilla.
+  async getCatalog(options: { maxAgeMs: number; force?: boolean; offline?: boolean }): Promise<StoredCatalog | null> {
     const stored = await this.readStoredCatalog();
+    if (options.offline) return stored;
     const age = stored ? Date.now() - stored.fetchedAt : Number.POSITIVE_INFINITY;
     if (stored && !options.force && age < options.maxAgeMs) {
       return stored;

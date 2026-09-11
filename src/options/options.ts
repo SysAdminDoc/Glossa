@@ -235,6 +235,16 @@ async function init(): Promise<void> {
   fillLanguages(target, knownLanguageCodes(), settings.targetLanguage);
   target.addEventListener("change", () => void persist({ targetLanguage: target.value }));
 
+  // Chrome's own translator is offered only where this page can see it (Chrome 138 or later, on a
+  // desktop), so Firefox never shows the choice. Someone who picked it keeps a way back, even if the
+  // browser has since lost the API.
+  if (typeof self.Translator?.create === "function" || settings.engine === "chrome") {
+    const engine = $<HTMLSelectElement>("engine");
+    $("engine-field").hidden = false;
+    engine.value = settings.engine;
+    engine.addEventListener("change", () => void persist({ engine: engine.value === "chrome" ? "chrome" : "bergamot" }));
+  }
+
   for (const button of document.querySelectorAll<HTMLButtonElement>(".segmented button")) {
     button.addEventListener("click", () => {
       void persist({ displayMode: button.dataset["mode"] as DisplayMode }).then(renderModes);

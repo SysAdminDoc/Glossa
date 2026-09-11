@@ -20,6 +20,7 @@ import { blockedReason, catalogMaxAgeMs, hostOf, loadSettings } from "../shared/
 import { languageName } from "../shared/languages.ts";
 import { t } from "../shared/i18n.ts";
 import { EngineHost } from "../engine/engine-host.ts";
+import { CHROME_NEEDS_DOWNLOAD, CHROME_UNAVAILABLE } from "../engine/chrome-translator.ts";
 
 // Background: routes messages between the content script, the UI pages, and the engine. On Chrome
 // this is a service worker and the engine sits in an offscreen document; on Firefox this is a
@@ -65,6 +66,8 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
     target: ENGINE_TARGET,
     experimental: settings.experimentalModels,
     catalogMaxAgeMs: catalogMaxAgeMs(settings),
+    // Firefox has no built-in Translator, whatever an imported settings blob says.
+    engine: settings.engine === "chrome" && hasOffscreenApi ? "chrome" : "bergamot",
     ...request
   } as EngineRequest;
   if (localEngine) {
@@ -214,8 +217,17 @@ async function translateFragments(request: TranslateRequest): Promise<TranslateR
     });
     return { ok: true, fragments: result.fragments, inferenceMs: result.inferenceMs };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    return { ok: false, error: engineErrorText(error) };
   }
+}
+
+// The offscreen document has no chrome.i18n, so Chrome's engine reports its two expected failures
+// as codes and they are worded here.
+function engineErrorText(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error);
+  if (text === CHROME_NEEDS_DOWNLOAD) return t("pageChromeNeedsDownload");
+  if (text === CHROME_UNAVAILABLE) return t("pageChromeUnavailable");
+  return text;
 }
 
 async function pageStatus(tabId: number): Promise<PageStatusResponse> {
@@ -337,7 +349,7 @@ api.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
     work = handleUiRequest(message as UiRequest);
   }
   work.then(sendResponse, (error: unknown) => {
-    sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    sendResponse({ ok: false, error: engineErrorText(error) });
   });
   return true;
 });
