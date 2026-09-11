@@ -204,6 +204,15 @@ try {
   }
   assert(!contact.includes("ejemplo. es"), `a protected literal was split: "${contact}"`);
 
+  // An address the page split across an inline tag travels as one placeholder with the tag inside.
+  const split = await page.$eval("#split glossa-translation", (block) => ({
+    text: block.textContent ?? "",
+    bold: block.querySelector("b")?.textContent ?? null
+  }));
+  console.info(`smoke: split address: ${split.text}`);
+  assert(split.text.includes("https://ejemplo.es/descargas"), `the split address did not survive translation: "${split.text}"`);
+  assert(split.bold === "es", `the <b> inside the split address was lost: ${JSON.stringify(split)}`);
+
   const shadow = await page.evaluate(() => {
     const root = document.getElementById("host")?.shadowRoot;
     const block = root?.querySelector("glossa-translation");

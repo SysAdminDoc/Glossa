@@ -18,7 +18,9 @@ export type Segment =
 
 // What a placeholder stands for: an inline element the page marked as untranslatable, or a run of
 // text inside a sentence (a URL, an address, a reference number) that has to come back unchanged.
-export type Hold = Element | Text;
+// What a placeholder stands for: an untranslatable element, a protected run inside one text node,
+// or a protected run the page split across inline tags, held as the fragment of nodes it touches.
+export type Hold = Element | Text | DocumentFragment;
 
 // Inline elements inside a unit that must survive untouched. Bergamot copies `code`, `kbd`,
 // `samp`, `var` and `math` through verbatim on its own; translate="no" and .notranslate are DOM
@@ -370,9 +372,101 @@ export function hasProtectedText(text: string): boolean {
   return PROTECTED_GATE.test(text);
 }
 
+// Elements that end a run of text for this purpose. A line break, an image or a form field sits
+// between two words; a <wbr>, <b> or <span> inside a url does not.
+const RUN_BREAK_TAGS = new Set(["BR", "HR", "IMG", "INPUT", "SELECT", "TEXTAREA", "BUTTON"]);
+
+// A url, address or number the page wrapped partly in an inline tag (`https://ejemplo.<b>es</b>`,
+// or a <wbr> for line breaking) is only visible in the unit's joined text: scanned one text node at
+// a time, the tail inside the tag reaches the engine as prose. Each such run becomes one placeholder
+// holding every node it touches, inline tags included, so the engine gets none of it and the tags
+// come back intact. A run inside a single text node is left to the per-node pass that follows.
+function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
+  const doc = clone.ownerDocument;
+  const pieces: Array<{ node: Text; start: number }> = [];
+  let flat = "";
+  const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (RUN_BREAK_TAGS.has((node as Element).tagName)) flat += "\n";
+      continue;
+    }
+    const text = node as Text;
+    // Already protected, by the engine or by a placeholder: a boundary no run may cross.
+    if (text.parentElement?.closest(`var, code, kbd, samp, math, ${HOLD_SELECTOR}`)) {
+      flat += "\n";
+      continue;
+    }
+    pieces.push({ node: text, start: flat.length });
+    flat += text.data;
+  }
+  if (pieces.length < 2 || !hasProtectedText(flat)) return;
+  const matches: Array<{ start: number; end: number }> = [];
+  PROTECTED_SCANNER.lastIndex = 0;
+  for (let match = PROTECTED_SCANNER.exec(flat); match; match = PROTECTED_SCANNER.exec(flat)) {
+    matches.push({ start: match.index, end: match.index + match[0].length });
+  }
+  // Last first: holding a run splits and moves only nodes after every run still to be handled.
+  for (const { start, end } of matches.reverse()) {
+    const first = locateInPieces(pieces, start, false);
+    const last = locateInPieces(pieces, end, true);
+    if (!first || !last || first.node === last.node) continue;
+    if (last.at < last.node.data.length) last.node.splitText(last.at);
+    const startNode = first.at > 0 ? first.node.splitText(first.at) : first.node;
+    const endNode = last.node;
+    // The run is held as whole children of the nearest element holding both of its ends.
+    const ancestors = new Set<Node>();
+    for (let node: Node | null = startNode; node; node = node.parentNode) ancestors.add(node);
+    let common: Node | null = endNode;
+    while (common && !ancestors.has(common)) common = common.parentNode;
+    if (!common) continue;
+    const childOf = (node: Node): Node => {
+      let current = node;
+      while (current.parentNode && current.parentNode !== common) current = current.parentNode;
+      return current;
+    };
+    const firstChild = childOf(startNode);
+    const lastChild = childOf(endNode);
+    const held: Node[] = [];
+    for (let node: Node | null = firstChild; node; node = node.nextSibling) {
+      held.push(node);
+      if (node === lastChild) break;
+    }
+    // A placeholder inside a hold would never be swapped back; leave such a run as it was.
+    const nestsHold = held.some(
+      (node) =>
+        node.nodeType === Node.ELEMENT_NODE &&
+        ((node as Element).matches(`var[${HOLD_ATTRIBUTE}]`) || (node as Element).querySelector(`var[${HOLD_ATTRIBUTE}]`))
+    );
+    if (nestsHold) continue;
+    const before = firstChild.previousSibling?.textContent ?? "";
+    const after = lastChild.nextSibling?.textContent ?? "";
+    const placeholder = doc.createElement("var");
+    placeholder.setAttribute(HOLD_ATTRIBUTE, String(holds.length));
+    placeholder.setAttribute(PAD_ATTRIBUTE, `${!before || SPACE.test(before.slice(-1)) ? "l" : ""}${!after || SPACE.test(after.charAt(0)) ? "r" : ""}`);
+    placeholder.textContent = held.map((node) => node.textContent ?? "").join("");
+    common.insertBefore(placeholder, firstChild);
+    const fragment = doc.createDocumentFragment();
+    fragment.append(...held);
+    holds.push(fragment);
+  }
+}
+
+// The text node holding a position of the joined text. An end position belongs to the node it
+// closes, a start position to the node it opens.
+function locateInPieces(pieces: Array<{ node: Text; start: number }>, offset: number, end: boolean): { node: Text; at: number } | null {
+  for (const piece of pieces) {
+    const from = piece.start;
+    const to = piece.start + piece.node.data.length;
+    if (end ? offset > from && offset <= to : offset >= from && offset < to) return { node: piece.node, at: offset - from };
+  }
+  return null;
+}
+
 // Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an
 // untranslatable element gets, and the exact original characters are kept to be put back.
 function protectText(clone: Element, holds: Hold[]): void {
+  protectRunsAcrossTags(clone, holds);
   const doc = clone.ownerDocument;
   const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];

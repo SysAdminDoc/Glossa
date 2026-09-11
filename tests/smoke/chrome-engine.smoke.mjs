@@ -146,6 +146,16 @@ try {
   }
   console.info(`smoke:chrome-engine: protected text kept ("${contact.trim().slice(0, 90)}")`);
 
+  // The same for an address the page split across an inline tag: it travels as one placeholder
+  // with the tag inside, and both have to come back.
+  const split = await page.$eval("#split glossa-translation", (node) => ({
+    text: node.textContent ?? "",
+    bold: node.querySelector("b")?.textContent ?? null
+  }));
+  assert(split.text.includes("https://ejemplo.es/descargas"), `the split address did not survive: "${split.text}"`);
+  assert(split.bold === "es", `the <b> inside the split address was lost: ${JSON.stringify(split)}`);
+  console.info(`smoke:chrome-engine: split address kept ("${split.text.trim()}")`);
+
   // With the pack on disk, a later translation needs no gesture: restore, then translate again from
   // the worker, which is how an "always" site and the context menu reach the engine.
   await popup.click("#action");

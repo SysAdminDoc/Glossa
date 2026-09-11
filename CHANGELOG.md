@@ -17,6 +17,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
 ### Fixed
+- A web address, email address or reference number that the page wraps partly in bold, a span or a line-break hint now comes back exactly as it was. Before, only the part before the tag was protected, and the rest went to the engine as ordinary text.
 - A language model that got damaged on disk is downloaded again the next time it's needed, instead of stopping the engine with no explanation. Glossa also asks the browser, once, to keep its storage when space runs low, so the models aren't cleared along with ordinary site data.
 - A form control inside a paragraph stays the page's own. Before, a text box, dropdown, search field or button in a translated paragraph was copied into the translation below it, as a second control that did nothing, and the words in a text box were sent to the engine even with "Never translate inside editable fields" on. The words around a control are still translated. A translation also no longer repeats any of the page's element ids.
 - A tooltip or label the page changes after translation is translated again in its new wording, and so is the tab title when a single-page site moves to another route. Showing the original leaves the page's latest values alone.

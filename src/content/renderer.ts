@@ -569,6 +569,9 @@ function parseFragment(html: string, holds: Hold[]): Node[] {
           for (const nested of element.querySelectorAll("[id]")) nested.removeAttribute("id");
         }
       }
+      // A run the page split across inline tags comes back as a fragment that keeps its numbers,
+      // so replace mode puts the page's own tags back, and mergeLiveElements turns a repeat into a
+      // plain copy the way it does for every element the engine repeats.
       placed.add(index);
       placeholder.replaceWith(copy);
     } else {

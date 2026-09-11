@@ -93,13 +93,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a manifest entry recorded under a different engine release is reported as not installed and re-downloaded; a unit test covers the mismatch.
   Complexity: S
 
-- [ ] P2 — G-49 — Protect a url or address that an inline tag splits in two
-  Why: protection works per text node, but the gate tests the whole unit, so `Visita https://ejemplo.<b>es/catalogo</b>` holds the first half and hands `es/catalogo` to the engine as prose. Pages wrap url tails in `<b>`, `<wbr>` or `<span>` for line breaking all the time.
-  Evidence: adversarial review 2026-09-10 (probe2 PROBE J); src/content/segmenter.ts `protectText` walks text nodes one at a time.
-  Touches: src/content/segmenter.ts (match across the unit's flattened text, or merge adjacent partial matches), tests/segmenter.test.ts
-  Acceptance: a url split across an inline tag comes back byte-identical, and the inline tag survives.
-  Complexity: M
-
 - [ ] P2 — G-50 — Keep a restore path for a unit the page re-renders in replace mode
   Why: when the page replaces the children of a unit translated in replace mode, the recorded original nodes no longer belong in the tree, so the record is dropped and "show original" can never bring that block's source text back. Bilingual mode is unaffected.
   Evidence: adversarial review 2026-09-10 (probe3 PROBE L); src/content/renderer.ts `reset` drops the record without restoring `originalChildren`.
