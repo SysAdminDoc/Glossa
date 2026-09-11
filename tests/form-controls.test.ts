@@ -168,6 +168,76 @@ test("an element the engine repeats in replace mode does not repeat the page's i
   assert.equal(window.document.querySelectorAll("#fuerte").length, 1, "the repeated element carried the page's id");
 });
 
+// Replace, then show the original: the page has to be exactly what it was, node for node, with
+// every field still where it was and still holding what the reader put in it.
+function replaceAndRestore(html: string, fieldId: string, touch: (field: HTMLElement) => void) {
+  load(html);
+  const field = byId(fieldId);
+  touch(field);
+  const original = byId("q").outerHTML;
+  const [unit] = units(window.document.body as unknown as Element);
+  assert.ok(unit, "the paragraph is not a unit");
+  const renderer = new Renderer();
+  renderer.apply(unit, unit.html.replace(/^(\s*)(\S+)/, "$1EN"), replace);
+  assert.match(byId("q").textContent ?? "", /^EN/, "replace mode did not run");
+  renderer.restoreAll();
+  assert.equal(byId(fieldId), field, "the field is not the page's own any more");
+  assert.equal(field.isConnected, true, "restoring took the field off the page");
+  assert.equal(byId("q").outerHTML, original, "the paragraph did not come back as it was");
+  return field;
+}
+
+test("a checkbox inside a label is back in its label, still ticked, after showing the original", () => {
+  const field = replaceAndRestore(
+    `<p id="q">Marca la casilla <label id="l">aquí mismo <input id="c" type="checkbox"></label> para aceptar las condiciones.</p>`,
+    "c",
+    (input) => {
+      (input as unknown as { checked: boolean }).checked = true;
+    }
+  );
+  assert.equal((field as unknown as { checked: boolean }).checked, true, "the tick was lost");
+  assert.equal(byId("l").contains(field), true);
+});
+
+test("a field inside a button, or inside a link inside a span, comes back where it was", () => {
+  replaceAndRestore(
+    `<p id="q">Pulsa <button id="btn" type="button">Aceptar <input id="n" type="number"></button> para seguir leyendo la página.</p>`,
+    "n",
+    () => undefined
+  );
+  const typed = replaceAndRestore(
+    `<p id="q">Hola <span id="s"><a id="a" href="#x">enlace <input id="t" type="text"></a></span> y adiós a todos.</p>`,
+    "t",
+    (input) => {
+      (input as unknown as { value: string }).value = "lo que escribí";
+    }
+  );
+  assert.equal((typed as unknown as { value: string }).value, "lo que escribí", "what was typed was lost");
+});
+
+test("a bold word inside a link is back inside the link after showing the original", () => {
+  load(`<p id="q">Una <a id="a" href="#x">casa <b id="b">muy</b> grande</a> junto al río.</p>`);
+  const original = byId("q").outerHTML;
+  const [unit] = units(window.document.body as unknown as Element);
+  assert.ok(unit);
+  const renderer = new Renderer();
+  renderer.apply(unit, unit.html.replace("Una", "A"), replace);
+  renderer.restoreAll();
+  assert.equal(byId("q").outerHTML, original);
+  assert.equal(byId("a").contains(byId("b")), true, "the bold word left the link");
+});
+
+test("a field slot the engine repeats in replace mode leaves one field, the page's own", () => {
+  load(`<p id="q">Elige una sala <select id="room"><option>Sala de lectura</option></select> para la visita de mañana.</p>`);
+  const live = byId("room");
+  const [unit] = units(window.document.body as unknown as Element);
+  assert.ok(unit);
+  const slot = /<select data-glossa-id="\d+"><\/select>/.exec(unit.html)?.[0] ?? "";
+  new Renderer().apply(unit, `Choose ${slot} a room ${slot} for tomorrow's visit.`, replace);
+  assert.equal(window.document.querySelectorAll("select").length, 1, "the repeated slot became a second select");
+  assert.equal(byId("room"), live);
+});
+
 test("a protected element the engine repeats in replace mode does not repeat the page's id", () => {
   const body = load(`<p id="b">Nuestro patrocinador es <span translate="no" id="brand">Café Aurora</span>, en la plaza mayor.</p>`);
   const [unit] = units(body);

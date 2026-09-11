@@ -433,6 +433,11 @@ function mergeLiveElements(
     if (id !== null) live.set(id, candidate);
   }
   if (live.size === 0) return { nodes, reused: [] };
+  // Every live element's children as they are now, before the walk below moves any of them. The
+  // walk goes deepest first, so a snapshot taken inside it would show a <label> already without the
+  // input moved out of it, and restoring from that would leave the input off the page.
+  const before = new Map<Element, Node[]>();
+  for (const element of live.values()) before.set(element, Array.from(element.childNodes));
   const reused: Array<{ element: Element; children: Node[] }> = [];
   const used = new Set<string>();
 
@@ -475,7 +480,7 @@ function mergeLiveElements(
         continue;
       }
       used.add(id);
-      reused.push({ element: original, children: Array.from(original.childNodes) });
+      reused.push({ element: original, children: before.get(original) ?? Array.from(original.childNodes) });
       original.replaceChildren(...Array.from(copy.childNodes));
       original.removeAttribute(ID_ATTRIBUTE);
       copy.replaceWith(original);
