@@ -28,6 +28,12 @@ export const MODEL_ORIGINS: readonly string[] = [
 // Firefox pins the model major version it can load. Bergamot 4.0 (the engine we vendor) reads 3.x.
 export const MODEL_MAJOR_VERSION = 3;
 
+// The major of the vendored engine's Remote Settings release (`remoteSettingsVersion` in
+// vendor/bergamot/engine.lock.json). Every installed model records the engine major and model
+// major it was installed under, and one from another major is downloaded again. A patch release
+// of the engine keeps its models. tests/manifest.test.ts keeps this in step with the lock file.
+export const ENGINE_MAJOR_VERSION = 4;
+
 export const PIVOT_LANGUAGE = "en";
 
 export type ModelFileType = "model" | "lex" | "vocab" | "srcvocab" | "trgvocab";

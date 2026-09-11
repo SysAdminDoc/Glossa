@@ -74,3 +74,13 @@ test("README and CHANGELOG carry the package version", async () => {
   assert.ok(readme.includes(`version-${pkg.version}-`), "README badge version is stale");
   assert.ok(changelog.includes(`## [${pkg.version}]`), "CHANGELOG has no entry for the current version");
 });
+
+test("the engine major in the source matches the pinned engine", async () => {
+  const lock = JSON.parse(await readFile(path.join(root, "vendor", "bergamot", "engine.lock.json"), "utf8")) as {
+    remoteSettingsVersion: string;
+  };
+  const { ENGINE_MAJOR_VERSION } = await import("../src/shared/catalog.ts");
+  // Installed models are checked against this number. Bumping the engine without it would load
+  // models an incompatible engine cannot read.
+  assert.equal(ENGINE_MAJOR_VERSION, Number(lock.remoteSettingsVersion.split(".")[0]));
+});

@@ -304,3 +304,47 @@ test("persistent storage is asked for once, when the first file is downloaded", 
     else Reflect.deleteProperty(globalThis, "navigator");
   }
 });
+
+// Rewrites the stored installed-pairs entry for es->en, the way an older build would have left it.
+function patchInstalledEntry(patch: Record<string, unknown>): void {
+  const meta = caches_.get("glossa-meta-v1");
+  const key = "https://store.glossa.invalid/meta/installedPairs";
+  const stored = meta?.store.get(key);
+  assert.ok(meta && stored, "nothing was installed");
+  const manifest = JSON.parse(new TextDecoder().decode(stored)) as Record<string, Record<string, unknown>>;
+  manifest["es->en"] = { ...manifest["es->en"], ...patch };
+  meta.store.set(key, new TextEncoder().encode(JSON.stringify(manifest)));
+}
+
+test("a model installed for another engine major is not installed for this one", async () => {
+  const store = freshStore();
+  await store.ensurePair(pair() as never, () => undefined);
+  assert.equal(await store.isPairInstalled(pair() as never), true);
+  patchInstalledEntry({ engineMajor: 5 });
+  assert.equal(await store.isPairInstalled(pair() as never), false, "a model from another engine counted as installed");
+  assert.deepEqual(await store.listInstalled(), [], "the options page would list it as usable");
+  patchInstalledEntry({ engineMajor: 4, modelMajor: 2 });
+  assert.equal(await store.isPairInstalled(pair() as never), false, "a model of another model major counted as installed");
+});
+
+test("a model installed before entries were stamped counts as this engine's", async () => {
+  const store = freshStore();
+  await store.ensurePair(pair() as never, () => undefined);
+  // JSON drops undefined, so this leaves the entry exactly as a build before the stamps wrote it.
+  patchInstalledEntry({ engineMajor: undefined, modelMajor: undefined });
+  assert.equal(await store.isPairInstalled(pair() as never), true);
+});
+
+test("replacing a pair's files drops the old ones and keeps what is still used", async () => {
+  const store = freshStore();
+  await store.ensurePair(pair() as never, () => undefined);
+  // The same pair with a newer model file: a new record id for the model, the same vocab.
+  const newer = pair();
+  newer.records.model = record("model", "m2");
+  plan = { calls: [] };
+  await store.ensurePair(newer as never, () => undefined);
+  const keys = [...(caches_.get("glossa-models-v1")?.store.keys() ?? [])];
+  assert.ok(!keys.some((entry) => entry.endsWith("/models/m1")), "the old model file stayed in the cache");
+  assert.ok(keys.some((entry) => entry.endsWith("/models/m2")), "the new model file was not cached");
+  assert.ok(keys.some((entry) => entry.endsWith("/models/v1")), "a file the pair still uses was deleted");
+});

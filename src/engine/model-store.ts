@@ -1,6 +1,8 @@
 import { api } from "../shared/api.ts";
 import {
   attachmentUrl,
+  ENGINE_MAJOR_VERSION,
+  MODEL_MAJOR_VERSION,
   MODEL_ORIGINS,
   MODEL_SOURCES,
   mirrorCatalogUrl,
@@ -110,6 +112,22 @@ interface StoredCatalog {
 
 interface InstalledManifestEntry extends InstalledPair {
   recordIds: string[];
+  // The model major and engine major the pair was installed under. Absent on entries written
+  // before these were recorded, which were all installed under LEGACY_STAMP.
+  modelMajor?: number;
+  engineMajor?: number;
+}
+
+// The only versions this store ever ran before entries were stamped.
+const LEGACY_STAMP = { modelMajor: 3, engineMajor: 4 };
+
+// A model from another model major or another engine major cannot be loaded by the engine that
+// ships now, so it counts as not installed and is downloaded again.
+function matchesRunningEngine(entry: InstalledManifestEntry): boolean {
+  return (
+    (entry.modelMajor ?? LEGACY_STAMP.modelMajor) === MODEL_MAJOR_VERSION &&
+    (entry.engineMajor ?? LEGACY_STAMP.engineMajor) === ENGINE_MAJOR_VERSION
+  );
 }
 
 interface SourceState {
@@ -290,7 +308,7 @@ export class ModelStore {
     const cache = await caches.open(CACHE_NAME);
     const result: InstalledPair[] = [];
     for (const entry of Object.values(manifest)) {
-      if (await this.entryIsComplete(cache, entry)) {
+      if (matchesRunningEngine(entry) && (await this.entryIsComplete(cache, entry))) {
         result.push({
           pairKey: entry.pairKey,
           sourceLanguage: entry.sourceLanguage,
@@ -307,7 +325,7 @@ export class ModelStore {
   async isPairInstalled(pair: PairFiles): Promise<boolean> {
     const manifest = await this.readManifest();
     const entry = manifest[pairKey(pair.sourceLanguage, pair.targetLanguage)];
-    if (!entry) return false;
+    if (!entry || !matchesRunningEngine(entry)) return false;
     const wanted = Object.values(pair.records).map((record) => record.id).sort();
     const have = [...entry.recordIds].sort();
     if (wanted.length !== have.length || wanted.some((id, index) => id !== have[index])) return false;
@@ -421,6 +439,13 @@ export class ModelStore {
     }
 
     const manifest = await this.readManifest();
+    // Files the pair's previous entry used and this one does not (a newer model, or one installed
+    // for another engine) would stay in the cache for good. Records are per direction in the
+    // catalog, and in a mirror built from it, so no other pair shares them.
+    const keep = new Set(records.map(([, record]) => record.id));
+    for (const id of manifest[key]?.recordIds ?? []) {
+      if (!keep.has(id)) await cache.delete(recordKey(id));
+    }
     manifest[key] = {
       pairKey: key,
       sourceLanguage: pair.sourceLanguage,
@@ -428,7 +453,9 @@ export class ModelStore {
       version: pair.version,
       bytes: records.reduce((sum, [, record]) => sum + (record.decompressedSize ?? record.attachment.size), 0),
       installedAt: Date.now(),
-      recordIds: records.map(([, record]) => record.id)
+      recordIds: records.map(([, record]) => record.id),
+      modelMajor: MODEL_MAJOR_VERSION,
+      engineMajor: ENGINE_MAJOR_VERSION
     };
     await writeMeta(INSTALLED_KEY, manifest);
     progress({ pairKey: key, phase: "done", file: null, loadedBytes: totalBytes, totalBytes });

@@ -17,6 +17,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - The README explains, for a store reviewer, what each permission is for, why the model files are data rather than remote code, and how to rebuild the package.
 
 ### Fixed
+- Each installed language remembers which engine it was installed for. When a future Glossa ships an engine that reads a new model format, languages installed for the old one download again instead of failing to load, and replacing a language's model no longer leaves the old files behind in storage.
 - The settings page's last English leftovers follow your language now: the "Saved" note, the download progress, the button that removes a language you read, and the hint under site rules. That hint also used to say "Always" needs access to every site, when it only asks for the one site you add.
 - Some sites rebuild a paragraph from what's on screen after Glossa translated it in place. Show original now still brings back the page's own text there, where before that paragraph stayed translated for good.
 - Showing the original after "In place of the original" puts every form field back exactly where it was, still holding what you typed or ticked. A checkbox inside a label, or a field inside a button or a link, used to be left off the page, and a bold word inside a link had the same problem.
