@@ -13,6 +13,16 @@
   <img alt="Engine" src="https://img.shields.io/badge/engine-Bergamot%20(MPL--2.0)-f9e2af" />
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/X8K126YVER">
+    <img height="42" src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" alt="Buy me a coffee on Ko-fi" />
+  </a>
+</p>
+
+<p align="center">
+  <sub><em>If this project helps you, a coffee helps me keep working on it.</em></sub>
+</p>
+
 Glossa is a browser extension that translates pages without sending the text anywhere. It runs the same neural translation engine that Firefox uses for its built-in translator, compiled to WebAssembly, inside your browser. Page text never leaves the machine.
 
 ## Why another translator
