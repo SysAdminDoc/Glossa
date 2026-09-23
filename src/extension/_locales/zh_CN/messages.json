@@ -484,5 +484,17 @@
   },
   "optionsIdleHint": {
     "message": "最后一次翻译后，引擎会在这段时间内把模型留在内存中，然后释放内存。时间越长，在页面之间切换时越不必重新加载。"
+  },
+  "qualityStandard": {
+    "message": "质量：标准"
+  },
+  "qualityLower": {
+    "message": "质量：此语言对偏低"
+  },
+  "qualityDetail": {
+    "message": "$1 在 Mozilla 的测试中得分 $2。Google 翻译在同一测试中得分 $3。"
+  },
+  "qualityDetailAlone": {
+    "message": "$1 在 Mozilla 的测试中得分 $2。"
   }
 }

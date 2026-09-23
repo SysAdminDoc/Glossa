@@ -89,11 +89,15 @@ only available to privileged browser code, and it can use threads. An extension 
 Glossa runs a single-threaded SIMD build. Expect a long article to take a few seconds rather than
 under one.
 
-**Quality.** These are Mozilla's models, and on Mozilla's own evaluation they average about 4 COMET22
-points below Google Translate across the 105 released pairs, and never come out ahead. Most pairs are
-close enough that you will not care. The weakest are English to Marathi, Hindi, Arabic, Telugu and
-Thai, and Marathi to English, where the gap is 7 to 9 points. Mozilla publishes the numbers at
-[mozilla.github.io/translations/final-evals](https://mozilla.github.io/translations/final-evals/).
+**Quality.** These are Mozilla's models. On Mozilla's own test set they score about 3 COMET22 points
+below Google Translate on average across the 113 released models (September 2026), and come out ahead
+on one, English to Urdu. Most pairs are close enough that you won't care. The furthest behind, at 4.5
+to 5.5 points, are Malayalam, Kannada, Telugu, Tamil, Lithuanian and Bengali into English, and English
+into Azerbaijani, Persian, Latvian, Korean and Thai. Before a language downloads, the popup and the
+settings page say whether its quality is standard or lower, with both scores in the tooltip.
+Mozilla publishes the numbers at
+[mozilla.github.io/translations/final-evals](https://mozilla.github.io/translations/final-evals/), and
+`node tools/quality-reference.mjs` refreshes the Google figures Glossa compares against.
 
 **Memory.** Each language model takes about 140 MB once it's loaded, most of it working space for the
 engine. On the Spanish test page the engine's memory reached 196 MB with one language loaded and 338 MB

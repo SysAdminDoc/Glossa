@@ -484,5 +484,17 @@
   },
   "optionsIdleHint": {
     "message": "Nach der letzten Übersetzung hält die Engine ihre Modelle so lange im Speicher und gibt ihn dann frei. Eine längere Zeit erspart das erneute Laden, wenn du zwischen Seiten wechselst."
+  },
+  "qualityStandard": {
+    "message": "Qualität: normal"
+  },
+  "qualityLower": {
+    "message": "Qualität: geringer bei diesem Sprachpaar"
+  },
+  "qualityDetail": {
+    "message": "$1 erreicht $2 im Test von Mozilla. Google Übersetzer erreicht im selben Test $3."
+  },
+  "qualityDetailAlone": {
+    "message": "$1 erreicht $2 im Test von Mozilla."
   }
 }

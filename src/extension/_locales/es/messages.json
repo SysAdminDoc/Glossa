@@ -484,5 +484,17 @@
   },
   "optionsIdleHint": {
     "message": "Tras la última traducción, el motor guarda sus modelos en memoria durante este tiempo y luego la libera. Un tiempo más largo evita cargarlos de nuevo al pasar de una página a otra."
+  },
+  "qualityStandard": {
+    "message": "Calidad: normal"
+  },
+  "qualityLower": {
+    "message": "Calidad: más baja en este par de idiomas"
+  },
+  "qualityDetail": {
+    "message": "$1 obtiene $2 en la prueba de Mozilla. Google Translate obtiene $3 en la misma prueba."
+  },
+  "qualityDetailAlone": {
+    "message": "$1 obtiene $2 en la prueba de Mozilla."
   }
 }

@@ -484,5 +484,17 @@
   },
   "optionsIdleHint": {
     "message": "Après la dernière traduction, le moteur garde ses modèles en mémoire pendant cette durée, puis la libère. Une durée plus longue évite de les recharger quand vous passez d'une page à l'autre."
+  },
+  "qualityStandard": {
+    "message": "Qualité : normale"
+  },
+  "qualityLower": {
+    "message": "Qualité : plus faible pour cette paire de langues"
+  },
+  "qualityDetail": {
+    "message": "$1 obtient $2 au test de Mozilla. Google Traduction obtient $3 au même test."
+  },
+  "qualityDetailAlone": {
+    "message": "$1 obtient $2 au test de Mozilla."
   }
 }

@@ -88,6 +88,7 @@ const sources = [
   "src/options/options.ts",
   "src/content/content.ts",
   "src/shared/settings.ts",
+  "src/shared/quality.ts",
   "src/extension/manifest.chrome.json",
   "src/extension/manifest.firefox.json"
 ];

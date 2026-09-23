@@ -92,6 +92,18 @@ try {
     shownBack === "plaza mayor\nbiblioteca municipal = Glossa Library\nmartes = TUESDAY\ndomingos = SUNDAYS",
     `the glossary box shows "${shownBack}"`
   );
+  // Picking a pair to download says how good it is, both halves of a route through English included.
+  await options.waitForFunction(() => document.querySelector("#install-to option[value='fr']") !== null, null, { timeout: 60_000 });
+  await options.selectOption("#install-from", "es");
+  await options.selectOption("#install-to", "fr");
+  await options.waitForFunction(() => document.getElementById("install-quality")?.hidden === false, null, { timeout: 30_000 });
+  const pairQuality = await options.$eval("#install-quality", (box) => ({ text: box.textContent ?? "", title: box.title }));
+  console.info(`smoke: options quality for es -> fr "${pairQuality.text}"`);
+  assert(/^Quality: /.test(pairQuality.text), `the options quality label reads "${pairQuality.text}"`);
+  assert(
+    /Spanish → English scores/.test(pairQuality.title) && /English → French scores/.test(pairQuality.title),
+    `the pivot's figures are missing a half: "${pairQuality.title}"`
+  );
   await options.close();
 
   const popup = await context.newPage();
@@ -118,6 +130,12 @@ try {
   }, null, { timeout: 60_000 });
   const label = await popup.$eval("#action", (button) => button.textContent);
   console.info(`smoke: action button reads "${label}"`);
+  // Before the download, a word on how good the pair is, with Mozilla's figures behind it.
+  await popup.waitForFunction(() => document.getElementById("quality")?.hidden === false, null, { timeout: 30_000 });
+  const quality = await popup.$eval("#quality", (box) => ({ text: box.textContent ?? "", title: box.title }));
+  console.info(`smoke: quality "${quality.text}" (${quality.title})`);
+  assert(/^Quality: /.test(quality.text), `the quality label reads "${quality.text}"`);
+  assert(/Spanish → English scores \d+\.\d on Mozilla's test set\. Google Translate scores \d+\.\d/.test(quality.title), `the quality figures read "${quality.title}"`);
 
   await popup.click("#action");
   // Closing the popup mid-download loses nothing: the download and the translation carry on in the

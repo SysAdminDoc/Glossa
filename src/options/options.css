@@ -34,7 +34,8 @@
     --accent-2: #4c3fc7;
     --on-accent: #ffffff;
     --ok: #2f8f4e;
-    --warn: #a56a00;
+    /* 5.4:1 on the light background; #a56a00 was 4.1:1, under AA for text this small. */
+    --warn: #8a5a00;
     --error: #c23b5e;
   }
 }
@@ -114,6 +115,11 @@ select, input[type="text"], textarea {
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
+}
+
+/* How the pair picked for download compares with an online translator; the figures are in the title. */
+.quality.lower {
+  color: var(--warn);
 }
 
 #glossary {

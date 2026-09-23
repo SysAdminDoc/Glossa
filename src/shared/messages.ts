@@ -1,3 +1,4 @@
+import type { HopQuality } from "./quality.ts";
 import type { DisplayMode } from "./settings.ts";
 
 // Every message carries a `type` prefixed with "glossa:" so unrelated extension traffic on the
@@ -166,6 +167,9 @@ export interface RouteStatus {
   downloadBytes: number;
   catalogAgeMs: number | null;
   catalogError: string | null;
+  // How each model on the route scores against Google Translate, for a route still to download.
+  // Absent when a score is not known (a mirror, Chrome's engine, offline).
+  quality?: HopQuality[];
 }
 
 export interface ModelsListResponse {

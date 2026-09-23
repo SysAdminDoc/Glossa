@@ -634,5 +634,21 @@
   "optionsIdleHint": {
     "message": "After the last translation the engine holds its models in memory this long, then gives the memory back. A longer time saves loading them again as you move between pages.",
     "description": "Hint under the keep-loaded setting"
+  },
+  "qualityStandard": {
+    "message": "Quality: standard",
+    "description": "Shown before a language model downloads, when it translates about as well as Mozilla's other models"
+  },
+  "qualityLower": {
+    "message": "Quality: lower for this language pair",
+    "description": "Shown before a language model downloads, when it trails online translators clearly more than usual"
+  },
+  "qualityDetail": {
+    "message": "$1 scores $2 on Mozilla's test set. Google Translate scores $3 on the same test.",
+    "description": "Tooltip; $1 is a language pair such as Spanish → English, $2 and $3 are scores such as 85.9"
+  },
+  "qualityDetailAlone": {
+    "message": "$1 scores $2 on Mozilla's test set.",
+    "description": "Tooltip; $1 is a language pair, $2 a score such as 85.9"
   }
 }

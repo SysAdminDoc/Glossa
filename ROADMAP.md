@@ -46,13 +46,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a measured comparison on at least three language pairs decides it; if a rewrite wins, it lands with tests, otherwise this item records why not.
   Complexity: S
 
-- [ ] P2 — G-41 — Show per-pair quality and size before download
-  Why: Bergamot trails Google by 4 COMET22 on average and by 7 to 9 on en-th, hi-en, en-ko, en-hi and en-lv; users on those pairs will blame the extension unless told first.
-  Evidence: Mozilla eval DB (`db/db.sqlite`, 105 Release pairs, means Bergamot 84.8 vs Google 88.8) and registry `metrics.flores200-plus.comet22` in `models.json`.
-  Touches: src/engine/model-store.ts (read the registry metrics already fetched for Chromium; fetch once for Firefox), src/popup/popup.ts and src/options/options.ts (a "quality: standard / lower" label with the COMET figure in a tooltip)
-  Acceptance: the popup shows the label for the detected pair before download; the ten weakest pairs from RESEARCH.md show "lower".
-  Complexity: S
-
 - [ ] P2 — G-53 — Handle a page that changes part of a unit translated in replace mode
   Why: G-50 covers a page that renders a replaced unit again from what it reads on screen (the record is kept and "show original" still works). A page that changes only part of such a unit, adding a node or editing one of its own inside the translated text, still gets the record dropped, and the mixed text (translation plus the page's change) is then sent to the engine as if it were source text. Restoring the originals first would throw the page's change away, so this needs a decision rather than a quick fix: keep the page's nodes and restore around them, or report the block as not restorable.
   Evidence: G-50 work 2026-09-10; `reset` in src/content/renderer.ts compares the unit's text with what was written and keeps the record only on an exact match.

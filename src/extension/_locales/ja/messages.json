@@ -484,5 +484,17 @@
   },
   "optionsIdleHint": {
     "message": "最後の翻訳のあと、エンジンはこの時間だけモデルをメモリに保持し、その後メモリを解放します。長くすると、ページを移動したときに読み込み直す手間が省けます。"
+  },
+  "qualityStandard": {
+    "message": "品質: 標準"
+  },
+  "qualityLower": {
+    "message": "品質: この言語の組み合わせでは低め"
+  },
+  "qualityDetail": {
+    "message": "$1 は Mozilla のテストで $2 です。同じテストで Google 翻訳は $3 です。"
+  },
+  "qualityDetailAlone": {
+    "message": "$1 は Mozilla のテストで $2 です。"
   }
 }

@@ -10,6 +10,7 @@ import type {
   ProgressEvent,
   RouteStatus
 } from "../shared/messages.ts";
+import { describeQuality } from "../shared/quality.ts";
 import { hostOf, loadSettings, saveSettings, type DisplayMode } from "../shared/settings.ts";
 import { sendUi } from "../shared/ui-client.ts";
 
@@ -206,10 +207,24 @@ async function checkModelHosts(): Promise<void> {
   }
 }
 
+// Before a download, how the pair's model compares with an online translator. Nothing once the
+// model is on disk, and nothing when no score is known (a mirror, Chrome's engine, offline).
+function renderQuality(): void {
+  const box = $<HTMLParagraphElement>("quality");
+  const hops = route && !route.installed ? route.quality : undefined;
+  box.hidden = !hops;
+  if (!hops) return;
+  const { label, detail, lower } = describeQuality(hops);
+  box.textContent = label;
+  box.title = detail;
+  box.classList.toggle("lower", lower);
+}
+
 async function refreshRoute(): Promise<void> {
   if (blocked) {
     // Nothing to ask the engine about: the user's settings already ruled this page out.
     route = null;
+    renderQuality();
     render();
     return;
   }
@@ -217,10 +232,12 @@ async function refreshRoute(): Promise<void> {
   const target = targetSelect.value;
   if (!source || !target || source === target) {
     route = null;
+    renderQuality();
     render();
     return;
   }
   route = await sendUi<RouteStatus>({ type: "glossa:route-status", sourceLanguage: source, targetLanguage: target });
+  renderQuality();
   if (chromeEngine) {
     if (route.hops === null) {
       setStatus(t("popupChromeNoPair", languageName(source), languageName(target)), "warn");

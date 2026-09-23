@@ -105,7 +105,8 @@ globals.fetch = async (url: string, init?: { signal?: AbortSignal; headers?: Rec
                 files: {
                   model: { path: "models/es-en/model.bin.gz", uncompressedHash: PLAIN_HASH },
                   vocab: { path: "models/es-en/vocab.bin.gz", uncompressedHash: PLAIN_HASH }
-                }
+                },
+                metrics: { "flores200-plus": { comet22: 0.8572 } }
               }
             ]
           }
@@ -347,4 +348,17 @@ test("replacing a pair's files drops the old ones and keeps what is still used",
   assert.ok(!keys.some((entry) => entry.endsWith("/models/m1")), "the old model file stayed in the cache");
   assert.ok(keys.some((entry) => entry.endsWith("/models/m2")), "the new model file was not cached");
   assert.ok(keys.some((entry) => entry.endsWith("/models/v1")), "a file the pair still uses was deleted");
+});
+
+test("the score shown before a download is the registry's for the exact model, and a mirror asks Mozilla nothing", async () => {
+  const store = freshStore();
+  assert.equal(await store.modelScore(pair() as never), 0.8572);
+  // Another model under the same pair (the catalog moved on, the registry did not) has no score.
+  const other = pair();
+  other.records.model = { ...other.records.model, decompressedHash: "0".repeat(64) };
+  assert.equal(await store.modelScore(other as never), null);
+  const mirrored = freshStore();
+  mirrored.setMirror("https://models.example.org/glossa/");
+  assert.equal(await mirrored.modelScore(pair() as never), null);
+  assert.deepEqual(plan.calls, [], "the store reached Mozilla's registry with a mirror set");
 });

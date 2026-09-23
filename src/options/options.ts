@@ -4,7 +4,8 @@ import { formatBytes } from "../shared/hash.ts";
 import { mirrorPermissionPattern, normalizeMirrorUrl } from "../shared/catalog.ts";
 import { formatGlossary, parseGlossary } from "../shared/glossary.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
-import type { ModelsListResponse, ProgressEvent } from "../shared/messages.ts";
+import type { ModelsListResponse, ProgressEvent, RouteStatus } from "../shared/messages.ts";
+import { describeQuality } from "../shared/quality.ts";
 import { ENGINE_IDLE_CHOICES, loadSettings, saveSettings, type DisplayMode, type Settings, type SiteRule } from "../shared/settings.ts";
 import { sendUi } from "../shared/ui-client.ts";
 
@@ -412,6 +413,32 @@ async function init(): Promise<void> {
     await refreshModels();
   });
 
+  // The pair picked for download, and how its model compares with an online translator. Asked
+  // when the reader picks a pair, never on opening the page: looking at the settings is no reason
+  // to fetch anything from Mozilla.
+  const installFrom = $<HTMLSelectElement>("install-from");
+  const installTo = $<HTMLSelectElement>("install-to");
+  const showInstallQuality = async (): Promise<void> => {
+    const box = $("install-quality");
+    const from = installFrom.value;
+    const to = installTo.value;
+    let hops: RouteStatus["quality"];
+    if (from && to && from !== to) {
+      const status = await sendUi<RouteStatus>({ type: "glossa:route-status", sourceLanguage: from, targetLanguage: to }).catch(() => null);
+      // Asked again while this one was out: the answer belongs to another pair.
+      if (installFrom.value !== from || installTo.value !== to) return;
+      hops = status && !status.installed ? status.quality : undefined;
+    }
+    box.hidden = !hops;
+    if (!hops) return;
+    const { label, detail, lower } = describeQuality(hops);
+    box.textContent = label;
+    box.title = detail;
+    box.classList.toggle("lower", lower);
+  };
+  installFrom.addEventListener("change", () => void showInstallQuality());
+  installTo.addEventListener("change", () => void showInstallQuality());
+
   $("install").addEventListener("click", async () => {
     const from = $<HTMLSelectElement>("install-from").value;
     const to = $<HTMLSelectElement>("install-to").value;
@@ -433,6 +460,7 @@ async function init(): Promise<void> {
       downloading = null;
       hideProgress();
       await refreshModels();
+      await showInstallQuality();
     }
   });
 

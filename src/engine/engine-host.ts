@@ -21,6 +21,7 @@ import {
 import { ModelStore, type PairBytes } from "./model-store.ts";
 import { ChromeEngine } from "./chrome-translator.ts";
 import { prepareForEngine, restoreEdges } from "./text-prep.ts";
+import { referenceScore, type HopQuality } from "../shared/quality.ts";
 import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot.worker.ts";
 
 // The engine host runs wherever a Worker can live long enough to keep a 40 MB model warm:
@@ -297,7 +298,22 @@ export class EngineHost {
         bytes: routeBytes([pair])
       });
     }
-    return { ...base, hops, installed: hops.every((hop) => hop.installed), downloadBytes };
+    const installed = hops.every((hop) => hop.installed);
+    // What the reader is about to download is worth a word on how good it is; once it is on disk,
+    // they have seen for themselves.
+    const quality = installed ? null : await this.routeQuality(route);
+    return { ...base, hops, installed, downloadBytes, ...(quality ? { quality } : {}) };
+  }
+
+  private async routeQuality(route: PairFiles[]): Promise<HopQuality[] | null> {
+    const hops: HopQuality[] = [];
+    for (const pair of route) {
+      const comet = await this.store.modelScore(pair);
+      if (comet === null) return null;
+      const key = pairKey(pair.sourceLanguage, pair.targetLanguage);
+      hops.push({ pairKey: key, comet, reference: referenceScore(key) });
+    }
+    return hops;
   }
 
   // With Chrome's engine selected the catalog is read from disk only, and the processor check does

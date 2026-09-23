@@ -145,6 +145,7 @@ interface GcsRegistryModel {
   sourceLanguage: string;
   targetLanguage: string;
   files: Record<string, GcsRegistryFile>;
+  metrics?: { "flores200-plus"?: { comet22?: number } };
 }
 
 interface GcsRegistry {
@@ -659,6 +660,23 @@ export class ModelStore {
       throw new Error(`Registry entry for ${pair.sourceLanguage}-${pair.targetLanguage} has no ${fileType} file (${record.name})`);
     }
     return `${registry.baseUrl.replace(/\/$/, "")}/${file.path}`;
+  }
+
+  // Mozilla's score for the model this pair would download (COMET22 on FLORES+), from its registry,
+  // matched by the model file's hash the way a download from the bucket is. Null when it cannot be
+  // had: with a mirror, which must not lead to Mozilla's hosts, offline, or for a model the registry
+  // does not list.
+  async modelScore(pair: PairFiles): Promise<number | null> {
+    const hash = pair.records.model?.decompressedHash;
+    if (this.mirror || !hash) return null;
+    try {
+      const registry = await this.getGcsRegistry();
+      const candidates = registry.models[`${pair.sourceLanguage}-${pair.targetLanguage}`] ?? [];
+      const score = candidates.find((candidate) => candidate.files["model"]?.uncompressedHash === hash)?.metrics?.["flores200-plus"]?.comet22;
+      return typeof score === "number" ? score : null;
+    } catch {
+      return null;
+    }
   }
 
   private async getGcsRegistry(): Promise<GcsRegistry> {
