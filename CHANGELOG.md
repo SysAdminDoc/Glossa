@@ -7,12 +7,12 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 ### Added
 - A glossary, under its own heading on the options page. A name or term on a line by itself comes through every translation exactly as written, and `term = translation` makes Glossa use your translation every time. It covers pages, tooltips, image descriptions, selections and text you translate in a text box, with either engine. Terms match with their exact capitals and as whole words, except in Chinese, Japanese, Thai and other languages written without spaces.
 - Before a language downloads, the popup says whether its quality is standard or lower, with Mozilla's score for that exact model and Google Translate's on the same test in the tooltip. About ten pairs read as lower today, the ones that trail Google by 4.5 points or more. The settings page says the same when you pick a pair to download.
-- A setting for how long the engine keeps languages in memory after the last translation: 15 seconds as before, or up to 15 minutes if you move between pages a lot.
+- On Chrome, a setting for how long the engine keeps languages in memory after the last translation: 15 seconds as before, or up to 15 minutes if you move between pages a lot. Firefox decides that itself, so it doesn't show the setting.
 
 ### Fixed
 - Warning text in the light theme is darker, so it's readable at the size the popup uses.
 - Pages that keep hiding and showing large parts of themselves no longer make Glossa look over every tooltip and label in there again each time. It now asks the browser for just the ones still to translate, which on a 2,000-element test feed cut the work on a repeat pass by more than 40 times.
-- Translating through English no longer loads the English model a second time. With Spanish pages translated into English, French and German in turn, the engine's memory peaked at 338 MB instead of 585 MB, and it now never holds more than two models.
+- Translating through English no longer loads the English model a second time. With Spanish pages translated into English, French and German in turn, the engine's memory peaked at 406 MB instead of 585 MB, and it now holds at most three models.
 - Text inside closed shadow roots gets translated now. Plenty of sites build widgets that way (sidebars, comment boxes, whole design systems), and the page itself can't see inside them, so Glossa used to skip them too.
 - Closing the popup while a language downloads no longer loses track of it. Open the popup again and the progress bar is back where the download is, and when the page finishes, the popup says so without another click.
 - With Chrome's translator, closing the popup before a new language pack finishes downloading no longer leaves the page untranslated. The download carries on, and the page is translated when the pack arrives.

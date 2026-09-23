@@ -34,8 +34,8 @@ for (const name of COUNTED) {
   };
 }
 
-// A feed of 100 posts, each with an avatar, a profile link, a timestamp, a message with a link, and
-// three icon buttons: about 2,000 elements, most of them carrying something a reader sees.
+// A feed of 100 posts, each with an avatar, a profile link, a timestamp, a message with a link, three
+// icon buttons and a small form: over 2,000 elements, most of them carrying something a reader sees.
 function feed(): Element {
   const post = (index: number) => `
     <article>
@@ -48,6 +48,8 @@ function feed(): Element {
         <button aria-label="Compartir la publicación"><i></i></button>
         <span><b></b><b></b><b></b></span>
       </div></footer>
+      <form><select name="dia"><option value="1">Lunes por la mañana</option><option value="2">Martes por la tarde</option></select>
+        <input type="text" name="q" value="hola"></form>
     </article>`;
   window.document.body.innerHTML = `<main id="feed">${Array.from({ length: 100 }, (_, index) => post(index)).join("")}</main>`;
   return window.document.getElementById("feed") as unknown as Element;
@@ -82,11 +84,10 @@ test("a second flush over a translated subtree asks under a tenth of what the fi
 
   // The page hides and shows the whole feed: the observer hands the wrapper back as a root.
   const second = attributePassCalls((attributes) => collectFromNodes([root], { ...options, attributes }));
-  assert.equal(
-    (second.segments as ReturnType<typeof collectFromNodes>).filter((segment) => segment.kind === "attribute").length,
-    0,
-    "a translated attribute was collected again"
-  );
+  const again = second.segments as ReturnType<typeof collectFromNodes>;
+  assert.equal(again.filter((segment) => segment.kind === "attribute").length, 0, "a translated attribute was collected again");
+  // An option's text, translated, must never go back to the engine as if it were the page's.
+  assert.equal(again.filter((segment) => segment.kind === "label").length, 0, "a translated option was collected again");
   console.info(`attribute pass over ${elements} elements: first flush ${first.calls} calls, second ${second.calls}`);
   assert.ok(second.calls * 10 < first.calls, `the second flush made ${second.calls} calls against ${first.calls} for the first`);
 });

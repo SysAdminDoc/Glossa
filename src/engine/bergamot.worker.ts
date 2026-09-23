@@ -28,12 +28,13 @@ const FILE_ALIGNMENTS: Record<ModelFileType, number> = {
 };
 
 // How many models stay resident. A route is one model, or two when it pivots through English, and
-// routes share models: es->en and es->en->fr hold three models between them only if nothing is
-// shared, two if it is. Each model costs about 170 MB of heap once loaded (its files plus Marian's
-// 128 MB workspace, the figure Firefox uses too), and the heap never shrinks, so two models is a
-// peak near 370 MB: one pivot route, or two direct ones. Measured on the fixture set with
-// `npm run smoke:memory` (README, Memory).
-const MAX_LOADED_MODELS = 2;
+// routes share models: es->en and es->en->fr hold two between them, not three. A model costs about
+// 140 MB of heap once loaded, most of it Marian's 128 MB workspace (the figure Firefox uses too),
+// and the heap never shrinks. Two was tried and thrashed: a Spanish page with a German quote,
+// translated into French, needs es->en, de->en and en->fr, and swapped a model on every change of
+// language (review 2026-09-23), as do two tabs on different pairs. Three holds a pivot route and
+// one more language beside it. Measured with `npm run smoke:memory` (README, Memory).
+const MAX_LOADED_MODELS = 3;
 
 export interface WorkerModelInput {
   sourceLanguage: string;
@@ -64,6 +65,9 @@ let service: InstanceType<BergamotModule["BlockingService"]> | null = null;
 // Models by language pair ("es->en"), and each loaded route as the pairs it runs through, in order.
 const models = new Map<string, LoadedModel>();
 const routes = new Map<string, string[]>();
+// Orders uses for eviction. A count, not the time: two uses in the same millisecond still have an
+// order, and the one used first is the one that goes.
+let clock = 0;
 
 workerSelf.importScripts("bergamot-translator.js");
 
@@ -156,18 +160,27 @@ function loadRoute(routeKey: string, inputs: WorkerModelInput[]): void {
   const missing = inputs.filter((input) => !models.has(modelKey(input)));
   // Room first, keeping whatever this route shares with what is loaded.
   evictFor(missing.length, new Set(keys));
-  for (const input of missing) {
-    const memory: BergamotAlignedMemory[] = [];
-    let model: BergamotTranslationModel;
-    try {
-      model = constructModel(engine, input, memory);
-    } catch (error) {
-      for (const block of memory) block.delete();
-      throw error;
+  const built: string[] = [];
+  try {
+    for (const input of missing) {
+      const memory: BergamotAlignedMemory[] = [];
+      let model: BergamotTranslationModel;
+      try {
+        model = constructModel(engine, input, memory);
+      } catch (error) {
+        for (const block of memory) block.delete();
+        throw error;
+      }
+      models.set(modelKey(input), { model, memory, lastUsed: ++clock });
+      built.push(modelKey(input));
     }
-    models.set(modelKey(input), { model, memory, lastUsed: Date.now() });
+  } catch (error) {
+    // A route that could not be finished leaves behind nothing that no route uses.
+    const inUse = new Set([...routes.values()].flat());
+    for (const key of built) if (!inUse.has(key)) dropModel(key);
+    throw error;
   }
-  const now = Date.now();
+  const now = ++clock;
   for (const key of keys) models.get(key)!.lastUsed = now;
   routes.set(routeKey, keys);
 }
@@ -280,7 +293,7 @@ function translate(routeKey: string, fragments: string[], html: boolean): { frag
     throw new Error(`Route ${routeKey} is not loaded`);
   }
   const loaded = route as LoadedModel[];
-  const now = Date.now();
+  const now = ++clock;
   for (const entry of loaded) entry.lastUsed = now;
 
   // Empty inputs crash the decoder; keep their slots and skip them.

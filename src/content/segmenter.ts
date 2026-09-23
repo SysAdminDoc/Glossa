@@ -95,20 +95,35 @@ const ARIA_TEXT_ATTRIBUTES = [
   "aria-rowindextext"
 ];
 
-const TRANSLATABLE_ATTRIBUTES: Array<{ attribute: string; applies: (element: Element) => boolean }> = [
-  { attribute: "title", applies: () => true },
-  { attribute: "alt", applies: (element) => ["AREA", "IMG", "IMAGE", "INPUT"].includes(element.tagName) },
-  { attribute: "placeholder", applies: (element) => ["INPUT", "TEXTAREA"].includes(element.tagName) },
+// `selector` says the same as `applies`, for the browser to find candidates with: an element it
+// matches that `applies` turns down would be asked about again on every pass.
+const TRANSLATABLE_ATTRIBUTES: Array<{ attribute: string; selector: string; applies: (element: Element) => boolean }> = [
+  { attribute: "title", selector: "[title]", applies: () => true },
+  {
+    attribute: "alt",
+    selector: "area[alt], img[alt], image[alt], input[alt]",
+    applies: (element) => ["AREA", "IMG", "IMAGE", "INPUT"].includes(element.tagName)
+  },
+  {
+    attribute: "placeholder",
+    selector: "input[placeholder], textarea[placeholder]",
+    applies: (element) => ["INPUT", "TEXTAREA"].includes(element.tagName)
+  },
   {
     // Only on a button that submits nothing. A submit button's value is both its label and the
     // value the form posts, and a server that branches on it would see a different answer.
     attribute: "value",
+    selector: 'input[type="button" i][value], input[type="reset" i][value]',
     applies: (element) =>
       element.tagName === "INPUT" && ["button", "reset"].includes((element.getAttribute("type") ?? "").toLowerCase())
   },
   // The visible label of a group of options, and of an option that carries one.
-  { attribute: "label", applies: (element) => element.tagName === "OPTGROUP" || element.tagName === "OPTION" },
-  ...ARIA_TEXT_ATTRIBUTES.map((attribute) => ({ attribute, applies: () => true }))
+  {
+    attribute: "label",
+    selector: "optgroup[label], option[label]",
+    applies: (element) => element.tagName === "OPTGROUP" || element.tagName === "OPTION"
+  },
+  ...ARIA_TEXT_ATTRIBUTES.map((attribute) => ({ attribute, selector: `[${attribute}]`, applies: () => true }))
 ];
 
 export interface SegmentOptions {
@@ -222,6 +237,8 @@ function collectReadableAttributes(root: Node, out: Segment[], options: SegmentO
     // A datalist option is a suggestion the browser inserts by value, so translating its text
     // changes what gets typed into the field rather than what the user reads.
     if (element.tagName === "OPTION" && element.closest("datalist")) continue;
+    // Here for an attribute of its own, its text already done.
+    if (element.hasAttribute(LABEL_MARKER)) continue;
     const label = (element.textContent ?? "").trim();
     if (!label || !LETTER.test(label)) continue;
     out.push({ kind: "label", element, text: label, lang: effectiveLang(element) });
@@ -253,7 +270,9 @@ export const MARKER_SELECTOR = [
 // An element with an attribute still to translate, or a label (an <option>, the <title>) not yet
 // done, as a selector. A done attribute carries its marker, which is how the browser leaves it out.
 const UNTRANSLATED_SELECTOR = [
-  ...new Set(TRANSLATABLE_ATTRIBUTES.map(({ attribute }) => `[${attribute}]:not([${attributeMarker(attribute)}])`)),
+  ...TRANSLATABLE_ATTRIBUTES.flatMap(({ attribute, selector }) =>
+    selector.split(",").map((part) => `${part.trim()}:not([${attributeMarker(attribute)}])`)
+  ),
   `option:not([${LABEL_MARKER}])`,
   `title:not([${LABEL_MARKER}])`
 ].join(", ");

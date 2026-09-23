@@ -20,6 +20,10 @@ let crashEveryWorker = false;
 // call to still be in flight when something else happens sets it.
 let answerDelayMs = 0;
 
+// Routes the next translate finds gone, and whether loads fail.
+const forgottenRoutes = new Set<string>();
+let failLoads = false;
+
 class FakeWorker {
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onerror: ((event: { message: string }) => void) | null = null;
@@ -37,6 +41,15 @@ class FakeWorker {
     const deliver = () => {
       if (message.type === "translate" && (this.crashOnTranslate || crashEveryWorker)) {
         this.onerror?.({ message: "simulated abort" });
+        return;
+      }
+      // A route the worker let go without the host being told: another load made room.
+      if (message.type === "translate" && forgottenRoutes.delete(message.routeKey ?? "")) {
+        this.onmessage?.({ data: { id: message.id, ok: false, error: `Error: Route ${message.routeKey} is not loaded` } });
+        return;
+      }
+      if (message.type === "load-route" && failLoads) {
+        this.onmessage?.({ data: { id: message.id, ok: false, error: "Error: Marian could not read the model" } });
         return;
       }
       const result =
@@ -277,4 +290,32 @@ test("a page translation reaches the engine cleaned and comes back with the page
   } finally {
     await host.shutdown();
   }
+});
+
+test("a batch whose route was let go under it loads the route again and is translated", async () => {
+  workers.length = 0;
+  const host = new EngineHost();
+  fakeStore(host as unknown as { store: Record<string, unknown> });
+  await host.translate("es", "en", ["Hola"]);
+  const loadsBefore = workers[0]!.seen.filter((message) => message.type === "load-route").length;
+  forgottenRoutes.add("es->en");
+  const result = (await host.translate("es", "en", ["Adiós"])) as { fragments: string[] };
+  assert.deepEqual(result.fragments, ["EN(Adiós)"]);
+  assert.equal(workers[0]!.seen.filter((message) => message.type === "load-route").length, loadsBefore + 1, "the route was not loaded again");
+  await host.shutdown();
+});
+
+test("a load that fails still reads back which routes the worker kept", async () => {
+  workers.length = 0;
+  const host = new EngineHost();
+  fakeStore(host as unknown as { store: Record<string, unknown> });
+  failLoads = true;
+  try {
+    await assert.rejects(host.translate("es", "en", ["Hola"]), /could not read/);
+  } finally {
+    failLoads = false;
+  }
+  const seen = workers[0]!.seen.map((message) => message.type);
+  assert.deepEqual(seen.slice(seen.indexOf("load-route")), ["load-route", "status"], "the host did not ask what the failed load left");
+  await host.shutdown();
 });

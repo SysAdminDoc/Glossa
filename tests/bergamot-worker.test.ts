@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 // The translation worker's bookkeeping, with Bergamot faked: which models are built, shared between
-// routes, and let go. Each real model costs about 170 MB of heap, so building one twice, or keeping
+// routes, and let go. Each real model costs about 140 MB of heap, so building one twice, or keeping
 // one nobody can use, is the defect this guards against.
 
 const built: string[] = [];
 const deleted: string[] = [];
 const posted = new Map<number, { ok: boolean; result?: unknown; error?: string }>();
+// Pairs whose model fails to build, the way a damaged file does.
+const unbuildable = new Set<string>();
 
 class FakeMemory {
   private readonly bytes: Uint8Array;
@@ -30,6 +32,7 @@ const fakeModule = {
     readonly source: string;
     readonly target: string;
     constructor(source: string, target: string) {
+      if (unbuildable.has(`${source}->${target}`)) throw new Error(`Marian could not read ${source}->${target}`);
       this.source = source;
       this.target = target;
       built.push(`${source}->${target}`);
@@ -114,20 +117,37 @@ test("a pivot route uses the model its direct route already loaded", async () =>
   assert.deepEqual(answer.fragments, ["fr[en[hola]]"]);
 });
 
-test("a third model evicts one the new route does not use, and every route that ran through it", async () => {
-  // The new route needs es->en, which is loaded, and en->de, which is not: en->fr has to make room.
+test("a third model fits beside a pivot route, and a fourth evicts the one used longest ago", async () => {
   await send({ type: "load-route", routeKey: "es->en|en->de", models: [model("es", "en"), model("en", "de")] });
   assert.deepEqual(built, ["es->en", "en->fr", "en->de"]);
+  assert.deepEqual(deleted, [], "a model was evicted with room for three");
+  // en->fr was last used by the pivot translation in the first test; everything else since.
+  await send({ type: "translate", routeKey: "es->en|en->de", fragments: ["hola"], html: false });
+  await send({ type: "load-route", routeKey: "it->en", models: [model("it", "en")] });
   assert.deepEqual(deleted, ["en->fr"]);
   const now = await status();
-  assert.deepEqual(now.models, ["es->en", "en->de"]);
-  assert.deepEqual(now.loaded, ["es->en", "es->en|en->de"], "a route through the evicted model was still listed");
+  assert.deepEqual(now.models, ["es->en", "en->de", "it->en"]);
+  assert.deepEqual(now.loaded, ["es->en", "es->en|en->de", "it->en"], "a route through the evicted model was still listed");
   await assert.rejects(send({ type: "translate", routeKey: "es->en|en->fr", fragments: ["hola"], html: false }), /not loaded/);
 });
 
+test("a route whose second model fails to build leaves no model behind that nothing uses", async () => {
+  unbuildable.add("en->pt");
+  await assert.rejects(send({ type: "load-route", routeKey: "de->en|en->pt", models: [model("de", "en"), model("en", "pt")] }), /could not read/);
+  const now = await status();
+  assert.ok(!now.models.includes("de->en"), `de->en was left loaded with no route: ${JSON.stringify(now.models)}`);
+  for (const route of now.loaded) {
+    for (const key of route.split("|")) assert.ok(now.models.includes(key), `${route} is listed but ${key} is gone`);
+  }
+  unbuildable.clear();
+});
+
 test("unloading a route lets go of the models no other route uses", async () => {
+  await send({ type: "load-route", routeKey: "es->en", models: [model("es", "en")] });
+  await send({ type: "load-route", routeKey: "es->en|en->de", models: [model("es", "en"), model("en", "de")] });
   await send({ type: "unload-route", routeKey: "es->en|en->de" });
-  assert.deepEqual(deleted, ["en->fr", "en->de"], "en->de outlived its only route, or es->en went with it");
-  assert.deepEqual((await status()).models, ["es->en"]);
+  const after = await status();
+  assert.ok(!after.models.includes("en->de"), "en->de outlived its only route");
+  assert.ok(after.models.includes("es->en"), "es->en went although its own route still uses it");
   assert.deepEqual(((await send({ type: "translate", routeKey: "es->en", fragments: ["hola", " "], html: false })) as { fragments: string[] }).fragments, ["en[hola]", ""]);
 });

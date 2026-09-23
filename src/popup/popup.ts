@@ -300,6 +300,7 @@ async function loadPage(): Promise<void> {
     }
     if (!blocked) setStatus(t("popupInvite"));
   }
+  renderQuality();
   render();
 }
 
@@ -384,30 +385,23 @@ async function onAction(): Promise<void> {
     }
     const source = sourceSelect.value || undefined;
     const target = targetSelect.value;
-    // Chrome starts a pack download only inside a user gesture, and this click is the one there is,
-    // so the download begins before the first await while the click still counts.
+    // Chrome starts a pack download only inside a user gesture, and this click is the one there is.
+    // The engine's own document takes the download on with it first: that one outlives the popup.
+    // Only if it cannot does the popup download the pack itself, still inside the few seconds a
+    // click counts for, and then the page waits for it here, as a translation handed over early
+    // would find neither the pack nor a click. One download either way: two for the same pack, one
+    // of them dropped when the popup closed, is the case that stalled in the smoke.
     const packSource = source ?? page?.detectedLanguage ?? null;
     const packNeeded = chromeEngine && route && !route.installed && packSource;
-    const pack = packNeeded ? downloadChromePack(packSource, target) : null;
-    const claim = packNeeded ? claimChromePack(packSource, target) : null;
-    // Kept for the status line: a download that fails says why better than the page's "needs a
-    // download" that follows from it.
-    let packFailure: unknown = null;
-    pack?.then(
-      () => {
-        if (busy) showProgress(null, t("popupTranslating"));
-      },
-      (error: unknown) => {
-        packFailure = error;
-      }
-    );
-    if (pack) showPackProgress(0);
+    if (packNeeded) showPackProgress(0);
+    const claimed = packNeeded ? await claimChromePack(packSource, target) : false;
+    const pack = packNeeded && !claimed ? downloadChromePack(packSource, target) : null;
     await saveSettings({ targetLanguage: target, displayMode });
     if (pack) {
-      // With the download in the engine's document the page goes over now, and its translation
-      // waits there for the pack. Without it, the pack is the popup's alone and the page waits for
-      // it here, as a translation handed over early would find neither the pack nor a click.
-      if (!(await claim)) await pack;
+      await pack;
+      showProgress(null, t("popupTranslating"));
+    } else if (packNeeded) {
+      // The engine's document reports the download as it goes; the bar follows its reports.
     } else if (route && !route.installed) {
       showProgress(0, t("popupStartingDownload"));
     } else {
@@ -422,9 +416,7 @@ async function onAction(): Promise<void> {
     });
     if (result) page = result;
     hideProgress();
-    if (packFailure && !page?.translated) {
-      setStatus(packFailure instanceof Error ? packFailure.message : String(packFailure), "error");
-    } else if (page?.lastError) {
+    if (page?.lastError) {
       setStatus(page.lastError, "error");
     } else if (page?.translated) {
       showTranslated(page);
@@ -489,6 +481,8 @@ function rereadSoon(): void {
   if (rereadTimer !== null) window.clearTimeout(rereadTimer);
   rereadTimer = window.setTimeout(() => {
     rereadTimer = null;
+    // A click since then drives the page itself, and reports what it did.
+    if (busy) return;
     loadPage().then(
       () => {
         if (page?.translating) showProgress(null, t("popupTranslating"));

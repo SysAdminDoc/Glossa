@@ -210,11 +210,21 @@ export class EngineHost {
     // recover as the first.
     const run = this.queue.then(async () => {
       let restarts = 0;
+      let reloaded = false;
       for (;;) {
         const workerBefore = this.worker;
         try {
           const routeKey = await this.ensureRoute(sourceLanguage, targetLanguage, environment);
-          return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
+          try {
+            return await this.call({ type: "translate", id: 0, routeKey, fragments, html: true });
+          } catch (error) {
+            // The worker let a model of this route go after it was checked: the settings page's
+            // Download made room for its own pair. The route is loaded again, once.
+            if (reloaded || !/is not loaded/.test(error instanceof Error ? error.message : String(error))) throw error;
+            reloaded = true;
+            this.loadedRoutes.delete(routeKey);
+            continue;
+          }
         } catch (error) {
           // Only a worker that actually died is worth restarting for. A missing model or an
           // unsupported processor fails the same way however many times it is asked.
@@ -387,12 +397,13 @@ export class EngineHost {
         files
       });
     }
-    await this.call({ type: "load-route", id: 0, routeKey, models }, transfer);
-    // The worker evicts the least recently used route when it is full; mirror that bookkeeping
-    // loosely by trusting its reported list.
-    const status = (await this.call({ type: "status", id: 0 })) as { loaded: string[] };
-    this.loadedRoutes.clear();
-    for (const key of status.loaded) this.loadedRoutes.add(key);
+    try {
+      await this.call({ type: "load-route", id: 0, routeKey, models }, transfer);
+    } finally {
+      // The worker makes room before it builds, so a load that failed can still have let other
+      // routes go. Its own list is the truth either way.
+      await this.syncLoadedRoutes();
+    }
     for (const pair of route) {
       this.broadcast({
         pairKey: pairKey(pair.sourceLanguage, pair.targetLanguage),
@@ -403,6 +414,16 @@ export class EngineHost {
       });
     }
     return routeKey;
+  }
+
+  private async syncLoadedRoutes(): Promise<void> {
+    this.loadedRoutes.clear();
+    try {
+      const status = (await this.call({ type: "status", id: 0 })) as { loaded: string[] };
+      for (const key of status.loaded) this.loadedRoutes.add(key);
+    } catch {
+      // No worker to ask: nothing counts as loaded, and the next request loads what it needs.
+    }
   }
 
   private ensureWorker(): Promise<void> {

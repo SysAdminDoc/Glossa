@@ -1,4 +1,4 @@
-import { api } from "../shared/api.ts";
+import { api, hasOffscreenApi } from "../shared/api.ts";
 import { localize, t } from "../shared/i18n.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { mirrorPermissionPattern, normalizeMirrorUrl } from "../shared/catalog.ts";
@@ -284,7 +284,11 @@ async function init(): Promise<void> {
   });
   renderNever();
 
-  // The browser words the durations, in the interface language and with its own plurals.
+  // The browser words the durations, in the interface language and with its own plurals. Firefox
+  // runs the engine in an event page it suspends about 30 seconds after the last event, whatever
+  // this says, so the choice is Chrome's alone.
+  $("engine-idle-field").hidden = !hasOffscreenApi;
+  $("engine-idle-hint").hidden = !hasOffscreenApi;
   const idle = $<HTMLSelectElement>("engine-idle");
   for (const seconds of ENGINE_IDLE_CHOICES) {
     const option = document.createElement("option");

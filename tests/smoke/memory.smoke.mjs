@@ -1,7 +1,8 @@
 // Memory smoke: how big the engine's heap gets on the fixture set, and whether the engine lets it go
 // when idle. The fixture is translated into English (one model), then French and German, which both
-// pivot through English (two models each), so the third route has to evict one. After each, the
-// worker reports its WebAssembly heap, which grows and never shrinks: the last reading is the peak.
+// pivot through English and share its English model, so the three routes hold three models, the
+// most the worker keeps. After each, the worker reports its WebAssembly heap, which grows and never
+// shrinks: the last reading is the peak.
 // Then the idle timer: the engine's document must be gone after the default 15 seconds, and still
 // there after 20 when the setting says a minute. Downloads three pairs (about 70 MB) on a fresh
 // profile. Run with `npm run smoke:memory`.
@@ -16,7 +17,7 @@ const extensionPath = path.join(root, "dist", "chrome-smoke");
 const profileDir = path.join(root, ".tmp", "memory-smoke-profile");
 const fixtureDir = path.join(root, "tests", "fixtures");
 // The heap may not pass this. Set from the measured peak with headroom (see README, Memory).
-const HEAP_CEILING_MB = Number(process.env.GLOSSA_HEAP_CEILING_MB ?? 400);
+const HEAP_CEILING_MB = Number(process.env.GLOSSA_HEAP_CEILING_MB ?? 480);
 
 function assert(condition, message) {
   if (!condition) throw new Error(`smoke:memory: ${message}`);
@@ -94,14 +95,17 @@ try {
     const state = await send({ type: "glossa:translate-page", tabId, targetLanguage: target, sourceLanguage: "es" });
     assert(state?.translated === true && !state.lastError, `es -> ${target} failed: ${JSON.stringify(state)}`);
     const ping = await inOffscreen(`glossaEngineHost.handle({ target: "glossa-engine", type: "ping" })`);
-    const loaded = await inOffscreen(`glossaEngineHost.call({ type: "status", id: 0 }).then((status) => status.loaded)`);
+    const { loaded, models } = await inOffscreen(`glossaEngineHost.call({ type: "status", id: 0 }).then(({ loaded, models }) => ({ loaded, models }))`);
     assert(ping && ping.heapBytes > 0, `the engine reported no heap: ${JSON.stringify(ping)}`);
-    readings.push({ target, heapMb: mb(ping.heapBytes), loaded, seconds: Math.round((Date.now() - started) / 1000) });
-    console.info(`smoke:memory: es -> ${target}: heap ${mb(ping.heapBytes)} MB, routes loaded ${JSON.stringify(loaded)} (${readings.at(-1).seconds} s)`);
+    readings.push({ target, heapMb: mb(ping.heapBytes), loaded, models, seconds: Math.round((Date.now() - started) / 1000) });
+    console.info(`smoke:memory: es -> ${target}: heap ${mb(ping.heapBytes)} MB, models ${JSON.stringify(models)}, routes ${JSON.stringify(loaded)} (${readings.at(-1).seconds} s)`);
   }
   const peak = Math.max(...readings.map((reading) => reading.heapMb));
   assert(peak <= HEAP_CEILING_MB, `the heap reached ${peak} MB, over the ${HEAP_CEILING_MB} MB ceiling`);
-  assert(readings.at(-1).loaded.length <= 2, `more routes stayed loaded than the limit: ${JSON.stringify(readings.at(-1).loaded)}`);
+  assert(readings.at(-1).models.length <= 3, `more models stayed loaded than the limit: ${JSON.stringify(readings.at(-1).models)}`);
+  // Three routes in three models is only possible with es->en shared between them; each loaded on
+  // its own would take five, and the cap would have evicted routes.
+  assert(readings.at(-1).loaded.length === 3, `the routes did not all fit, so the models were not shared: ${JSON.stringify(readings.at(-1).loaded)}`);
 
   // The idle timer, at the default: nothing is asked for 17 seconds, and the document is gone.
   await page.waitForTimeout(17_000);
