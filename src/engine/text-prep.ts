@@ -7,6 +7,11 @@
 //   space between them, so two Japanese, Chinese or Korean sentences go through as one;
 // - leading and trailing whitespace confuses the model, and whatever it does with it, the page's own
 //   spacing around a block has to come back byte for byte.
+//
+// Curly quotes and apostrophes are left as the page wrote them. Making them straight was measured on
+// FLORES-200 (tools/compare-quotes.mjs, 2026-09-23): it changed 36 to 69 percent of the translations
+// but moved chrF by +0.02 (French, 209 sentences), +0.32 (German, 68) and -0.08 (Polish, 79) into
+// English, which is noise, and it would hand back straight quotes where the page had its own.
 
 const SOFT_HYPHEN = /­/g;
 const WHITESPACE = /\s/;
