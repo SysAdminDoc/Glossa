@@ -146,6 +146,23 @@ export class EngineHost {
         const catalog = await this.store.getCatalog({ maxAgeMs: 0, force: true });
         return { fetchedAt: catalog?.fetchedAt ?? null, error: this.store.catalogError };
       }
+      case "chrome-pack": {
+        const key = `${request.sourceLanguage}->${request.targetLanguage}`;
+        const download = this.chrome.claimPack(request.sourceLanguage, request.targetLanguage, (fraction) =>
+          this.broadcast({ pairKey: key, phase: "pack", file: null, loadedBytes: fraction, totalBytes: 1 })
+        );
+        if (!download) return { claimed: false };
+        // This document owns the download now and stays open until it is over, whether or not the
+        // page's first batch has arrived to keep it busy.
+        this.busy++;
+        void download
+          .catch(() => undefined)
+          .finally(() => {
+            this.busy--;
+            this.keepAlive();
+          });
+        return { claimed: true };
+      }
     }
   }
 

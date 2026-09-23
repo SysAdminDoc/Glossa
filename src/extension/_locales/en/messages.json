@@ -544,6 +544,10 @@
     "message": "Downloading Chrome's language pack: $1%",
     "description": "Popup progress; $1 is a percentage number"
   },
+  "popupChromePackArriving": {
+    "message": "Chrome is downloading the language pack. The page is translated when it arrives.",
+    "description": "Popup progress, shown when the popup is opened again while a pack started earlier is still downloading"
+  },
   "popupChromePackNeeded": {
     "message": "Chrome downloads the $1 language pack the first time.",
     "description": "Popup status; $1 is a language pair such as Spanish → English"

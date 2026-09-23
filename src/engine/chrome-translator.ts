@@ -1,5 +1,5 @@
 import type { RouteStatus } from "../shared/messages.ts";
-import type { TranslatorConstructor, TranslatorInstance } from "../shared/translator.d.ts";
+import type { TranslatorConstructor, TranslatorCreateOptions, TranslatorInstance } from "../shared/translator.d.ts";
 
 // Chrome's on-device Translator (Chrome 138+) as a second engine, opted into from the settings.
 // It runs in the offscreen document next to Bergamot: that is a Window on the extension's own origin,
@@ -7,9 +7,9 @@ import type { TranslatorConstructor, TranslatorInstance } from "../shared/transl
 // origin, which keeps reporting "downloadable" after the pack is on disk and refuses create()
 // without a gesture in the page itself.
 //
-// The first download of a pack needs a user gesture on the extension's origin, so the popup starts
-// it from the Translate click. Everything after that (the page, a selection, a field, an "always"
-// site) goes through here with no gesture at all. Nothing in this path talks to Mozilla's hosts:
+// The first download of a pack needs a user gesture on the extension's origin, so it starts from the
+// popup's Translate click, both in the popup and here (claimPack). Everything after that (the page,
+// a selection, a field, an "always" site) goes through here with no gesture at all. Nothing in this path talks to Mozilla's hosts:
 // the packs come from Chrome's own component updater.
 
 // Error texts the background turns into localised messages. The offscreen document has no
@@ -37,6 +37,19 @@ export class ChromeEngine {
   // One translator per pair, shared by every request for it. A failed create is not kept: the next
   // request tries again, which is what makes "download it from the popup, then retry" work.
   private readonly translators = new Map<string, Promise<TranslatorInstance>>();
+
+  // Start the pack download here, in the document that outlives the popup. Without it, a popup
+  // closed mid-download leaves this document with a pack it cannot open: create() refuses without a
+  // click while the pack is not ready, and Chrome answers "downloadable" here for the whole download,
+  // never "downloading", so a pack on its way looks like one nobody asked for (Chrome 153, probed
+  // 2026-09-23). A message from the popup brings its click here for a few seconds, and a create()
+  // started with it keeps downloading after the popup is gone. Returns the download, or null when
+  // this document has no click to start it with.
+  claimPack(sourceLanguage: string, targetLanguage: string, progress: (fraction: number) => void): Promise<TranslatorInstance> | null {
+    const activation = (globalThis as { navigator?: { userActivation?: { isActive?: boolean } } }).navigator?.userActivation;
+    if (!activation?.isActive) return null;
+    return this.translator(sourceLanguage, targetLanguage, progress);
+  }
 
   async routeStatus(sourceLanguage: string, targetLanguage: string): Promise<RouteStatus> {
     const base: RouteStatus = {
@@ -92,13 +105,23 @@ export class ChromeEngine {
     };
   }
 
-  private translator(sourceLanguage: string, targetLanguage: string): Promise<TranslatorInstance> {
+  // A translation that asks while a claimed download is running gets that download's translator,
+  // which is how the page waits for the pack.
+  private translator(
+    sourceLanguage: string,
+    targetLanguage: string,
+    progress?: (fraction: number) => void
+  ): Promise<TranslatorInstance> {
     const key = `${sourceLanguage}->${targetLanguage}`;
     const known = this.translators.get(key);
     if (known) return known;
     const api = translatorApi();
     if (!api) return Promise.reject(new Error(CHROME_UNAVAILABLE));
-    const created = api.create({ sourceLanguage, targetLanguage }).catch((error: unknown) => {
+    const options: TranslatorCreateOptions = { sourceLanguage, targetLanguage };
+    if (progress) {
+      options.monitor = (monitor) => monitor.addEventListener("downloadprogress", (event) => progress(event.loaded));
+    }
+    const created = api.create(options).catch((error: unknown) => {
       this.translators.delete(key);
       const name = (error as { name?: unknown } | null)?.name;
       // The pack is not on disk yet, and only a gesture can start the download.

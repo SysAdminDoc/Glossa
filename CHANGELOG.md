@@ -2,6 +2,12 @@
 
 All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Fixed
+- Closing the popup while a language downloads no longer loses track of it. Open the popup again and the progress bar is back where the download is, and when the page finishes, the popup says so without another click.
+- With Chrome's translator, closing the popup before a new language pack finishes downloading no longer leaves the page untranslated. The download carries on, and the page is translated when the pack arrives.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added

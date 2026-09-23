@@ -121,6 +121,14 @@ export interface RouteStatusRequest {
   sourceLanguage: string;
   targetLanguage: string;
 }
+// Sent from the popup straight after the Translate click: the engine's own document starts Chrome's
+// pack download with that click, so the download and the page's translation outlive the popup.
+// Answered with `{ claimed }`, false when the click did not reach that document.
+export interface ChromePackRequest {
+  type: "glossa:chrome-pack";
+  sourceLanguage: string;
+  targetLanguage: string;
+}
 
 export type UiRequest =
   | PageStatusRequest
@@ -135,7 +143,8 @@ export type UiRequest =
   | ModelsDownloadsRequest
   | ModelsResetSourceRequest
   | CatalogRefreshRequest
-  | RouteStatusRequest;
+  | RouteStatusRequest
+  | ChromePackRequest;
 
 // ---- background <-> engine host ----
 
@@ -198,6 +207,7 @@ export type EngineRequest =
   | (EngineEnvelope & { type: "models-cancel"; pairKey: string })
   | (EngineEnvelope & { type: "models-reset-source" })
   | (EngineEnvelope & { type: "catalog-refresh" })
+  | (EngineEnvelope & { type: "chrome-pack"; sourceLanguage: string; targetLanguage: string })
   | (EngineEnvelope & { type: "ping" });
 
 // Omit does not distribute over a union; this one does.
@@ -213,7 +223,9 @@ export interface ProgressEvent {
   target: typeof UI_TARGET;
   type: "glossa:progress";
   pairKey: string;
-  phase: "download" | "verify" | "decompress" | "store" | "load" | "done" | "error";
+  // "pack" is Chrome's own language pack, whose size Chrome does not give: loadedBytes over
+  // totalBytes is the fraction done.
+  phase: "download" | "verify" | "decompress" | "store" | "load" | "done" | "error" | "pack";
   file: string | null;
   loadedBytes: number;
   totalBytes: number;

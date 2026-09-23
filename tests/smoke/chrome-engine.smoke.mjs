@@ -109,7 +109,7 @@ try {
   const tabId = await worker.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id ?? null, `http://127.0.0.1:${port}/es.html`);
   assert(tabId, "fixture tab not found by the service worker");
 
-  const popup = await context.newPage();
+  let popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
   const downloadLabel = english.popupChromeDownloadAndTranslate.message;
   await popup.waitForFunction((label) => document.getElementById("action")?.textContent === label, downloadLabel, {
@@ -119,15 +119,40 @@ try {
   assert(/Spanish → English/.test(status ?? ""), `the popup did not name the pack it will download: "${status}"`);
   console.info(`smoke:chrome-engine: popup offers "${downloadLabel}" (${status})`);
 
-  // A real click: the gesture Chrome requires before it downloads a pack.
+  // A real click: the gesture Chrome requires before it downloads a pack. The popup hands the page
+  // over once the download is under way, and is closed right then, the way a reader clicks away:
+  // the translation must not depend on it staying open.
   await popup.click("#action");
+  await page.waitForFunction(() => document.querySelector("[data-glossa-unit='pending']") !== null, null, { timeout: 120_000 });
+  // Its requests are read now, for the no-Mozilla check at the end; its timeline goes with it. So is
+  // how far the pack had got: the offscreen document cannot say, Chrome reports "downloadable" there
+  // until the pack is on disk.
+  const closing = await popup.evaluate(() => ({
+    fetches: performance.getEntriesByType("resource").map((entry) => entry.name),
+    progress: document.getElementById("progress-text")?.textContent ?? ""
+  }));
+  const closedPopupFetches = closing.fetches;
+  await popup.close();
+  // The handoff comes as soon as the engine's document has taken the download on, so the pack is
+  // still coming. A popup that held the page until the pack arrived fails here.
+  const percent = /language pack: (\d+)/.exec(closing.progress)?.[1];
+  assert(
+    percent !== undefined && Number(percent) < 100,
+    `the page was handed over only after the download ("${closing.progress}")`
+  );
+  console.info(`smoke:chrome-engine: popup closed with the pack at ${percent}%`);
+  // Polled on a timer: once the popup's tab is closed, headless Chrome stops running the default
+  // requestAnimationFrame polling on this page, and the wait never looks again (2026-09-23).
   await page.waitForFunction(
     () => Array.from(document.querySelectorAll("glossa-translation")).some((node) => /library/i.test(node.textContent ?? "")),
     null,
-    { timeout: 300_000 }
+    { timeout: 300_000, polling: 500 }
   );
   const sample = await page.$eval("glossa-translation", (node) => node.textContent);
   console.info(`smoke:chrome-engine: page translated through Chrome's engine ("${sample}")`);
+  // Opened again, the popup reads the finished page back.
+  popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
   await popup.waitForFunction(() => /Show original/.test(document.getElementById("action")?.textContent ?? ""), null, {
     timeout: 60_000
   });
@@ -176,7 +201,8 @@ try {
   const offending = [
     ...seen.map((url) => ["page", url]),
     ...offscreenFetches.map((url) => ["offscreen", url]),
-    ...popupFetches.map((url) => ["popup", url])
+    ...popupFetches.map((url) => ["popup", url]),
+    ...closedPopupFetches.map((url) => ["first popup", url])
   ].filter(([, url]) => {
     try {
       return MOZILLA.test(new URL(url).hostname) || MOZILLA.test(url);
@@ -189,7 +215,7 @@ try {
     `requests reached Mozilla's hosts: ${offending.map(([where, url]) => `${where} ${url}`).join(", ")}`
   );
   console.info(
-    `smoke:chrome-engine: no request to Mozilla (${seen.length} page requests, ${offscreenFetches.length} offscreen, ${popupFetches.length} popup)`
+    `smoke:chrome-engine: no request to Mozilla (${seen.length} page requests, ${offscreenFetches.length} offscreen, ${popupFetches.length + closedPopupFetches.length} popup)`
   );
   console.info(`smoke:chrome-engine: passed in ${Math.round((Date.now() - started) / 1000)} s`);
 } finally {

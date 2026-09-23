@@ -105,10 +105,34 @@ try {
   console.info(`smoke: action button reads "${label}"`);
 
   await popup.click("#action");
+  // Closing the popup mid-download loses nothing: the download and the translation carry on in the
+  // background, and the popup opened again shows the live bar, then the result, with no click.
+  await popup.waitForFunction(() => /^Downloading /.test(document.getElementById("progress-text")?.textContent ?? ""), null, {
+    timeout: 60_000
+  });
+  await popup.reload();
+  // A broadcast can put the bar up before the popup has read the page back, so wait for the button.
+  await popup.waitForFunction(
+    () => ["Translating…", "Show original"].includes(document.getElementById("action")?.textContent ?? ""),
+    null,
+    { timeout: 60_000 }
+  );
+  const reopened = await popup.evaluate(() => ({
+    hidden: document.getElementById("progress")?.hidden ?? true,
+    text: document.getElementById("progress-text")?.textContent ?? "",
+    button: document.getElementById("action")?.textContent ?? ""
+  }));
+  console.info(`smoke: popup reopened mid-download shows "${reopened.text}" (button "${reopened.button}")`);
+  assert(
+    !reopened.hidden && reopened.button === "Translating…" && /^(Downloading|Verifying|Loading|Translat)/.test(reopened.text),
+    `the reopened popup lost the running download: ${JSON.stringify(reopened)}`
+  );
   await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Show original", null, {
     timeout: 240_000
   });
   const status = await popup.$eval("#status", (element) => element.textContent);
+  assert(/^Translated \d+ blocks/.test(status ?? ""), `the reopened popup did not report the finished page: "${status}"`);
+  assert(await popup.$eval("#progress", (box) => box.hidden), "the progress bar stayed up after the page was translated");
   console.info(`smoke: popup status "${status}"`);
 
   // The intro paragraph must carry a bilingual block in English, and the original must survive.

@@ -323,6 +323,8 @@ async function handleUiRequest(request: UiRequest): Promise<unknown> {
       return engineCall({ type: "catalog-refresh" });
     case "glossa:route-status":
       return engineCall({ type: "route-status", sourceLanguage: request.sourceLanguage, targetLanguage: request.targetLanguage });
+    case "glossa:chrome-pack":
+      return engineCall({ type: "chrome-pack", sourceLanguage: request.sourceLanguage, targetLanguage: request.targetLanguage });
   }
 }
 

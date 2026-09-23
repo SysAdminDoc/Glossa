@@ -410,6 +410,9 @@
   "popupChromeDownloading": {
     "message": "Sprachpaket von Chrome wird geladen: $1 %"
   },
+  "popupChromePackArriving": {
+    "message": "Chrome lädt das Sprachpaket herunter. Die Seite wird übersetzt, sobald es da ist."
+  },
   "popupChromePackNeeded": {
     "message": "Chrome lädt das Sprachpaket $1 beim ersten Mal herunter."
   },

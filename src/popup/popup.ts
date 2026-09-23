@@ -296,12 +296,61 @@ async function downloadChromePack(source: string, target: string): Promise<void>
     sourceLanguage: source,
     targetLanguage: target,
     monitor(monitor) {
-      monitor.addEventListener("downloadprogress", (event) => {
-        showProgress(event.loaded, t("popupChromeDownloading", String(Math.round(event.loaded * 100))));
-      });
+      monitor.addEventListener("downloadprogress", (event) => showPackProgress(event.loaded));
     }
   });
   translator.destroy();
+}
+
+function showPackProgress(fraction: number): void {
+  showProgress(fraction, t("popupChromeDownloading", String(Math.round(fraction * 100))));
+}
+
+// Asks the engine's own document to start the same download with this click, so the download and the
+// page's translation carry on if the popup closes (ChromeEngine.claimPack says why the popup's own
+// download is not enough). A message sent from here carries the click to the extension pages that
+// receive it, for a few seconds. That document closes when idle, and one the first message had to
+// start received it without the click, so a refusal is asked once more.
+async function claimChromePack(source: string, target: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const answer = await sendUi<{ claimed?: boolean }>({ type: "glossa:chrome-pack", sourceLanguage: source, targetLanguage: target });
+      if (answer?.claimed) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+// A download or a translation started from an earlier popup carries on without it. Opening the
+// popup again picks up where that one left off: the live bar now, the result when the page reports it.
+async function resumeProgress(): Promise<void> {
+  if (!page?.translating) return;
+  if (chromeEngine) {
+    // Chrome tells only the document that started a download how far along it is. The engine's
+    // document passes that on as it comes, so the bar fills in from the next report.
+    if (route && !route.installed) showProgress(null, t("popupChromePackArriving"));
+    else showProgress(null, t("popupTranslating"));
+    return;
+  }
+  const hops = new Set(route?.hops?.map((hop) => hop.pairKey) ?? []);
+  const { downloads } = await sendUi<{ downloads: Array<{ pairKey: string; loadedBytes: number; totalBytes: number }> }>({
+    type: "glossa:models:downloads"
+  });
+  const download = downloads.find((entry) => hops.has(entry.pairKey));
+  if (download) {
+    showDownload(download.pairKey, download.loadedBytes, download.totalBytes);
+  } else if (page.blocksTotal > 0) {
+    showProgress(page.blocksDone / page.blocksTotal, t("popupTranslatingProgress", String(page.blocksDone), String(page.blocksTotal)));
+  } else {
+    showProgress(null, t("popupTranslating"));
+  }
+}
+
+function showDownload(key: string, loadedBytes: number, totalBytes: number): void {
+  const fraction = totalBytes > 0 ? loadedBytes / totalBytes : null;
+  showProgress(fraction, t("popupDownloading", key, formatBytes(loadedBytes), formatBytes(totalBytes)));
 }
 
 async function onAction(): Promise<void> {
@@ -321,13 +370,27 @@ async function onAction(): Promise<void> {
     // Chrome starts a pack download only inside a user gesture, and this click is the one there is,
     // so the download begins before the first await while the click still counts.
     const packSource = source ?? page?.detectedLanguage ?? null;
-    const packDownload = chromeEngine && route && !route.installed && packSource ? downloadChromePack(packSource, target) : null;
-    packDownload?.catch(() => undefined);
-    if (packDownload) showProgress(0, t("popupChromeDownloading", "0"));
+    const packNeeded = chromeEngine && route && !route.installed && packSource;
+    const pack = packNeeded ? downloadChromePack(packSource, target) : null;
+    const claim = packNeeded ? claimChromePack(packSource, target) : null;
+    // Kept for the status line: a download that fails says why better than the page's "needs a
+    // download" that follows from it.
+    let packFailure: unknown = null;
+    pack?.then(
+      () => {
+        if (busy) showProgress(null, t("popupTranslating"));
+      },
+      (error: unknown) => {
+        packFailure = error;
+      }
+    );
+    if (pack) showPackProgress(0);
     await saveSettings({ targetLanguage: target, displayMode });
-    if (packDownload) {
-      await packDownload;
-      showProgress(null, t("popupTranslating"));
+    if (pack) {
+      // With the download in the engine's document the page goes over now, and its translation
+      // waits there for the pack. Without it, the pack is the popup's alone and the page waits for
+      // it here, as a translation handed over early would find neither the pack nor a click.
+      if (!(await claim)) await pack;
     } else if (route && !route.installed) {
       showProgress(0, t("popupStartingDownload"));
     } else {
@@ -342,7 +405,9 @@ async function onAction(): Promise<void> {
     });
     if (result) page = result;
     hideProgress();
-    if (page?.lastError) {
+    if (packFailure && !page?.translated) {
+      setStatus(packFailure instanceof Error ? packFailure.message : String(packFailure), "error");
+    } else if (page?.lastError) {
       setStatus(page.lastError, "error");
     } else if (page?.translated) {
       showTranslated(page);
@@ -357,28 +422,39 @@ async function onAction(): Promise<void> {
   }
 }
 
-api.runtime.onMessage.addListener((message: unknown) => {
+api.runtime.onMessage.addListener((message: unknown, sender) => {
   const event = message as ProgressEvent;
-  if (!event || event.type !== "glossa:progress") return;
-  if (event.phase === "download") {
-    const fraction = event.totalBytes > 0 ? event.loadedBytes / event.totalBytes : null;
-    showProgress(fraction, t("popupDownloading", event.pairKey, formatBytes(event.loadedBytes), formatBytes(event.totalBytes)));
-  } else if (event.phase === "store" || event.phase === "verify" || event.phase === "decompress") {
-    showProgress(null, t("popupVerifying", event.file ?? event.pairKey));
-  } else if (event.phase === "load") {
-    showProgress(null, t("popupLoadingEngine", event.pairKey));
-  } else if (event.phase === "error") {
-    hideProgress();
-    setStatus(event.error ?? t("popupDownloadFailed"), "error");
+  if (event?.type === "glossa:progress") {
+    if (event.phase === "download") {
+      showDownload(event.pairKey, event.loadedBytes, event.totalBytes);
+    } else if (event.phase === "pack") {
+      showPackProgress(event.totalBytes > 0 ? event.loadedBytes / event.totalBytes : 0);
+    } else if (event.phase === "store" || event.phase === "verify" || event.phase === "decompress") {
+      showProgress(null, t("popupVerifying", event.file ?? event.pairKey));
+    } else if (event.phase === "load") {
+      showProgress(null, t("popupLoadingEngine", event.pairKey));
+    } else if (event.phase === "error") {
+      hideProgress();
+      setStatus(event.error ?? t("popupDownloadFailed"), "error");
+    }
+    return;
   }
   const state = message as { type?: string; state?: PageState };
-  if (state.type === "glossa:page-state" && state.state) {
-    page = state.state;
-    if (page.translating && page.blocksTotal > 0) {
-      showProgress(page.blocksDone / page.blocksTotal, t("popupTranslatingProgress", String(page.blocksDone), String(page.blocksTotal)));
-    }
-    render();
+  // Every content script in every tab reports here. Only the top frame of the tab this popup acts on
+  // is the page it shows; the other frames are in the count the background merges.
+  if (state?.type !== "glossa:page-state" || !state.state) return;
+  if (sender.tab?.id !== tabId || (sender.frameId ?? 0) !== 0) return;
+  const wasTranslating = page?.translating === true;
+  page = state.state;
+  if (page.translating && page.blocksTotal > 0) {
+    showProgress(page.blocksDone / page.blocksTotal, t("popupTranslatingProgress", String(page.blocksDone), String(page.blocksTotal)));
+  } else if (wasTranslating && !page.translating && !busy) {
+    // A translation this popup did not start (an earlier popup's, or an "always" site's) has ended.
+    // The click handler reports its own; this one is read back whole, every frame counted.
+    hideProgress();
+    void loadPage().catch(() => undefined);
   }
+  render();
 });
 
 async function init(): Promise<void> {
@@ -441,6 +517,7 @@ async function init(): Promise<void> {
     await checkModelHosts();
     await loadPage();
     await refreshRoute();
+    await resumeProgress();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), "error");
   }

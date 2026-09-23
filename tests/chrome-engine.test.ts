@@ -16,12 +16,17 @@ globals.Worker = class {
     throw new Error("the Bergamot worker must not start in Chrome mode");
   }
 };
+// What the engine broadcasts to any open popup.
+const broadcasts: Array<Record<string, unknown>> = [];
 globals.chrome = {
   storage: { local: {} },
   i18n: { getUILanguage: () => "en-US", getMessage: () => "" },
   runtime: {
     getURL: (path: string) => `chrome-extension://test/${path}`,
-    sendMessage: () => Promise.resolve(undefined)
+    sendMessage: (message: Record<string, unknown>) => {
+      broadcasts.push(message);
+      return Promise.resolve(undefined);
+    }
   }
 };
 globals.__GLOSSA_HAS_OFFSCREEN__ = true;
@@ -30,6 +35,11 @@ globals.__GLOSSA_HAS_OFFSCREEN__ = true;
 const availability = new Map<string, string>();
 const created: string[] = [];
 let destroyed = 0;
+// Whether the document holds the user's click, which a message from the clicked popup brings to it.
+let clicked = false;
+Object.defineProperty(globalThis.navigator, "userActivation", { configurable: true, get: () => ({ isActive: clicked }) });
+// Pack downloads a click started, which the test finishes or fails.
+const downloads = new Map<string, { finish: () => void; fail: (error: Error) => void }>();
 
 function refusal(name: string, message: string): Error {
   const error = new Error(message);
@@ -37,16 +47,33 @@ function refusal(name: string, message: string): Error {
   return error;
 }
 
+type Monitor = (monitor: EventTarget) => void;
+
 globals.Translator = {
   availability: async ({ sourceLanguage, targetLanguage }: { sourceLanguage: string; targetLanguage: string }) =>
     availability.get(`${sourceLanguage}->${targetLanguage}`) ?? "unavailable",
-  create: async ({ sourceLanguage, targetLanguage }: { sourceLanguage: string; targetLanguage: string }) => {
+  create: async ({ sourceLanguage, targetLanguage, monitor }: { sourceLanguage: string; targetLanguage: string; monitor?: Monitor }) => {
     const key = `${sourceLanguage}->${targetLanguage}`;
     created.push(key);
     const state = availability.get(key) ?? "unavailable";
     if (state === "unavailable") throw refusal("NotSupportedError", "Unable to create translator for the given source and target language.");
-    // What Chrome does without a gesture when the pack is not on disk yet.
-    if (state !== "available") throw refusal("NotAllowedError", 'Requires a user gesture when availability is "downloadable".');
+    if (state !== "available") {
+      // What Chrome does without a gesture when the pack is not on disk yet.
+      if (!clicked) throw refusal("NotAllowedError", 'Requires a user gesture when availability is "downloading" or "downloadable".');
+      // With one it downloads the pack, and the translator arrives with it.
+      const events = new EventTarget();
+      monitor?.(events);
+      await new Promise<void>((resolve, reject) => {
+        downloads.set(key, {
+          finish: () => {
+            events.dispatchEvent(Object.assign(new Event("downloadprogress"), { loaded: 1 }));
+            availability.set(key, "available");
+            resolve();
+          },
+          fail: reject
+        });
+      });
+    }
     return {
       sourceLanguage,
       targetLanguage,
@@ -91,6 +118,9 @@ function reset(): void {
   availability.clear();
   created.length = 0;
   destroyed = 0;
+  clicked = false;
+  downloads.clear();
+  broadcasts.length = 0;
 }
 
 test("route status follows Chrome's availability and never needs the catalog", async () => {
@@ -146,6 +176,66 @@ test("a pack that is not on disk yet sends the reader to the popup, and the next
   availability.set("es->en", "available");
   assert.deepEqual((await request()).fragments, ["EN[Hola]"]);
   assert.deepEqual(created, ["es->en", "es->en"], "the failed create was not cached");
+  await host.shutdown();
+});
+
+const translateEs = (host: InstanceType<typeof EngineHost>) =>
+  host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "translate", sourceLanguage: "es", targetLanguage: "en", fragments: ["Hola"] }) as Promise<{
+    fragments: string[];
+  }>;
+const claimEs = (host: InstanceType<typeof EngineHost>) =>
+  host.handle({ target: ENGINE_TARGET, engine: "chrome", type: "chrome-pack", sourceLanguage: "es", targetLanguage: "en" }) as Promise<{
+    claimed: boolean;
+  }>;
+
+test("the engine's document downloads the pack with the popup's click, so a closed popup still gets the page translated", async () => {
+  reset();
+  availability.set("es->en", "downloadable");
+  const { host } = chromeHost();
+  clicked = true;
+  assert.deepEqual(await claimEs(host), { claimed: true });
+  // The popup hands the page over and closes; the click has long expired by the first batch.
+  clicked = false;
+  let settled = false;
+  const translation = translateEs(host).finally(() => {
+    settled = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(settled, false, "the page's batch did not wait for the pack");
+  downloads.get("es->en")?.finish();
+  assert.deepEqual((await translation).fragments, ["EN[Hola]"]);
+  assert.deepEqual(created, ["es->en"], "the batch made a create() of its own instead of waiting for the download");
+  // A reopened popup fills its bar from what the engine passes on.
+  assert.ok(
+    broadcasts.some((message) => message["phase"] === "pack" && message["pairKey"] === "es->en" && message["loadedBytes"] === 1),
+    `no pack progress was passed on: ${JSON.stringify(broadcasts)}`
+  );
+  await host.shutdown();
+});
+
+test("without the click the engine's document leaves the download to the popup", async () => {
+  reset();
+  availability.set("es->en", "downloadable");
+  const { host } = chromeHost();
+  assert.deepEqual(await claimEs(host), { claimed: false });
+  assert.deepEqual(created, [], "a create() was tried with no click to allow it");
+  await host.shutdown();
+});
+
+test("a claimed download that fails fails the page's batch, and the next click can claim it again", async () => {
+  reset();
+  availability.set("es->en", "downloadable");
+  const { host } = chromeHost();
+  clicked = true;
+  await claimEs(host);
+  clicked = false;
+  const translation = translateEs(host);
+  downloads.get("es->en")?.fail(refusal("NetworkError", "The language pack could not be downloaded."));
+  await assert.rejects(translation, /could not be downloaded/);
+  clicked = true;
+  assert.deepEqual(await claimEs(host), { claimed: true });
+  assert.deepEqual(created, ["es->en", "es->en"], "the failed download was kept and handed out again");
+  downloads.get("es->en")?.finish();
   await host.shutdown();
 });
 

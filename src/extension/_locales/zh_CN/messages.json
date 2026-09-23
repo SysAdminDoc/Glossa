@@ -410,6 +410,9 @@
   "popupChromeDownloading": {
     "message": "正在下载 Chrome 语言包：$1%"
   },
+  "popupChromePackArriving": {
+    "message": "Chrome 正在下载语言包，下载完成后即翻译此页面。"
+  },
   "popupChromePackNeeded": {
     "message": "Chrome 首次使用时会下载 $1 语言包。"
   },

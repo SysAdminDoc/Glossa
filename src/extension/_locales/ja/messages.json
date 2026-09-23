@@ -410,6 +410,9 @@
   "popupChromeDownloading": {
     "message": "Chrome の言語パックをダウンロード中: $1%"
   },
+  "popupChromePackArriving": {
+    "message": "Chrome が言語パックをダウンロードしています。届きしだいページを翻訳します。"
+  },
   "popupChromePackNeeded": {
     "message": "初回のみ Chrome が $1 の言語パックをダウンロードします。"
   },

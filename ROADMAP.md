@@ -4,12 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P2
 
-- [ ] G-10 — Persist detected language and translation state across the popup closing during a download
-  Why: closing the popup mid-download hides progress; the download continues but the user has no way to see it. With Chrome's engine it is worse: the popup starts the language pack download itself, so closing it before the pack arrives means the page is never translated until Translate is clicked again (adversarial review 2026-09-10, finding 7).
-  Touches: src/popup/popup.ts (query engine for in-flight downloads on open; for Chrome's engine, hand the translate request to the background before the pack finishes), src/engine/engine-host.ts (expose active downloads)
-  Acceptance: reopening the popup during a download shows the live progress bar, and a Chrome pack download that finishes after the popup closed still translates the page.
-  Complexity: S
-
 - [ ] G-11 — Per-page glossary and never-translate terms
   Why: brand names and technical terms get mangled; a glossary is a recurring request and Bergamot has no built-in mechanism, so it has to be a pre-pass that wraps terms in `translate="no"` spans.
   Touches: src/content/segmenter.ts, src/options

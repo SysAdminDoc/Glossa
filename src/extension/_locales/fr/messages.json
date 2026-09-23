@@ -410,6 +410,9 @@
   "popupChromeDownloading": {
     "message": "Téléchargement du pack de langue de Chrome : $1 %"
   },
+  "popupChromePackArriving": {
+    "message": "Chrome télécharge le pack de langue. La page sera traduite dès son arrivée."
+  },
   "popupChromePackNeeded": {
     "message": "Chrome télécharge le pack de langue $1 la première fois."
   },
