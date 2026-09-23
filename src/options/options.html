@@ -88,6 +88,11 @@
           </div>
           <p class="hint" data-i18n="optionsMirrorHint">Fetch the catalog and model files from a server you run instead of from Mozilla. Build one with tools/mirror-models.mjs from the source archive and serve it over HTTPS. Glossa still checks every file against the hashes in the mirror's catalog, so only use a mirror you trust.</p>
         </div>
+        <div class="field">
+          <label for="engine-idle" data-i18n="optionsIdleLabel">Keep languages loaded for</label>
+          <select id="engine-idle" aria-describedby="engine-idle-hint"></select>
+        </div>
+        <p class="hint" id="engine-idle-hint" data-i18n="optionsIdleHint">After the last translation the engine holds its models in memory this long, then gives the memory back. A longer time saves loading them again as you move between pages.</p>
         <label class="check"><input type="checkbox" id="experimental-models" /> <span data-i18n="optionsExperimental">Offer Mozilla's prerelease models (Azerbaijani, Belarusian, Bosnian, Norwegian, Nynorsk). Quality is untested and Firefox ships them to its nightly channel only.</span></label>
         <table class="table" id="models">
           <thead><tr><th data-i18n="optionsModelsPair">Pair</th><th data-i18n="optionsModelsVersion">Version</th><th data-i18n="optionsModelsSize">Size</th><th></th></tr></thead>

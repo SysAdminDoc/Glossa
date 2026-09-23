@@ -75,6 +75,8 @@ export interface BergamotModule {
   BlockingService: new (options: { cacheSize: number }) => BergamotBlockingService;
   VectorString: new () => BergamotVectorString;
   VectorResponseOptions: new () => BergamotVectorResponseOptions;
+  // The glue swaps this view for a new one whenever the heap grows, so its buffer is the heap.
+  HEAP8?: Int8Array;
 }
 
 export interface BergamotModuleOptions {

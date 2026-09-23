@@ -38,7 +38,12 @@ export interface Settings {
   mirrorUrl: string;
   // Terms the user never wants translated, or always wants translated their own way.
   glossary: GlossaryEntry[];
+  // How long the engine keeps its models loaded after the last request, in seconds. Longer saves
+  // reloading tens of megabytes between pages; shorter gives the memory back sooner.
+  engineIdleSeconds: number;
 }
+
+export const ENGINE_IDLE_CHOICES = [15, 60, 300, 900];
 
 export const SETTINGS_KEY = "settings";
 
@@ -58,7 +63,8 @@ export function defaultSettings(uiLanguage?: string): Settings {
     experimentalModels: false,
     engine: "bergamot",
     mirrorUrl: "",
-    glossary: []
+    glossary: [],
+    engineIdleSeconds: 15
   };
 }
 
@@ -94,6 +100,9 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   // with a plain-http or credential-bearing address gets Mozilla's hosts, not that address.
   if (typeof input.mirrorUrl === "string") out.mirrorUrl = normalizeMirrorUrl(input.mirrorUrl) ?? "";
   out.glossary = sanitizeGlossary(input.glossary);
+  if (typeof input.engineIdleSeconds === "number" && ENGINE_IDLE_CHOICES.includes(input.engineIdleSeconds)) {
+    out.engineIdleSeconds = input.engineIdleSeconds;
+  }
   if (typeof input.catalogRefreshHours === "number" && input.catalogRefreshHours >= 1) {
     out.catalogRefreshHours = Math.min(input.catalogRefreshHours, 24 * 30);
   }

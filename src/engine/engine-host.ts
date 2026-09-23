@@ -31,8 +31,9 @@ import type { WorkerModelInput, WorkerRequest, WorkerResponse } from "./bergamot
 const DEFAULT_CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 // The engine idles out. Firefox uses 15 seconds per engine and discards it when a tab goes away;
-// this releases the worker, its models, and on Chrome the whole document hosting them.
-const ENGINE_IDLE_MS = 15_000;
+// this releases the worker, its models, and on Chrome the whole document hosting them. The user can
+// keep it longer, and each request says how long (the host cannot read settings on Chrome).
+const DEFAULT_ENGINE_IDLE_MS = 15_000;
 
 // A WebAssembly module whose body is `(module (func (result v128) (v128.const i32x4 0 0 0 0)))`.
 // It compiles only where SIMD is available, which is what the engine needs and what a pre-SSE4.1
@@ -79,6 +80,7 @@ export class EngineHost {
   // The refresh interval is a setting, and the host cannot read settings on Chrome, so each request
   // brings the current value with it.
   private catalogMaxAgeMs = DEFAULT_CATALOG_MAX_AGE_MS;
+  private idleMs = DEFAULT_ENGINE_IDLE_MS;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   // How many requests are being served right now. The engine is never taken down while this is
   // above zero: the first translation of a session downloads, verifies, decompresses and loads tens
@@ -96,6 +98,7 @@ export class EngineHost {
     if (typeof request.catalogMaxAgeMs === "number" && request.catalogMaxAgeMs > 0) {
       this.catalogMaxAgeMs = request.catalogMaxAgeMs;
     }
+    if (typeof request.idleMs === "number" && request.idleMs > 0) this.idleMs = request.idleMs;
     // Set or cleared on every request, for the same reason: the host cannot read settings.
     this.store.setMirror(request.mirror ?? null);
     this.busy++;
@@ -124,8 +127,11 @@ export class EngineHost {
       }
     }
     switch (request.type) {
-      case "ping":
-        return { alive: true, engineLoaded: this.worker !== null };
+      case "ping": {
+        // With the engine up, how big its heap has grown: the memory smoke reads this.
+        const status = this.worker ? ((await this.call({ type: "status", id: 0 })) as { heapBytes?: number }) : null;
+        return { alive: true, engineLoaded: this.worker !== null, heapBytes: status?.heapBytes ?? 0 };
+      }
       case "ensure-route":
         return { routeKey: await this.ensureRoute(request.sourceLanguage, request.targetLanguage, environment) };
       case "route-status":
@@ -232,7 +238,7 @@ export class EngineHost {
         return;
       }
       void this.shutdown();
-    }, ENGINE_IDLE_MS);
+    }, this.idleMs);
   }
 
   // Drop the worker, its models, and on Chrome the offscreen document that exists only to host it.

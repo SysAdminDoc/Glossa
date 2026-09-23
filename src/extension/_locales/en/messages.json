@@ -626,5 +626,13 @@
   "optionsGlossaryLabel": {
     "message": "Glossary entries",
     "description": "Accessible name of the glossary text box"
+  },
+  "optionsIdleLabel": {
+    "message": "Keep languages loaded for",
+    "description": "Options label for how long the engine keeps its models in memory after the last translation; the choices are durations such as 15 seconds"
+  },
+  "optionsIdleHint": {
+    "message": "After the last translation the engine holds its models in memory this long, then gives the memory back. A longer time saves loading them again as you move between pages.",
+    "description": "Hint under the keep-loaded setting"
   }
 }

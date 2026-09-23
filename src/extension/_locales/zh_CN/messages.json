@@ -478,5 +478,11 @@
   },
   "optionsGlossaryLabel": {
     "message": "术语表条目"
+  },
+  "optionsIdleLabel": {
+    "message": "语言保持加载的时长"
+  },
+  "optionsIdleHint": {
+    "message": "最后一次翻译后，引擎会在这段时间内把模型留在内存中，然后释放内存。时间越长，在页面之间切换时越不必重新加载。"
   }
 }

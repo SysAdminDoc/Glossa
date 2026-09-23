@@ -478,5 +478,11 @@
   },
   "optionsGlossaryLabel": {
     "message": "Glossareinträge"
+  },
+  "optionsIdleLabel": {
+    "message": "Sprachen geladen lassen für"
+  },
+  "optionsIdleHint": {
+    "message": "Nach der letzten Übersetzung hält die Engine ihre Modelle so lange im Speicher und gibt ihn dann frei. Eine längere Zeit erspart das erneute Laden, wenn du zwischen Seiten wechselst."
   }
 }

@@ -11,13 +11,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
   Acceptance: each fixture translates with no horizontal overflow and no element moving more than a set threshold, measured by Playwright.
   Complexity: M
 
-- [ ] G-13 — Memory ceiling and route eviction tuning
-  Why: two loaded routes plus the WASM heap can pass 300 MB. There is no telemetry, so the ceiling has to be measured locally.
-  Note 2026-09-10: the 15 s idle unload landed with G-28 (`ENGINE_IDLE_MS`), and on Chrome the offscreen document closes with it. What is left here is measuring the peak and tuning `MAX_LOADED_ROUTES`.
-  Touches: src/engine/bergamot.worker.ts (MAX_LOADED_ROUTES, unload after idle), src/engine/engine-host.ts, docs
-  Acceptance: an idle timer unloads models after a configurable period and the measured peak on the fixture set is documented in README.
-  Complexity: S
-
 ## P3
 
 - [ ] G-15 — Optional self-hosted LibreTranslate endpoint

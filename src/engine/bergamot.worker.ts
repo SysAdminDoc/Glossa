@@ -27,9 +27,13 @@ const FILE_ALIGNMENTS: Record<ModelFileType, number> = {
   trgvocab: 64
 };
 
-// How many translation routes stay resident. A route is one or two models (pivoting). Each base
-// model is roughly 20 to 45 MB of heap, so two routes keeps a page pair plus one more warm.
-const MAX_LOADED_ROUTES = 2;
+// How many models stay resident. A route is one model, or two when it pivots through English, and
+// routes share models: es->en and es->en->fr hold three models between them only if nothing is
+// shared, two if it is. Each model costs about 170 MB of heap once loaded (its files plus Marian's
+// 128 MB workspace, the figure Firefox uses too), and the heap never shrinks, so two models is a
+// peak near 370 MB: one pivot route, or two direct ones. Measured on the fixture set with
+// `npm run smoke:memory` (README, Memory).
+const MAX_LOADED_MODELS = 2;
 
 export interface WorkerModelInput {
   sourceLanguage: string;
@@ -49,15 +53,17 @@ export type WorkerResponse =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
 
-interface LoadedRoute {
-  models: BergamotTranslationModel[];
+interface LoadedModel {
+  model: BergamotTranslationModel;
   memory: BergamotAlignedMemory[];
   lastUsed: number;
 }
 
 let bergamot: BergamotModule | null = null;
 let service: InstanceType<BergamotModule["BlockingService"]> | null = null;
-const routes = new Map<string, LoadedRoute>();
+// Models by language pair ("es->en"), and each loaded route as the pairs it runs through, in order.
+const models = new Map<string, LoadedModel>();
+const routes = new Map<string, string[]>();
 
 workerSelf.importScripts("bergamot-translator.js");
 
@@ -91,7 +97,13 @@ async function handle(message: WorkerRequest): Promise<unknown> {
       unloadRoute(message.routeKey);
       return { loaded: [...routes.keys()] };
     case "status":
-      return { engine: Boolean(bergamot), loaded: [...routes.keys()] };
+      // A WebAssembly heap grows and never shrinks, so its size is the most this worker has held.
+      return {
+        engine: Boolean(bergamot),
+        loaded: [...routes.keys()],
+        models: [...models.keys()],
+        heapBytes: bergamot?.HEAP8?.buffer.byteLength ?? 0
+      };
   }
 }
 
@@ -131,29 +143,33 @@ function requireEngine(): BergamotModule {
   return bergamot;
 }
 
-function loadRoute(routeKey: string, models: WorkerModelInput[]): void {
-  const engine = requireEngine();
-  if (routes.has(routeKey)) {
-    routes.get(routeKey)!.lastUsed = Date.now();
-    return;
-  }
-  if (models.length === 0 || models.length > 2) {
-    throw new Error(`A route needs one or two models, got ${models.length}`);
-  }
-  evictIfNeeded();
+const modelKey = (input: WorkerModelInput): string => `${input.sourceLanguage}->${input.targetLanguage}`;
 
-  const memory: BergamotAlignedMemory[] = [];
-  const built: BergamotTranslationModel[] = [];
-  try {
-    for (const input of models) {
-      built.push(constructModel(engine, input, memory));
-    }
-  } catch (error) {
-    for (const model of built) model.delete();
-    for (const block of memory) block.delete();
-    throw error;
+// The host sends every file of the route, and a model already loaded for another route is used as
+// it is: its bytes here are dropped unread.
+function loadRoute(routeKey: string, inputs: WorkerModelInput[]): void {
+  const engine = requireEngine();
+  if (inputs.length === 0 || inputs.length > 2) {
+    throw new Error(`A route needs one or two models, got ${inputs.length}`);
   }
-  routes.set(routeKey, { models: built, memory, lastUsed: Date.now() });
+  const keys = inputs.map(modelKey);
+  const missing = inputs.filter((input) => !models.has(modelKey(input)));
+  // Room first, keeping whatever this route shares with what is loaded.
+  evictFor(missing.length, new Set(keys));
+  for (const input of missing) {
+    const memory: BergamotAlignedMemory[] = [];
+    let model: BergamotTranslationModel;
+    try {
+      model = constructModel(engine, input, memory);
+    } catch (error) {
+      for (const block of memory) block.delete();
+      throw error;
+    }
+    models.set(modelKey(input), { model, memory, lastUsed: Date.now() });
+  }
+  const now = Date.now();
+  for (const key of keys) models.get(key)!.lastUsed = now;
+  routes.set(routeKey, keys);
 }
 
 function constructModel(
@@ -218,36 +234,54 @@ function marianConfig(values: Record<string, string>): string {
   return out + indent;
 }
 
-function evictIfNeeded(): void {
-  while (routes.size >= MAX_LOADED_ROUTES) {
+// Drop the least recently used models, never one in `keep`, until `incoming` more fit. A route that
+// ran through a dropped model goes with it.
+function evictFor(incoming: number, keep: Set<string>): void {
+  while (models.size + incoming > MAX_LOADED_MODELS) {
     let oldestKey: string | null = null;
     let oldest = Number.POSITIVE_INFINITY;
-    for (const [key, route] of routes) {
-      if (route.lastUsed < oldest) {
-        oldest = route.lastUsed;
+    for (const [key, entry] of models) {
+      if (!keep.has(key) && entry.lastUsed < oldest) {
+        oldest = entry.lastUsed;
         oldestKey = key;
       }
     }
     if (oldestKey === null) break;
-    unloadRoute(oldestKey);
+    dropModel(oldestKey);
   }
 }
 
+function dropModel(key: string): void {
+  const entry = models.get(key);
+  if (!entry) return;
+  entry.model.delete();
+  for (const block of entry.memory) block.delete();
+  models.delete(key);
+  for (const [routeKey, keys] of routes) {
+    if (keys.includes(key)) routes.delete(routeKey);
+  }
+}
+
+// A route asked to go (its model is being deleted from disk) takes every model no other route uses.
 function unloadRoute(routeKey: string): void {
-  const route = routes.get(routeKey);
-  if (!route) return;
-  for (const model of route.models) model.delete();
-  for (const block of route.memory) block.delete();
+  const keys = routes.get(routeKey);
+  if (!keys) return;
   routes.delete(routeKey);
+  const inUse = new Set([...routes.values()].flat());
+  for (const key of keys) {
+    if (!inUse.has(key)) dropModel(key);
+  }
 }
 
 function translate(routeKey: string, fragments: string[], html: boolean): { fragments: string[]; inferenceMs: number } {
   const engine = requireEngine();
-  const route = routes.get(routeKey);
-  if (!route) {
+  const route = routes.get(routeKey)?.map((key) => models.get(key));
+  if (!route || route.some((entry) => !entry)) {
     throw new Error(`Route ${routeKey} is not loaded`);
   }
-  route.lastUsed = Date.now();
+  const loaded = route as LoadedModel[];
+  const now = Date.now();
+  for (const entry of loaded) entry.lastUsed = now;
 
   // Empty inputs crash the decoder; keep their slots and skip them.
   const indices: number[] = [];
@@ -265,9 +299,9 @@ function translate(routeKey: string, fragments: string[], html: boolean): { frag
     });
     if (messages.size() > 0) {
       responses =
-        route.models.length === 1
-          ? service!.translate(route.models[0]!, messages, options)
-          : service!.translateViaPivoting(route.models[0]!, route.models[1]!, messages, options);
+        loaded.length === 1
+          ? service!.translate(loaded[0]!.model, messages, options)
+          : service!.translateViaPivoting(loaded[0]!.model, loaded[1]!.model, messages, options);
       for (let i = 0; i < responses.size(); i++) {
         const target = indices[i];
         if (target !== undefined) {

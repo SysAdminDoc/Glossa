@@ -5,7 +5,7 @@ import { mirrorPermissionPattern, normalizeMirrorUrl } from "../shared/catalog.t
 import { formatGlossary, parseGlossary } from "../shared/glossary.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type { ModelsListResponse, ProgressEvent } from "../shared/messages.ts";
-import { loadSettings, saveSettings, type DisplayMode, type Settings, type SiteRule } from "../shared/settings.ts";
+import { ENGINE_IDLE_CHOICES, loadSettings, saveSettings, type DisplayMode, type Settings, type SiteRule } from "../shared/settings.ts";
 import { sendUi } from "../shared/ui-client.ts";
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -282,6 +282,18 @@ async function init(): Promise<void> {
     void persist({ neverTranslateLanguages: [...settings.neverTranslateLanguages, code] }).then(renderNever);
   });
   renderNever();
+
+  // The browser words the durations, in the interface language and with its own plurals.
+  const idle = $<HTMLSelectElement>("engine-idle");
+  for (const seconds of ENGINE_IDLE_CHOICES) {
+    const option = document.createElement("option");
+    option.value = String(seconds);
+    const [amount, unit] = seconds < 60 ? [seconds, "second"] : [seconds / 60, "minute"];
+    option.textContent = new Intl.NumberFormat(api.i18n.getUILanguage(), { style: "unit", unit, unitDisplay: "long" }).format(amount);
+    idle.append(option);
+  }
+  idle.value = String(settings.engineIdleSeconds);
+  idle.addEventListener("change", () => void persist({ engineIdleSeconds: Number(idle.value) }));
 
   // Saved when the box loses focus, then shown back as stored: a line that could not be a term is
   // dropped, and a term given twice keeps its last line.

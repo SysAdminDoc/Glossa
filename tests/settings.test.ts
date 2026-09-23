@@ -60,6 +60,16 @@ test("the glossary starts empty and a stored one is checked on the way in", () =
   assert.deepEqual(mergeSettings({ glossary: "Café Aurora" }, "en").glossary, []);
 });
 
+test("the engine keeps its models 15 seconds unless the user picked one of the offered times", () => {
+  assert.equal(defaultSettings("en").engineIdleSeconds, 15);
+  assert.equal(mergeSettings({ engineIdleSeconds: 300 }, "en").engineIdleSeconds, 300);
+  // Anything else, typed into an imported settings file, gets the default rather than a zero that
+  // would unload the engine between batches or a day that would never let the memory go.
+  for (const odd of [0, -5, 7, 86_400, "60", null]) {
+    assert.equal(mergeSettings({ engineIdleSeconds: odd }, "en").engineIdleSeconds, 15, `${String(odd)} was accepted`);
+  }
+});
+
 test("mergeSettings survives a non-object blob", () => {
   assert.equal(mergeSettings("corrupt", "en").targetLanguage, "en");
   assert.equal(mergeSettings(null, "es").targetLanguage, "es");

@@ -95,6 +95,13 @@ close enough that you will not care. The weakest are English to Marathi, Hindi, 
 Thai, and Marathi to English, where the gap is 7 to 9 points. Mozilla publishes the numbers at
 [mozilla.github.io/translations/final-evals](https://mozilla.github.io/translations/final-evals/).
 
+**Memory.** Each language model takes about 140 MB once it's loaded, most of it working space for the
+engine. On the Spanish test page the engine's memory reached 196 MB with one language loaded and 338 MB
+with two, which is what a translation through English (Spanish to French, say) needs. Glossa keeps at
+most two models in memory, shares the English one between routes that pass through it, and hands all
+of it back 15 seconds after the last translation. You can keep languages loaded longer in the settings,
+which saves reloading them as you move between pages. `npm run smoke:memory` measures this.
+
 **Hardware.** The engine needs WebAssembly SIMD: any x86 CPU with SSE4.1 (Intel from 2008, AMD from
 2011) or a 64-bit ARM machine. It never shipped for 32-bit ARM, so old Android phones cannot run it.
 

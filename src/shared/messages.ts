@@ -190,6 +190,8 @@ interface EngineEnvelope {
   experimental?: boolean;
   // How stale the model catalog may be before it is fetched again, from the user's settings.
   catalogMaxAgeMs?: number;
+  // How long the engine keeps its models in memory once nothing is asking it for anything.
+  idleMs?: number;
   // Which engine translates. "chrome" routes translate, route-status, ensure-route and models-list
   // to Chrome's built-in Translator, and none of those may reach Mozilla's hosts.
   engine?: "bergamot" | "chrome";

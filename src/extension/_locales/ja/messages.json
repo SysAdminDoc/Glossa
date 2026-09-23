@@ -478,5 +478,11 @@
   },
   "optionsGlossaryLabel": {
     "message": "用語集の項目"
+  },
+  "optionsIdleLabel": {
+    "message": "言語を読み込んだままにする時間"
+  },
+  "optionsIdleHint": {
+    "message": "最後の翻訳のあと、エンジンはこの時間だけモデルをメモリに保持し、その後メモリを解放します。長くすると、ページを移動したときに読み込み直す手間が省けます。"
   }
 }

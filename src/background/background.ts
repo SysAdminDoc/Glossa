@@ -66,6 +66,7 @@ async function engineCall<T>(request: DistributiveOmit<EngineRequest, "target">)
     target: ENGINE_TARGET,
     experimental: settings.experimentalModels,
     catalogMaxAgeMs: catalogMaxAgeMs(settings),
+    idleMs: settings.engineIdleSeconds * 1000,
     // Firefox has no built-in Translator, whatever an imported settings blob says.
     engine: settings.engine === "chrome" && hasOffscreenApi ? "chrome" : "bergamot",
     // Where the catalog and the model files come from, when the user runs a mirror of their own.

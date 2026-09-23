@@ -478,5 +478,11 @@
   },
   "optionsGlossaryLabel": {
     "message": "Entradas del glosario"
+  },
+  "optionsIdleLabel": {
+    "message": "Mantener los idiomas cargados durante"
+  },
+  "optionsIdleHint": {
+    "message": "Tras la última traducción, el motor guarda sus modelos en memoria durante este tiempo y luego la libera. Un tiempo más largo evita cargarlos de nuevo al pasar de una página a otra."
   }
 }

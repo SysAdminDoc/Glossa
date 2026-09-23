@@ -478,5 +478,11 @@
   },
   "optionsGlossaryLabel": {
     "message": "Entrées du glossaire"
+  },
+  "optionsIdleLabel": {
+    "message": "Garder les langues chargées pendant"
+  },
+  "optionsIdleHint": {
+    "message": "Après la dernière traduction, le moteur garde ses modèles en mémoire pendant cette durée, puis la libère. Une durée plus longue évite de les recharger quand vous passez d'une page à l'autre."
   }
 }
