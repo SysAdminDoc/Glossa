@@ -2,6 +2,7 @@ import { api } from "../shared/api.ts";
 import { localize, t } from "../shared/i18n.ts";
 import { formatBytes } from "../shared/hash.ts";
 import { mirrorPermissionPattern, normalizeMirrorUrl } from "../shared/catalog.ts";
+import { formatGlossary, parseGlossary } from "../shared/glossary.ts";
 import { knownLanguageCodes, languageName } from "../shared/languages.ts";
 import type { ModelsListResponse, ProgressEvent } from "../shared/messages.ts";
 import { loadSettings, saveSettings, type DisplayMode, type Settings, type SiteRule } from "../shared/settings.ts";
@@ -281,6 +282,16 @@ async function init(): Promise<void> {
     void persist({ neverTranslateLanguages: [...settings.neverTranslateLanguages, code] }).then(renderNever);
   });
   renderNever();
+
+  // Saved when the box loses focus, then shown back as stored: a line that could not be a term is
+  // dropped, and a term given twice keeps its last line.
+  const glossary = $<HTMLTextAreaElement>("glossary");
+  glossary.value = formatGlossary(settings.glossary);
+  glossary.addEventListener("change", () => {
+    void persist({ glossary: parseGlossary(glossary.value) }).then(() => {
+      glossary.value = formatGlossary(settings.glossary);
+    });
+  });
 
   // What the browser will call this host when a page from it is open: punycode for a non-ASCII name,
   // no port, no path. A rule stored under anything else can never match and looks active forever.

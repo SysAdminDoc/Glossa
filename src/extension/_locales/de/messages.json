@@ -469,5 +469,14 @@
   },
   "optionsRulesHint": {
     "message": "„Nie“ hält Glossa ganz von einer Website fern. „Immer“ übersetzt sie bei jedem Besuch, sobald du Glossa erlaubst, diese Website zu lesen."
+  },
+  "optionsGlossarySection": {
+    "message": "Glossar"
+  },
+  "optionsGlossaryHint": {
+    "message": "Ein Eintrag pro Zeile. Ein Name oder Begriff allein in seiner Zeile wird nie übersetzt. Schreib Begriff = Übersetzung, dann wird er jedes Mal so übersetzt, wie du willst. Groß- und Kleinschreibung zählt."
+  },
+  "optionsGlossaryLabel": {
+    "message": "Glossareinträge"
   }
 }

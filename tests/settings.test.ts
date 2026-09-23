@@ -52,6 +52,14 @@ test("mergeSettings keeps valid stored values and discards garbage", () => {
   assert.equal(merged.catalogRefreshHours, 24);
 });
 
+test("the glossary starts empty and a stored one is checked on the way in", () => {
+  assert.deepEqual(defaultSettings("en").glossary, []);
+  assert.deepEqual(mergeSettings({ glossary: [{ term: " Café Aurora ", translation: 3 }, { term: "" }, "plaza"] }, "en").glossary, [
+    { term: "Café Aurora", translation: "" }
+  ]);
+  assert.deepEqual(mergeSettings({ glossary: "Café Aurora" }, "en").glossary, []);
+});
+
 test("mergeSettings survives a non-object blob", () => {
   assert.equal(mergeSettings("corrupt", "en").targetLanguage, "en");
   assert.equal(mergeSettings(null, "es").targetLanguage, "es");

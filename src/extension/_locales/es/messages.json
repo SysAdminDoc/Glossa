@@ -469,5 +469,14 @@
   },
   "optionsRulesHint": {
     "message": "«Nunca» impide que Glossa toque un sitio. «Siempre» lo traduce en cada visita, en cuanto permitas a Glossa leer ese sitio."
+  },
+  "optionsGlossarySection": {
+    "message": "Glosario"
+  },
+  "optionsGlossaryHint": {
+    "message": "Una entrada por línea. Un nombre o término solo en su línea no se traduce nunca. Escríbelo como término = traducción para que se traduzca a tu manera siempre. Las mayúsculas cuentan."
+  },
+  "optionsGlossaryLabel": {
+    "message": "Entradas del glosario"
   }
 }

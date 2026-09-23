@@ -52,6 +52,7 @@ Glossa takes the opposite approach. There is no cloud engine in the code at all,
 - Restores the original page without a reload.
 - Translates a selection from the context menu, and translates what you have typed into a text box from the same menu.
 - Per-site rules. Turn Glossa off for a host and it will not even look at its pages. List the languages you read and those pages are never offered.
+- A glossary on the options page. Put a product name or a term of art on a line and it's never translated. Write `term = translation` and every page, tooltip and selection uses your translation instead of the engine's.
 - Downloads each language model once (roughly 20 to 45 MB per direction), verifies it against Mozilla's published hashes, and keeps it on disk. You see the size before anything downloads and can delete models from the options page.
 - Can use Chrome's built-in translator instead (Chrome 138 or newer, on a desktop with 22 GB of free disk). It runs on your device too. Chrome fetches its language packs from Google the first time you click Translate for a pair, and Glossa sends nothing to Mozilla while it's selected. Bergamot stays the default, and Firefox doesn't offer the choice.
 

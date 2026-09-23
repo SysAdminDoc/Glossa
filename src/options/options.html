@@ -67,6 +67,12 @@
       </section>
 
       <section class="panel">
+        <h2 data-i18n="optionsGlossarySection">Glossary</h2>
+        <p class="hint" id="glossary-hint" data-i18n="optionsGlossaryHint">One entry per line. A name or term on a line of its own is never translated. Write it as term = translation to have it translated your way every time. Capitals count.</p>
+        <textarea id="glossary" rows="6" spellcheck="false" aria-describedby="glossary-hint" aria-label="Glossary entries" data-i18n-attr="aria-label=optionsGlossaryLabel" placeholder="Café Aurora&#10;plaza mayor = Main Square"></textarea>
+      </section>
+
+      <section class="panel">
         <h2 data-i18n="optionsModelsSection">Language models</h2>
         <p class="hint" data-i18n="optionsModelsHint">Each model is downloaded once from Mozilla's catalog, checked against its published hash, and kept on this device. Nothing else is ever sent or received.</p>
         <div class="catalog-line">

@@ -82,9 +82,12 @@ try {
   // page lists Bergamot's languages from Mozilla's catalog, which is right for Bergamot and would
   // make the no-Mozilla check at the end prove nothing. From here on the whole run must be clean,
   // the options page included.
+  // With a glossary term, which Chrome's translator has to hand back as written too.
   await worker.evaluate(async () => {
     const { settings } = await chrome.storage.local.get("settings");
-    await chrome.storage.local.set({ settings: { ...(settings ?? {}), engine: "chrome" } });
+    await chrome.storage.local.set({
+      settings: { ...(settings ?? {}), engine: "chrome", glossary: [{ term: "plaza mayor", translation: "" }] }
+    });
   });
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/options.html`);
@@ -180,6 +183,10 @@ try {
   assert(split.text.includes("https://ejemplo.es/descargas"), `the split address did not survive: "${split.text}"`);
   assert(split.bold === "es", `the <b> inside the split address was lost: ${JSON.stringify(split)}`);
   console.info(`smoke:chrome-engine: split address kept ("${split.text.trim()}")`);
+
+  const brand = await page.$eval("#brand glossa-translation", (node) => node.textContent ?? "");
+  assert(/\bplaza mayor\b/.test(brand), `the glossary term did not survive Chrome's translation: "${brand}"`);
+  console.info(`smoke:chrome-engine: glossary term kept ("${brand.trim()}")`);
 
   // With the pack on disk, a later translation needs no gesture: restore, then translate again from
   // the worker, which is how an "always" site and the context menu reach the engine.

@@ -469,5 +469,14 @@
   },
   "optionsRulesHint": {
     "message": "“从不”会让 Glossa 完全不碰该网站。“总是”会在你允许 Glossa 读取该网站后，每次访问时自动翻译。"
+  },
+  "optionsGlossarySection": {
+    "message": "术语表"
+  },
+  "optionsGlossaryHint": {
+    "message": "每行一项。单独占一行的名称或术语永远不会被翻译。写成“术语 = 译文”，就会每次都按你的译法翻译。区分大小写。"
+  },
+  "optionsGlossaryLabel": {
+    "message": "术语表条目"
   }
 }

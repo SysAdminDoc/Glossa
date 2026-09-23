@@ -1,6 +1,7 @@
 import { api } from "./api.ts";
 import { t } from "./i18n.ts";
 import { normalizeMirrorUrl } from "./catalog.ts";
+import { sanitizeGlossary, type GlossaryEntry } from "./glossary.ts";
 
 export type DisplayMode = "bilingual" | "replace";
 export type SiteRule = "always" | "never";
@@ -35,6 +36,8 @@ export interface Settings {
   // A model mirror the user runs, as a normalised base address ending in "/", or "" for Mozilla's
   // hosts. With one set, the catalog and every model file come from there and nowhere else.
   mirrorUrl: string;
+  // Terms the user never wants translated, or always wants translated their own way.
+  glossary: GlossaryEntry[];
 }
 
 export const SETTINGS_KEY = "settings";
@@ -54,7 +57,8 @@ export function defaultSettings(uiLanguage?: string): Settings {
     sourceLanguages: {},
     experimentalModels: false,
     engine: "bergamot",
-    mirrorUrl: ""
+    mirrorUrl: "",
+    glossary: []
   };
 }
 
@@ -89,6 +93,7 @@ export function mergeSettings(stored: unknown, uiLanguage?: string): Settings {
   // Whatever is stored goes through the same check as what is typed: an imported settings blob
   // with a plain-http or credential-bearing address gets Mozilla's hosts, not that address.
   if (typeof input.mirrorUrl === "string") out.mirrorUrl = normalizeMirrorUrl(input.mirrorUrl) ?? "";
+  out.glossary = sanitizeGlossary(input.glossary);
   if (typeof input.catalogRefreshHours === "number" && input.catalogRefreshHours >= 1) {
     out.catalogRefreshHours = Math.min(input.catalogRefreshHours, 24 * 30);
   }

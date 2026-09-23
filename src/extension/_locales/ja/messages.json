@@ -469,5 +469,14 @@
   },
   "optionsRulesHint": {
     "message": "「翻訳しない」を選ぶと、Glossa はそのサイトに一切触れません。「常に翻訳」を選ぶと、そのサイトの読み取りを許可した後は、訪問するたびに翻訳します。"
+  },
+  "optionsGlossarySection": {
+    "message": "用語集"
+  },
+  "optionsGlossaryHint": {
+    "message": "1 行に 1 項目です。名前や用語だけを書いた行は翻訳しません。「用語 = 訳語」と書くと、いつもその訳語で翻訳します。大文字と小文字は区別します。"
+  },
+  "optionsGlossaryLabel": {
+    "message": "用語集の項目"
   }
 }

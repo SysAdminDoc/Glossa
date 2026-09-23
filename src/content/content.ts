@@ -2,6 +2,7 @@ import { api } from "../shared/api.ts";
 import { normalizeLanguageTag } from "../shared/catalog.ts";
 import { t } from "../shared/i18n.ts";
 import { loadSettings, SETTINGS_KEY, type Settings } from "../shared/settings.ts";
+import { compileGlossary, sanitizeGlossary, type Glossary } from "../shared/glossary.ts";
 import type {
   DetectRequest,
   DetectResponse,
@@ -14,10 +15,11 @@ import type {
 import { buildSample } from "./detect-sample.ts";
 import { OutputCache } from "./output-cache.ts";
 import { createScheduler, whenVisible } from "./scheduler.ts";
-import { Renderer, type RenderOptions } from "./renderer.ts";
+import { Renderer, repairInlineSpacing, type RenderOptions } from "./renderer.ts";
 import {
   collectFromNodes,
   collectSegments,
+  plainFragment,
   segmentFragment,
   UNIT_ATTRIBUTE,
   READABLE_ATTRIBUTES,
@@ -227,6 +229,8 @@ async function translatePage(
   controller.state.translating = true;
   // An automatic translation can arrive before the first detection has come back.
   if (!command.sourceLanguage && !controller.state.detectedLanguage) await detect(controller);
+  // And before the settings the glossary comes from.
+  await ensureSettings(controller);
   const source = command.sourceLanguage ?? controller.state.detectedLanguage;
   if (!source) {
     controller.state.translating = false;
@@ -366,11 +370,12 @@ async function translateSegments(
       scheduler.stop();
       return;
     }
+    const glossary = glossaryOf(controller);
     const request: TranslateRequest = {
       type: "glossa:translate",
       sourceLanguage: source,
       targetLanguage: target,
-      fragments: batch.map(segmentFragment)
+      fragments: batch.map((segment) => segmentFragment(segment, glossary))
     };
     let response: TranslateResponse;
     try {
@@ -676,8 +681,29 @@ function isSegment(value: Segment | Node): value is Segment {
   return typeof (value as Segment).kind === "string" && (value as { nodeType?: number }).nodeType === undefined;
 }
 
-function segmentOptions(controller: Controller): { skipFormFields: boolean; deferred: Set<Element> } {
-  return { skipFormFields: controller.skipFormFields, deferred: controller.deferred };
+function segmentOptions(controller: Controller): { skipFormFields: boolean; deferred: Set<Element>; glossary: Glossary | null } {
+  return { skipFormFields: controller.skipFormFields, deferred: controller.deferred, glossary: glossaryOf(controller) };
+}
+
+// The settings are read when the script boots, and a command can arrive before they have.
+async function ensureSettings(controller: Controller): Promise<void> {
+  if (controller.settings) return;
+  try {
+    controller.settings = await loadSettings();
+  } catch {
+    // Nothing here depends on them but the glossary, which is then left out.
+  }
+}
+
+// The glossary in force, compiled once per settings object. A storage change hands over the raw
+// stored value, so it is checked again here.
+const compiledGlossaries = new WeakMap<Settings, Glossary | null>();
+
+function glossaryOf(controller: Controller): Glossary | null {
+  const settings = controller.settings;
+  if (!settings) return null;
+  if (!compiledGlossaries.has(settings)) compiledGlossaries.set(settings, compileGlossary(sanitizeGlossary(settings.glossary)));
+  return compiledGlossaries.get(settings) ?? null;
 }
 
 function report(controller: Controller): void {
@@ -766,12 +792,14 @@ async function translateField(controller: Controller, target: string): Promise<v
     return;
   }
   const pending = showPopover(t("popoverTranslating"), rect, false);
+  await ensureSettings(controller);
+  const glossary = glossaryOf(controller);
   const request: TranslateRequest = {
     type: "glossa:translate",
     sourceLanguage: source,
     targetLanguage: target,
     // Paragraph by paragraph, so a long message keeps its shape.
-    fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
+    fragments: text.split(/\n{2,}/).map((paragraph) => plainFragment(paragraph, glossary))
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
   // Closed while the engine worked: leave it closed, and leave the field as the reader left it.
@@ -780,13 +808,16 @@ async function translateField(controller: Controller, target: string): Promise<v
     showPopover(response?.error ?? t("popoverNoAnswer"), rect, true);
     return;
   }
-  const parsed = new DOMParser().parseFromString(`<body>${response.fragments.join("\n\n")}</body>`, "text/html");
-  writeField(element, parsed.body.textContent ?? "");
+  writeField(element, answerText(response.fragments));
   showPopover(t("fieldTranslated"), rect, false);
 }
 
-function escapeForEngine(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// The engine's answer for plain text, as plain text. A glossary term comes back in a `var` whose
+// surrounding spaces the engine dropped.
+function answerText(fragments: string[]): string {
+  const parsed = new DOMParser().parseFromString(`<body>${fragments.join("\n\n")}</body>`, "text/html");
+  repairInlineSpacing(parsed.body);
+  return parsed.body.textContent ?? "";
 }
 
 // ---- selection ----
@@ -875,11 +906,13 @@ async function translateSelection(controller: Controller, target: string): Promi
     return;
   }
   const pending = showPopover(t("popoverTranslating"), anchor, false);
+  await ensureSettings(controller);
+  const glossary = glossaryOf(controller);
   const request: TranslateRequest = {
     type: "glossa:translate",
     sourceLanguage: source,
     targetLanguage: target,
-    fragments: text.split(/\n{2,}/).map((paragraph) => escapeForEngine(paragraph))
+    fragments: text.split(/\n{2,}/).map((paragraph) => plainFragment(paragraph, glossary))
   };
   const response = (await api.runtime.sendMessage(request)) as TranslateResponse | undefined;
   // Closed while the engine worked: an answer arriving later must not reopen it.
@@ -888,8 +921,7 @@ async function translateSelection(controller: Controller, target: string): Promi
     showPopover(response?.error ?? t("popoverNoAnswer"), anchor, true);
     return;
   }
-  const parsed = new DOMParser().parseFromString(`<body>${response.fragments.join("\n\n")}</body>`, "text/html");
-  showPopover(parsed.body.textContent ?? "", anchor, false);
+  showPopover(answerText(response.fragments), anchor, false);
 }
 
 // The popover floats over the page, so it has to behave like something floating over a page:

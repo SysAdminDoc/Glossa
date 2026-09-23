@@ -79,6 +79,21 @@ try {
   const cardsBefore = await page.$eval("#cards", (grid) => grid.querySelectorAll("a").length);
   assert(cardsBefore === 2, `fixture card grid should hold 2 anchors, found ${cardsBefore}`);
 
+  // A glossary typed on the options page: one term kept as written, one always translated the
+  // user's way. The box stores on leaving it, and shows back what was stored.
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/options.html`);
+  // The last two are checked where they land: the text box translation and the selection popover.
+  await options.fill("#glossary", "plaza mayor\n\nbiblioteca municipal =  Glossa Library \nmartes = TUESDAY\ndomingos = SUNDAYS");
+  await options.locator("#glossary").blur();
+  await options.waitForFunction(async () => (await chrome.storage.local.get("settings")).settings?.glossary?.length === 4);
+  const shownBack = await options.$eval("#glossary", (box) => box.value);
+  assert(
+    shownBack === "plaza mayor\nbiblioteca municipal = Glossa Library\nmartes = TUESDAY\ndomingos = SUNDAYS",
+    `the glossary box shows "${shownBack}"`
+  );
+  await options.close();
+
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tabId=${tabId}`);
   await popup.waitForSelector("#action:not([disabled])", { timeout: 60_000 });
@@ -150,6 +165,11 @@ try {
 
   const title = await page.$eval("#title", (element) => element.querySelector("glossa-translation")?.textContent ?? "");
   assert(/welcome/i.test(title), `title translation was "${title}"`);
+  // The glossary: its translation in place of the term, and a kept term exactly as written.
+  assert(/\bGlossa Library\b/.test(title) && !/municipal/i.test(title), `the glossary translation was not used in the title: "${title}"`);
+  const brandLine = await page.$eval("#brand", (element) => element.querySelector("glossa-translation")?.textContent ?? "");
+  assert(/\bplaza mayor\b/.test(brandLine), `the kept glossary term did not survive: "${brandLine}"`);
+  console.info(`smoke: glossary title "${title.trim()}", kept term "${brandLine.trim()}"`);
 
   const code = await page.$eval("#code", (element) => element.textContent);
   assert(code === 'const saludo = "hola mundo";', "pre block was modified");
@@ -189,6 +209,8 @@ try {
   console.info(`smoke: title "${attrs.title}", placeholder "${attrs.placeholder}", alt "${attrs.alt}"`);
   assert(/library|page|test/i.test(attrs.title), `the document title was not translated: "${attrs.title}"`);
   assert(/library|front/i.test(attrs.alt), `alt text was not translated: "${attrs.alt}"`);
+  // The alt text carries the glossary too, with the space the engine drops around it put back.
+  assert(/(^|\s)Glossa Library\b/.test(attrs.alt) && !/municipal/i.test(attrs.alt), `the glossary missed the alt text: "${attrs.alt}"`);
   assert(/search|catalog/i.test(attrs.placeholder), `placeholder was not translated: "${attrs.placeholder}"`);
   assert(/search|title/i.test(attrs.ariaLabel), `aria-label was not translated: "${attrs.ariaLabel}"`);
   assert(/hours|opening/i.test(attrs.linkTitle), `title attribute was not translated: "${attrs.linkTitle}"`);
@@ -543,6 +565,7 @@ try {
   const field = await page.$eval("#message", (element) => element.value);
   console.info(`smoke: the field now reads: ${field}`);
   assert(/reading room|book|room/i.test(field), `the field was not translated: "${field}"`);
+  assert(/(^|\s)TUESDAY\b/.test(field), `the glossary missed the text box: "${field}"`);
   await page.keyboard.press("Escape");
 
   // The selection offer is off by default, and stays off until the setting is on.
@@ -647,6 +670,7 @@ try {
   });
   console.info(`smoke: selection popover says: ${popover.text.trim().slice(0, 60)}`);
   assert(/library/i.test(popover.text), `the selection was not translated: "${popover.text}"`);
+  assert(/(^|\s)SUNDAYS\b/.test(popover.text), `the glossary missed the selection: "${popover.text}"`);
   assert(popover.parentIsRoot && !popover.insideEditor, "the popover was inserted inside the page's content");
   assert(popover.editableUnchanged, "the popover changed the editable region's content");
   assert(

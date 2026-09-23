@@ -4,12 +4,6 @@ Open work only. Items come from the 2026-09-10 research pass (see RESEARCH.md) a
 
 ## P2
 
-- [ ] G-11 — Per-page glossary and never-translate terms
-  Why: brand names and technical terms get mangled; a glossary is a recurring request and Bergamot has no built-in mechanism, so it has to be a pre-pass that wraps terms in `translate="no"` spans.
-  Touches: src/content/segmenter.ts, src/options
-  Acceptance: a term added to the glossary survives translation verbatim on the fixture page.
-  Complexity: M
-
 - [ ] G-12 — Layout-safety regression suite
   Why: broken layouts are the most reproducible complaint class for every competitor. A public list of sites rendered correctly is a checkable differentiator.
   Research note 2026-09-10: seed the fixture list from competitor defects: Wikipedia infobox with an excluded descendant (immersive-translate #2997), MathJax on IEEE and ar5iv (TWP #704), Reddit comment box (kiss #670), YouTube sidebar rail (kiss #561), Mastodon root `notranslate` with per-post `translate` (TWP #651), Svelte empty text-node placeholders (TWP #393), Google News icon-font ligatures (translatelocally #4), `<ruby>` (Bugzilla 1947054), inline-block card grids (local probe 2026-09-10).

@@ -4,6 +4,8 @@
 // sentences intact through links and emphasis; Bergamot's HTML mode carries the inline tags
 // through the translation.
 
+import type { Glossary } from "../shared/glossary.ts";
+
 export const UNIT_ATTRIBUTE = "data-glossa-unit";
 export const TRANSLATION_CLASS = "glossa-t";
 export const TRANSLATION_TAG = "GLOSSA-TRANSLATION";
@@ -108,6 +110,9 @@ const TRANSLATABLE_ATTRIBUTES: Array<{ attribute: string; applies: (element: Ele
 
 export interface SegmentOptions {
   skipFormFields: boolean;
+  // The user's glossary. Its terms are held like a url: the engine never sees them, and they come
+  // back as written or as the user's own translation.
+  glossary?: Glossary | null;
   // Attributes and labels are collected unless this is explicitly false. Used by the selection
   // path, which is about the text a user highlighted and nothing around it.
   attributes?: boolean;
@@ -170,7 +175,7 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       options.deferred?.add(element);
       continue;
     }
-    const { html, holds } = serializeUnit(element);
+    const { html, holds } = serializeUnit(element, options.glossary);
     // A block that is nothing but a url or a reference number has no prose left once the
     // placeholders are in; sending it wastes a round trip and risks the engine rewriting it.
     if (holds.length > 0 && !LETTER.test(textOutsideHolds(html))) continue;
@@ -291,7 +296,7 @@ function effectiveLang(start: Element | null): string | null {
 // Serialise a unit for the engine. Protected inline descendants become `var` placeholders that
 // Bergamot passes through untouched; the originals are returned so the renderer can put them
 // back by index. Clone and original are walked with the same selector, so indexes line up.
-export function serializeUnit(element: Element): { html: string; holds: Hold[] } {
+export function serializeUnit(element: Element, glossary?: Glossary | null): { html: string; holds: Hold[] } {
   stampIds(element);
   // A field is never a hold, and neither is anything inside one: fields are emptied below, and
   // original and clone have to be filtered the same way for the indexes to line up.
@@ -299,7 +304,7 @@ export function serializeUnit(element: Element): { html: string; holds: Hold[] }
   const holds: Hold[] = Array.from(element.querySelectorAll(HOLD_SELECTOR)).filter(outsideFields);
   const hasFields = element.querySelector(FORM_FIELD_SELECTOR) !== null;
   const source = unitText(element);
-  if (holds.length === 0 && !hasFields && !hasProtectedText(source)) {
+  if (holds.length === 0 && !hasFields && !hasRuns(source, glossary)) {
     return { html: element.innerHTML, holds };
   }
   const clone = element.cloneNode(true) as Element;
@@ -314,7 +319,7 @@ export function serializeUnit(element: Element): { html: string; holds: Hold[] }
     placeholder.textContent = held.textContent ?? "";
     held.replaceWith(placeholder);
   });
-  protectText(clone, holds);
+  protectText(clone, holds, glossary);
   return { html: clone.innerHTML, holds };
 }
 
@@ -372,6 +377,55 @@ export function hasProtectedText(text: string): boolean {
   return PROTECTED_GATE.test(text);
 }
 
+// A run of text to hold. `replacement` is the user's translation of a glossary term; null keeps the
+// run exactly as written.
+interface Run {
+  start: number;
+  end: number;
+  replacement: string | null;
+}
+
+function hasGlossaryTerm(text: string, glossary: Glossary | null | undefined): boolean {
+  if (!glossary) return false;
+  glossary.scanner.lastIndex = 0;
+  const found = glossary.scanner.test(text);
+  glossary.scanner.lastIndex = 0;
+  return found;
+}
+
+function hasRuns(text: string, glossary: Glossary | null | undefined): boolean {
+  return hasProtectedText(text) || hasGlossaryTerm(text, glossary);
+}
+
+// Every run of a text to hold, in order and none overlapping: the user's glossary terms and, unless
+// `patterns` is false, the urls, addresses and numbers above. Where two start at the same place the
+// glossary wins; where two overlap, the one that starts first does, so a term inside a url stays
+// part of the url.
+function findRuns(text: string, glossary: Glossary | null | undefined, patterns = true): Run[] {
+  const runs: Run[] = [];
+  if (hasGlossaryTerm(text, glossary)) {
+    const { scanner, translations } = glossary!;
+    for (let match = scanner.exec(text); match; match = scanner.exec(text)) {
+      runs.push({ start: match.index, end: match.index + match[0].length, replacement: translations.get(match[0]) ?? null });
+    }
+    scanner.lastIndex = 0;
+  }
+  if (patterns && hasProtectedText(text)) {
+    PROTECTED_SCANNER.lastIndex = 0;
+    for (let match = PROTECTED_SCANNER.exec(text); match; match = PROTECTED_SCANNER.exec(text)) {
+      runs.push({ start: match.index, end: match.index + match[0].length, replacement: null });
+    }
+  }
+  // A stable sort keeps the glossary's runs ahead of a pattern's at the same start.
+  runs.sort((a, b) => a.start - b.start);
+  let end = 0;
+  return runs.filter((run) => {
+    if (run.start < end) return false;
+    end = run.end;
+    return true;
+  });
+}
+
 // Elements that end a run of text for this purpose. A line break, an image or a form field sits
 // between two words; a <wbr>, <b> or <span> inside a url does not.
 const RUN_BREAK_TAGS = new Set(["BR", "HR", "IMG", "INPUT", "SELECT", "TEXTAREA", "BUTTON"]);
@@ -381,7 +435,7 @@ const RUN_BREAK_TAGS = new Set(["BR", "HR", "IMG", "INPUT", "SELECT", "TEXTAREA"
 // a time, the tail inside the tag reaches the engine as prose. Each such run becomes one placeholder
 // holding every node it touches, inline tags included, so the engine gets none of it and the tags
 // come back intact. A run inside a single text node is left to the per-node pass that follows.
-function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
+function protectRunsAcrossTags(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): void {
   const doc = clone.ownerDocument;
   const pieces: Array<{ node: Text; start: number }> = [];
   let flat = "";
@@ -400,14 +454,9 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
     pieces.push({ node: text, start: flat.length });
     flat += text.data;
   }
-  if (pieces.length < 2 || !hasProtectedText(flat)) return;
-  const matches: Array<{ start: number; end: number }> = [];
-  PROTECTED_SCANNER.lastIndex = 0;
-  for (let match = PROTECTED_SCANNER.exec(flat); match; match = PROTECTED_SCANNER.exec(flat)) {
-    matches.push({ start: match.index, end: match.index + match[0].length });
-  }
+  if (pieces.length < 2 || !hasRuns(flat, glossary)) return;
   // Last first: holding a run splits and moves only nodes after every run still to be handled.
-  for (const { start, end } of matches.reverse()) {
+  for (const { start, end, replacement } of findRuns(flat, glossary).reverse()) {
     const first = locateInPieces(pieces, start, false);
     const last = locateInPieces(pieces, end, true);
     if (!first || !last || first.node === last.node) continue;
@@ -443,11 +492,13 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[]): void {
     const placeholder = doc.createElement("var");
     placeholder.setAttribute(HOLD_ATTRIBUTE, String(holds.length));
     placeholder.setAttribute(PAD_ATTRIBUTE, `${!before || SPACE.test(before.slice(-1)) ? "l" : ""}${!after || SPACE.test(after.charAt(0)) ? "r" : ""}`);
-    placeholder.textContent = held.map((node) => node.textContent ?? "").join("");
+    placeholder.textContent = replacement ?? held.map((node) => node.textContent ?? "").join("");
     common.insertBefore(placeholder, firstChild);
     const fragment = doc.createDocumentFragment();
     fragment.append(...held);
-    holds.push(fragment);
+    // A glossary term with a translation of its own comes back as that text, without the page's
+    // tags inside the term: there is nothing in the translation for them to wrap.
+    holds.push(replacement === null ? fragment : doc.createTextNode(replacement));
   }
 }
 
@@ -478,8 +529,8 @@ function locateInPieces(pieces: Array<{ node: Text; start: number }>, offset: nu
 
 // Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an
 // untranslatable element gets, and the exact original characters are kept to be put back.
-function protectText(clone: Element, holds: Hold[]): void {
-  protectRunsAcrossTags(clone, holds);
+function protectText(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): void {
+  protectRunsAcrossTags(clone, holds, glossary);
   const doc = clone.ownerDocument;
   const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
@@ -487,18 +538,17 @@ function protectText(clone: Element, holds: Hold[]): void {
   for (const text of texts) {
     // Anything already protected, verbatim by the engine or by a placeholder, is left alone.
     if (text.parentElement?.closest(`var, code, kbd, samp, math, ${HOLD_SELECTOR}`)) continue;
-    if (!hasProtectedText(text.data)) continue;
+    if (!hasRuns(text.data, glossary)) continue;
     const fragment = doc.createDocumentFragment();
     let cursor = 0;
-    PROTECTED_SCANNER.lastIndex = 0;
-    for (let match = PROTECTED_SCANNER.exec(text.data); match; match = PROTECTED_SCANNER.exec(text.data)) {
-      if (match.index > cursor) fragment.append(doc.createTextNode(text.data.slice(cursor, match.index)));
-      const end = match.index + match[0].length;
+    for (const { start, end, replacement } of findRuns(text.data, glossary)) {
+      if (start > cursor) fragment.append(doc.createTextNode(text.data.slice(cursor, start)));
+      const kept = replacement ?? text.data.slice(start, end);
       const placeholder = doc.createElement("var");
       placeholder.setAttribute(HOLD_ATTRIBUTE, String(holds.length));
-      placeholder.setAttribute(PAD_ATTRIBUTE, padSides(text.data, match.index, end));
-      placeholder.textContent = match[0];
-      holds.push(doc.createTextNode(match[0]));
+      placeholder.setAttribute(PAD_ATTRIBUTE, padSides(text.data, start, end));
+      placeholder.textContent = kept;
+      holds.push(doc.createTextNode(kept));
       fragment.append(placeholder);
       cursor = end;
     }
@@ -628,7 +678,22 @@ export function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-export function segmentFragment(segment: Segment): string {
-  return segment.kind === "element" ? segment.html : escapeHtml(segment.text);
+export function segmentFragment(segment: Segment, glossary?: Glossary | null): string {
+  return segment.kind === "element" ? segment.html : plainFragment(segment.text, glossary);
+}
+
+// Plain text for the engine (a tooltip, a label, a selection), with each glossary term in a `var`
+// the engine copies through. The var already holds what the term becomes, and a hold number no
+// unit uses, so the renderer keeps its text.
+export function plainFragment(text: string, glossary?: Glossary | null): string {
+  let out = "";
+  let cursor = 0;
+  for (const { start, end, replacement } of findRuns(text, glossary, false)) {
+    out += escapeHtml(text.slice(cursor, start));
+    const pad = padSides(text, start, end);
+    out += `<var ${HOLD_ATTRIBUTE}="-1" ${PAD_ATTRIBUTE}="${pad}">${escapeHtml(replacement ?? text.slice(start, end))}</var>`;
+    cursor = end;
+  }
+  return out + escapeHtml(text.slice(cursor));
 }
 

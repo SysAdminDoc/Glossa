@@ -614,5 +614,17 @@
   "optionsRulesHint": {
     "message": "\"Never\" stops Glossa from touching a site. \"Always\" translates it on every visit, once you allow Glossa to read that site.",
     "description": "Hint under site rules; the quoted words are the two rule options, optionsRuleNever and optionsRuleAlways"
+  },
+  "optionsGlossarySection": {
+    "message": "Glossary",
+    "description": "Options section heading for terms the user never wants translated, or wants translated their own way"
+  },
+  "optionsGlossaryHint": {
+    "message": "One entry per line. A name or term on a line of its own is never translated. Write it as term = translation to have it translated your way every time. Capitals count.",
+    "description": "Hint under the glossary heading; keep the = sign, it is the separator the user types"
+  },
+  "optionsGlossaryLabel": {
+    "message": "Glossary entries",
+    "description": "Accessible name of the glossary text box"
   }
 }

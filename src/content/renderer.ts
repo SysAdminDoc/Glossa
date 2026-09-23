@@ -582,6 +582,8 @@ function hideDuplicateFromScreenReaders(block: Element): void {
 function plainText(html: string): string {
   if (!/[<&]/.test(html)) return html;
   const doc = parser.parseFromString(`<body>${html}</body>`, "text/html");
+  // A glossary term travels in a `var`, and the engine drops the spaces around it.
+  repairInlineSpacing(doc.body);
   return doc.body.textContent ?? "";
 }
 

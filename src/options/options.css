@@ -107,13 +107,22 @@ h2 {
   color: var(--muted);
 }
 
-select, input[type="text"] {
+select, input[type="text"], textarea {
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
+}
+
+#glossary {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 8em;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .segmented {
