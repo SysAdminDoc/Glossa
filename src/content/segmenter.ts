@@ -204,10 +204,12 @@ function collectReadableAttributes(root: Node, out: Segment[], options: SegmentO
         ? (root as Document | DocumentFragment)
         : null;
   if (!scope) return;
+  const self = root.nodeType === Node.ELEMENT_NODE ? [root as Element] : [];
 
-  const candidates: Element[] = [];
-  if (root.nodeType === Node.ELEMENT_NODE) candidates.push(root as Element);
-  candidates.push(...Array.from(scope.querySelectorAll("*")));
+  // The browser finds the elements that still carry something to translate. Asking every element
+  // about every attribute cost a dozen calls apiece, and a page that toggles `hidden` on a large
+  // wrapper paid all of it again on every flush although everything in there was already done.
+  const candidates = [...self.filter((element) => element.matches(UNTRANSLATED_SELECTOR)), ...scope.querySelectorAll(UNTRANSLATED_SELECTOR)];
   for (const element of candidates) {
     // Anything inside our own output, or inside a block already translated, is not source text.
     // The `title` a replace-mode unit carries is the original this extension parked there, and
@@ -216,17 +218,21 @@ function collectReadableAttributes(root: Node, out: Segment[], options: SegmentO
     if (isProtected(element)) continue;
     if (options.skipFormFields && (element as HTMLElement).isContentEditable) continue;
     collectAttributes(element, out);
-    // A shadow root is part of the page too, and querySelectorAll does not cross into one.
-    const shadow = shadowRootOf(element);
-    if (shadow) collectReadableAttributes(shadow, out, options);
     if (element.tagName !== "OPTION" && element.tagName !== "TITLE") continue;
     // A datalist option is a suggestion the browser inserts by value, so translating its text
     // changes what gets typed into the field rather than what the user reads.
     if (element.tagName === "OPTION" && element.closest("datalist")) continue;
     const label = (element.textContent ?? "").trim();
     if (!label || !LETTER.test(label)) continue;
-    if (element.hasAttribute(LABEL_MARKER)) continue;
     out.push({ kind: "label", element, text: label, lang: effectiveLang(element) });
+  }
+  // A shadow root is part of the page too, and querySelectorAll does not cross into one. Only a
+  // host can have one, which a look at the tag settles before anything is asked.
+  for (const element of [...self, ...scope.querySelectorAll("*")]) {
+    const shadow = shadowRootOf(element);
+    if (!shadow || element.closest(SKIP_ATTRIBUTE_SCOPE) || isProtected(element)) continue;
+    if (options.skipFormFields && (element as HTMLElement).isContentEditable) continue;
+    collectReadableAttributes(shadow, out, options);
   }
 }
 
@@ -242,6 +248,14 @@ export const LABEL_MARKER = "data-glossa-label";
 export const MARKER_SELECTOR = [
   ...new Set(TRANSLATABLE_ATTRIBUTES.map(({ attribute }) => `[${attributeMarker(attribute)}]`)),
   `[${LABEL_MARKER}]`
+].join(", ");
+
+// An element with an attribute still to translate, or a label (an <option>, the <title>) not yet
+// done, as a selector. A done attribute carries its marker, which is how the browser leaves it out.
+const UNTRANSLATED_SELECTOR = [
+  ...new Set(TRANSLATABLE_ATTRIBUTES.map(({ attribute }) => `[${attribute}]:not([${attributeMarker(attribute)}])`)),
+  `option:not([${LABEL_MARKER}])`,
+  `title:not([${LABEL_MARKER}])`
 ].join(", ");
 
 // Every attribute name Glossa can translate, for an observer that has to notice a page rewriting one.
@@ -264,12 +278,13 @@ export function attributeSegment(element: Element, attribute: string, options: S
 }
 
 function collectAttributes(element: Element, out: Segment[]): void {
+  // One read of the names instead of a question per attribute.
+  const names = element.getAttributeNames();
   for (const { attribute, applies } of TRANSLATABLE_ATTRIBUTES) {
-    if (!element.hasAttribute(attribute) || !applies(element)) continue;
+    if (!names.includes(attribute) || names.includes(attributeMarker(attribute)) || !applies(element)) continue;
     const text = element.getAttribute(attribute)?.trim() ?? "";
     // Nothing to say, or nothing that reads as language: a url, a token, a single letter.
     if (text.length < 2 || !LETTER.test(text)) continue;
-    if (element.hasAttribute(attributeMarker(attribute))) continue;
     out.push({ kind: "attribute", element, attribute, text, lang: effectiveLang(element) });
   }
 }
