@@ -53,13 +53,6 @@ Added 2026-09-10 from the research pass in RESEARCH.md. Ids continue from G-17.
   Acceptance: a measured comparison on at least three language pairs decides it; if a rewrite wins, it lands with tests, otherwise this item records why not.
   Complexity: S
 
-- [ ] P2 — G-39 — Walk closed shadow roots with the extension DOM API
-  Why: sites built on closed shadow roots (yandex.ru sidebar, many web-component frameworks) stay untranslated; the API to reach them exists in both browsers.
-  Evidence: translatelocally #2, #38; `chrome.dom.openOrClosedShadowRoot` and `browser.dom.openOrClosedShadowRoot` (verified present on both engines 2026-09-10); `segmenter.ts` line 85 uses `element.shadowRoot`.
-  Touches: src/content/segmenter.ts (`openOrClosedShadowRoot` with a fallback to `shadowRoot`), tests/fixtures
-  Acceptance: a fixture with a closed shadow root is translated in both browser smokes.
-  Complexity: S
-
 - [ ] P2 — G-41 — Show per-pair quality and size before download
   Why: Bergamot trails Google by 4 COMET22 on average and by 7 to 9 on en-th, hi-en, en-ko, en-hi and en-lv; users on those pairs will blame the extension unless told first.
   Evidence: Mozilla eval DB (`db/db.sqlite`, 105 Release pairs, means Bergamot 84.8 vs Google 88.8) and registry `metrics.flores200-plus.comet22` in `models.json`.

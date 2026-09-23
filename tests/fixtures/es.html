@@ -48,6 +48,7 @@
         <a class="card" href="#libro2"><div class="name">Historia de la ciudad</div><div class="note">Solo para consulta en la sala de lectura.</div></a>
       </div>
       <section id="host"></section>
+      <section id="closed-host"></section>
       <p id="late" hidden>Este párrafo aparece más tarde.</p>
       <p id="edited">La primera versión de este párrafo se reemplaza más tarde.</p>
       <details id="det">
@@ -63,6 +64,15 @@
       p.id = "shadow-text";
       p.textContent = "Este texto vive dentro de un shadow root.";
       root.append(p);
+
+      // Closed shadow root, the way many widgets ship: the page itself cannot reach into it. The
+      // root is kept on window only so the smokes can read what Glossa wrote there.
+      const closedRoot = document.getElementById("closed-host").attachShadow({ mode: "closed" });
+      const closedText = document.createElement("p");
+      closedText.id = "closed-text";
+      closedText.textContent = "Este párrafo está escondido dentro de un componente cerrado.";
+      closedRoot.append(closedText);
+      window.glossaClosedRoot = closedRoot;
     </script>
   </body>
 </html>

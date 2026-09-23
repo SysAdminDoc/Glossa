@@ -263,6 +263,15 @@ def main() -> None:
         )
         if not shadow or not re.search(r"shadow", shadow[0], re.I) or shadow[1] != "block":
             fail(f"shadow root translation wrong: {shadow}")
+        # A closed root is out of the page's reach; Glossa gets it from the extension DOM API.
+        closed = driver.execute_script(
+            "const r = window.glossaClosedRoot; if (!r) return ['no root on window', ''];"
+            "const b = r.querySelector('glossa-translation');"
+            "return b ? [b.textContent, getComputedStyle(b).display] : ['nothing written: ' + r.innerHTML, '']"
+        )
+        if not re.search(r"paragraph|hidden|component", closed[0], re.I) or closed[1] != "block":
+            fail(f"closed shadow root translation wrong: {closed}")
+        print(f"smoke(firefox): closed shadow root: {closed[0].strip()}")
 
         driver.execute_script(
             "const f = document.createElement('p'); f.id = 'dynamic';"

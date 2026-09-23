@@ -8,6 +8,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - A glossary, under its own heading on the options page. A name or term on a line by itself comes through every translation exactly as written, and `term = translation` makes Glossa use your translation every time. It covers pages, tooltips, image descriptions, selections and text you translate in a text box, with either engine. Terms match with their exact capitals and as whole words, except in Chinese, Japanese, Thai and other languages written without spaces.
 
 ### Fixed
+- Text inside closed shadow roots gets translated now. Plenty of sites build widgets that way (sidebars, comment boxes, whole design systems), and the page itself can't see inside them, so Glossa used to skip them too.
 - Closing the popup while a language downloads no longer loses track of it. Open the popup again and the progress bar is back where the download is, and when the page finishes, the popup says so without another click.
 - With Chrome's translator, closing the popup before a new language pack finishes downloading no longer leaves the page untranslated. The download carries on, and the page is translated when the pack arrives.
 

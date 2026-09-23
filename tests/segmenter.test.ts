@@ -359,6 +359,28 @@ test("open shadow roots are walked", () => {
   assert.equal(segments[0]?.kind, "element");
 });
 
+test("closed shadow roots are walked through the extension's DOM API, tooltips included", () => {
+  const body = load(`<section id="host"></section>`);
+  const host = window.document.getElementById("host")!;
+  const root = host.attachShadow({ mode: "closed" });
+  root.innerHTML = `<p>Dentro de una sombra cerrada</p><img alt="Un botón cerrado" src="x.png">`;
+  assert.equal(host.shadowRoot, null, "happy-dom handed out the closed root to the page");
+  // Without the extension API the closed root is out of reach, as it is for the page itself.
+  assert.equal(collectSegments(body, options).length, 0);
+  const roots = new Map<unknown, unknown>([[host, root]]);
+  globals.chrome = { dom: { openOrClosedShadowRoot: (element: unknown) => roots.get(element) ?? null } };
+  try {
+    const segments = collectSegments(body, options);
+    assert.deepEqual(
+      segments.map((segment) => segment.kind),
+      ["element", "attribute"],
+      "the paragraph or the tooltip inside the closed root was missed"
+    );
+  } finally {
+    delete globals.chrome;
+  }
+});
+
 test("collectFromNodes treats the given nodes themselves as candidates", () => {
   load("");
   const fresh = window.document.createElement("p");

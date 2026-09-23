@@ -273,6 +273,16 @@ try {
   assert(/shadow/i.test(shadow.text), `shadow root text was not translated: "${shadow.text}"`);
   assert(shadow.display === "block", `shadow root translation is not styled as a block (display: ${shadow.display})`);
 
+  // A closed root is out of the page's reach, and was out of Glossa's until it asked the extension
+  // DOM API for it.
+  const closed = await page.evaluate(() => {
+    const block = window.glossaClosedRoot?.querySelector("glossa-translation");
+    return { text: block?.textContent ?? "", display: block ? getComputedStyle(block).display : "" };
+  });
+  console.info(`smoke: closed shadow root: ${closed.text.trim()}`);
+  assert(/paragraph|hidden|component/i.test(closed.text), `the closed shadow root was not translated: "${closed.text}"`);
+  assert(closed.display === "block", `the closed root's translation is not styled as a block (display: ${closed.display})`);
+
   // Dynamic content. Four kinds of change at once: a node added, a `hidden` paragraph revealed, the
   // text of a translated unit replaced in place, and a `<details>` panel opened. The observer has to
   // catch all four, and the edited unit must end up with exactly one translation, not two.

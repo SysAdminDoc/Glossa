@@ -162,8 +162,9 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       continue;
     }
 
-    if (element.shadowRoot) {
-      walk(element.shadowRoot, out, options);
+    const shadow = shadowRootOf(element);
+    if (shadow) {
+      walk(shadow, out, options);
     }
     if (isContainer(element)) {
       walk(element, out, options);
@@ -209,7 +210,8 @@ function collectReadableAttributes(root: Node, out: Segment[], options: SegmentO
     if (options.skipFormFields && (element as HTMLElement).isContentEditable) continue;
     collectAttributes(element, out);
     // A shadow root is part of the page too, and querySelectorAll does not cross into one.
-    if (element.shadowRoot) collectReadableAttributes(element.shadowRoot, out, options);
+    const shadow = shadowRootOf(element);
+    if (shadow) collectReadableAttributes(shadow, out, options);
     if (element.tagName !== "OPTION" && element.tagName !== "TITLE") continue;
     // A datalist option is a suggestion the browser inserts by value, so translating its text
     // changes what gets typed into the field rather than what the user reads.
@@ -615,10 +617,33 @@ function emptyFields(root: Element): void {
   }
 }
 
+// A closed shadow root is out of the page's reach, not an extension's, and widgets built on closed
+// roots otherwise stay untranslated. Firefox gives content scripts an `openOrClosedShadowRoot`
+// property on every element (with the dom API alone, Firefox 156 left the smoke's closed root
+// untranslated, 2026-09-23); Chrome gives
+// them chrome.dom.openOrClosedShadowRoot. Read through the globals so the unit tests, which have no
+// extension API, get the open root.
+type DomApi = { dom?: { openOrClosedShadowRoot?: (element: HTMLElement) => ShadowRoot | null | undefined } };
+
+function shadowRootOf(element: Element): ShadowRoot | null {
+  const own = (element as { openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot;
+  if (own !== undefined) return own;
+  const extension = globalThis as { browser?: DomApi; chrome?: DomApi };
+  const dom = extension.browser?.dom ?? extension.chrome?.dom;
+  if (dom?.openOrClosedShadowRoot) {
+    try {
+      return dom.openOrClosedShadowRoot(element as HTMLElement) ?? null;
+    } catch {
+      // Not an element it accepts (an SVG node, say), which has no root worth walking anyway.
+    }
+  }
+  return element.shadowRoot;
+}
+
 function isContainer(element: Element): boolean {
   for (const child of element.children) {
     if (BLOCK_TAGS.has(child.tagName)) return true;
-    if (child.shadowRoot) return true;
+    if (shadowRootOf(child)) return true;
   }
   // An inline wrapper can still hold blocks: card grids are built as `div > a > div`, and sending
   // the wrapper as one unit makes bilingual mode append a second copy of every card in it. That
