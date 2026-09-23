@@ -33,8 +33,15 @@ interface ElementRecord {
   element: Element;
   originalChildren: Node[];
   // Elements of the page that were reused in the translation rather than copied, with the children
-  // they held before. Restoring means giving each one its own contents back.
-  reused: Array<{ element: Element; children: Node[] }>;
+  // they held before and the text written into them (their own, not a reused child's). Restoring
+  // means giving each one its own contents back, unless the page has written into it since.
+  reused: Array<{ element: Element; children: Node[]; writtenText: string }>;
+  // The text written into the unit outside every reused element. A page that changes that has
+  // edited the translation itself, and nothing maps its edit back onto the original.
+  writtenOwnText: string;
+  // Set once the page has done that. The block stays as the page left it, is never sent to the
+  // engine as if it were source text, and "show original" reports it rather than guessing.
+  unrestorable: boolean;
   addedTitle: boolean;
   previousTitle: string | null;
   // A page that labels its own elements keeps its attributes through translate and restore, so the
@@ -185,6 +192,8 @@ export class Renderer {
         element,
         originalChildren: [],
         reused: [],
+        writtenOwnText: "",
+        unrestorable: false,
         addedTitle: false,
         previousTitle: null,
         previousLang: element.getAttribute("lang"),
@@ -200,8 +209,9 @@ export class Renderer {
     let addedTitle = false;
     // Replace mode owns the block, so the block's own elements can be moved into the translation.
     const merged = mergeLiveElements(nodes, element);
-    const reused = merged.reused;
     element.replaceChildren(...merged.nodes);
+    const reusedSet = new Set(merged.reused.map((entry) => entry.element));
+    const reused = merged.reused.map((entry) => ({ ...entry, writtenText: ownText(entry.element, reusedSet) }));
     if (options.showOriginalOnHover && previousTitle === null) {
       const original = segment.text.replace(/\s+/g, " ").trim();
       if (original) {
@@ -218,6 +228,8 @@ export class Renderer {
       element,
       originalChildren,
       reused,
+      writtenOwnText: ownText(element, reusedSet),
+      unrestorable: false,
       translatedText: applied,
       written: merged.nodes,
       addedTitle,
@@ -297,6 +309,9 @@ export class Renderer {
     // page's own text back. Only when the page really wrote new nodes, though: with the nodes Glossa
     // wrote still in place, the unit went stale for another reason (its `lang` or `translate`
     // changed) and has to be reset as usual.
+    // A block "show original" had to leave as the page edited it stays out, whatever the page does
+    // to it next: its text is still mostly the translation.
+    if (target.getAttribute(UNIT_ATTRIBUTE) === "kept") return false;
     const unitRecord = this.records.find((entry): entry is ElementRecord => entry.kind === "element" && entry.element === target);
     if (
       unitRecord &&
@@ -305,6 +320,18 @@ export class Renderer {
       sameText(target.textContent ?? "", unitRecord.translatedText)
     ) {
       return false;
+    }
+    // A page that edited part of a translated block (a counter it updates, a word it rewrote) has
+    // not written new source text: what is there is the translation with its edit in it. Sending
+    // that to the engine would translate English as if it were the page's language, and resetting
+    // would lose the originals. The block stays as it is, and "show original" either brings the
+    // original back with the page's edit in it or says it cannot.
+    if (unitRecord && unitRecord.appended === null) {
+      const edit = pageEdit(unitRecord);
+      if (edit !== "none") {
+        if (edit === "translation") unitRecord.unrestorable = true;
+        return false;
+      }
     }
     let dropped = false;
     for (let index = this.records.length - 1; index >= 0; index--) {
@@ -374,8 +401,11 @@ export class Renderer {
     element.removeAttribute(LABEL_MARKER);
   }
 
-  restoreAll(): number {
+  // Returns how many blocks went back to their originals, and how many the page had edited in a way
+  // that cannot be carried back, which stay as they are.
+  restoreAll(): { restored: number; kept: number } {
     let restored = 0;
+    let kept = 0;
     for (const record of this.records.reverse()) {
       if (record.kind === "attribute") {
         restoreAttribute(record);
@@ -402,10 +432,23 @@ export class Renderer {
         continue;
       }
       const element = record.element;
+      if (record.appended === null && (record.unrestorable || pageEdit(record) === "translation")) {
+        // Left exactly as the page made it, and marked so no later pass takes it for source text.
+        kept++;
+        clearIds(element);
+        element.setAttribute(UNIT_ATTRIBUTE, "kept");
+        continue;
+      }
       if (record.appended) {
         record.appended.remove();
       } else {
-        for (const { element: reused, children } of record.reused) reused.replaceChildren(...children);
+        const reusedSet = new Set(record.reused.map((entry) => entry.element));
+        for (const { element: reused, children, writtenText } of record.reused) {
+          // The page wrote into one of its own elements since: its content is the page's latest,
+          // and it goes back into the original as it is.
+          if (ownText(reused, reusedSet) !== writtenText) continue;
+          reused.replaceChildren(...children);
+        }
         element.replaceChildren(...record.originalChildren);
         if (record.addedTitle) element.removeAttribute("title");
         else if (record.previousTitle !== null) element.setAttribute("title", record.previousTitle);
@@ -430,7 +473,7 @@ export class Renderer {
       }
       stray.removeAttribute(LABEL_MARKER);
     }
-    return restored;
+    return { restored, kept };
   }
 }
 
@@ -536,6 +579,58 @@ function labelLanguage(element: Element, language: string): void {
 
 function sameText(a: string, b: string): boolean {
   return a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
+}
+
+// The text of an element that is not inside one of `nested`: what was written into it directly.
+function ownText(root: Element, nested: Set<Element>): string {
+  let text = "";
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    let inside = false;
+    for (let parent = node.parentElement; parent && parent !== root; parent = parent.parentElement) {
+      if (nested.has(parent)) {
+        inside = true;
+        break;
+      }
+    }
+    if (!inside) text += (node as Text).data;
+  }
+  return text;
+}
+
+// Words, for telling the translation with a word changed from text the page wrote afresh.
+function words(text: string): string[] {
+  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+// What the page did to a block translated in place, by what it left there:
+// - "none": the text is still ours, or the page wrote new text of its own, to translate afresh;
+// - "reused": it changed only the insides of its own elements the translation reused (a counter),
+//   which restoring can carry back;
+// - "translation": it edited the translation itself, which nothing maps back onto the original.
+function pageEdit(record: ElementRecord): "none" | "reused" | "translation" {
+  const element = record.element;
+  const now = element.textContent ?? "";
+  if (sameText(now, record.translatedText)) return "none";
+  if (record.written.some((node) => element.contains(node))) {
+    const reusedSet = new Set(record.reused.map((entry) => entry.element));
+    return ownText(element, reusedSet) === record.writtenOwnText ? "reused" : "translation";
+  }
+  // Every node written is gone. New source text shares few words with the translation; the
+  // translation read back with an edit in it shares nearly all of them.
+  const written = new Map<string, number>();
+  for (const word of words(record.translatedText)) written.set(word, (written.get(word) ?? 0) + 1);
+  const current = words(now);
+  if (written.size < 3 || current.length === 0) return "none";
+  let shared = 0;
+  for (const word of current) {
+    const left = written.get(word) ?? 0;
+    if (left > 0) {
+      shared++;
+      written.set(word, left - 1);
+    }
+  }
+  return shared / current.length >= 0.75 ? "translation" : "none";
 }
 
 // A copy must not repeat the page's ids. Two elements with one id is invalid, and whatever looks an

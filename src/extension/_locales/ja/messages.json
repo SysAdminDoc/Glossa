@@ -496,5 +496,8 @@
   },
   "qualityDetailAlone": {
     "message": "$1 は Mozilla のテストで $2 です。"
+  },
+  "popupRestoredExcept": {
+    "message": "元のページに戻しました。翻訳後にページ自身が書き換えたブロックはそのままです（$1 個）。"
   }
 }

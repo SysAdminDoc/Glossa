@@ -149,7 +149,8 @@ function mergeStates(states: PageState[]): PageState | undefined {
     blocksTotal: states.reduce((sum, state) => sum + state.blocksTotal, 0),
     blocksDone: states.reduce((sum, state) => sum + state.blocksDone, 0),
     lastError: states.find((state) => state.lastError)?.lastError ?? null,
-    notice: states.find((state) => state.notice)?.notice ?? null
+    notice: states.find((state) => state.notice)?.notice ?? null,
+    unrestored: states.reduce((sum, state) => sum + (state.unrestored ?? 0), 0)
   };
 }
 

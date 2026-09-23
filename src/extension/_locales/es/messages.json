@@ -496,5 +496,8 @@
   },
   "qualityDetailAlone": {
     "message": "$1 obtiene $2 en la prueba de Mozilla."
+  },
+  "popupRestoredExcept": {
+    "message": "Se restauró la página original. Los bloques que la propia página cambió después de traducirlos se quedan como están ($1)."
   }
 }

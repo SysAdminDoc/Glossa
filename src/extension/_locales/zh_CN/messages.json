@@ -496,5 +496,8 @@
   },
   "qualityDetailAlone": {
     "message": "$1 在 Mozilla 的测试中得分 $2。"
+  },
+  "popupRestoredExcept": {
+    "message": "已还原原始页面。翻译后被页面自身修改过的段落保持现状（$1 个）。"
   }
 }

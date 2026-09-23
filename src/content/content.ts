@@ -99,7 +99,8 @@ function boot(): void {
       blocksTotal: 0,
       blocksDone: 0,
       lastError: null,
-      notice: null
+      notice: null,
+      unrestored: 0
     },
     renderer: new Renderer(),
     options: null,
@@ -249,6 +250,7 @@ async function translatePage(
   controller.skipFormFields = command.skipFormFields;
   controller.state.lastError = null;
   controller.state.notice = null;
+  controller.state.unrestored = 0;
   controller.options = {
     displayMode: command.displayMode,
     showOriginalOnHover: command.showOriginalOnHover,
@@ -452,7 +454,7 @@ function restore(controller: Controller): void {
   controller.routes.clear();
   controller.source = null;
   controller.target = null;
-  controller.renderer.restoreAll();
+  controller.state.unrestored = controller.renderer.restoreAll().kept;
   controller.state.translated = false;
   controller.state.translating = false;
   controller.state.blocksDone = 0;

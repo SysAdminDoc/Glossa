@@ -496,5 +496,8 @@
   },
   "qualityDetailAlone": {
     "message": "$1 erreicht $2 im Test von Mozilla."
+  },
+  "popupRestoredExcept": {
+    "message": "Originalseite wiederhergestellt. Blöcke, die die Seite nach der Übersetzung selbst geändert hat, bleiben, wie sie sind ($1)."
   }
 }

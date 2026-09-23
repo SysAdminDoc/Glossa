@@ -456,10 +456,30 @@ try {
   assert(/catalog/i.test(replaced.text), `the link text was not translated: "${replaced.text}"`);
   assert(replaced.leftoverIds === 0, `${replaced.leftoverIds} elements were left numbered`);
 
+  // The page edits a word of a block translated in place. That is the translation with an edit in
+  // it, not text in the page's language: it must not go back to the engine, and show original has
+  // no original with the edit in it to give back, so it leaves the block and says so.
+  const editedTitle = await page.evaluate(() => {
+    const title = document.getElementById("title");
+    const first = title?.firstChild;
+    if (first?.nodeType === Node.TEXT_NODE) first.data = "Hello again, welcome to the ";
+    return title?.textContent ?? "";
+  });
+  await page.waitForTimeout(1_500);
+  const afterEdit = await page.$eval("#title", (title) => ({ text: title.textContent ?? "", unit: title.getAttribute("data-glossa-unit") }));
+  console.info(`smoke: the page edited a replaced block to "${afterEdit.text}"`);
+  assert(/^Hello again, welcome to the /.test(editedTitle), `the edit did not land where expected: "${editedTitle}"`);
+  assert(afterEdit.text === editedTitle && afterEdit.unit === "replaced", `the edited block was translated again: ${JSON.stringify(afterEdit)}`);
+
   await popup.click("#action");
   await popup.waitForFunction(() => document.getElementById("action")?.textContent === "Translate page", null, {
     timeout: 30_000
   });
+  const restoredStatus = await popup.$eval("#status", (status) => status.textContent ?? "");
+  const keptTitle = await page.$eval("#title", (title) => ({ text: title.textContent ?? "", unit: title.getAttribute("data-glossa-unit") }));
+  console.info(`smoke: show original says "${restoredStatus}"`);
+  assert(/stay as they are \(1\)/.test(restoredStatus), `show original did not say it left the edited block: "${restoredStatus}"`);
+  assert(keptTitle.text === editedTitle && keptTitle.unit === "kept", `the edited block was not left as the page made it: ${JSON.stringify(keptTitle)}`);
   const restoredLink = await page.$eval("#intro a", (link) => ({
     same: link.dataset.glossaProbe === "1",
     text: link.textContent ?? ""

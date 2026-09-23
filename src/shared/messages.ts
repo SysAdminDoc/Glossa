@@ -57,6 +57,8 @@ export interface PageState {
   // Why some blocks were left in their own language while the rest was translated, when the engine
   // gave a reason. A warning beside the count, never an error in place of it.
   notice: string | null;
+  // Blocks "show original" left as they were, because the page had edited the translation itself.
+  unrestored: number;
 }
 
 // ---- popup / options <-> background ----

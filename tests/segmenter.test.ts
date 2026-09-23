@@ -322,7 +322,7 @@ test("reset drops a unit's record and its translation block so it can be transla
   assert.equal(p.querySelector("glossa-translation"), null);
   assert.equal(p.getAttribute("data-glossa-unit"), null);
   // Nothing is left to undo, and the element is a candidate again.
-  assert.equal(renderer.restoreAll(), 0);
+  assert.equal(renderer.restoreAll().restored, 0);
   const again = collectSegments(body, options);
   assert.equal(again.length, 1);
 });
@@ -423,7 +423,7 @@ test("renderer bilingual mode appends a block and restore removes it", () => {
   assert.equal(p.getAttribute("data-glossa-unit"), "bilingual");
   assert.equal(p.querySelector("glossa-translation")?.textContent, "Hello world, welcome");
   assert.equal(p.querySelector("glossa-translation a")?.getAttribute("href"), "#x");
-  assert.equal(renderer.restoreAll(), 1);
+  assert.equal(renderer.restoreAll().restored, 1);
   assert.equal(p.querySelector("glossa-translation"), null);
   assert.equal(p.getAttribute("data-glossa-unit"), null);
   assert.equal(p.innerHTML, 'Hola <a href="#x">mundo</a>, bienvenidos');

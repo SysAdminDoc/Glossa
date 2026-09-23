@@ -10,6 +10,7 @@ All notable changes to Glossa are recorded here. Dates are ISO (YYYY-MM-DD).
 - On Chrome, a setting for how long the engine keeps languages in memory after the last translation: 15 seconds as before, or up to 15 minutes if you move between pages a lot. Firefox decides that itself, so it doesn't show the setting.
 
 ### Fixed
+- In "In place of the original" mode, a site that later edits part of a translated block (a message count it updates, a word it rewrites) no longer gets that mix of translation and edit sent back to be translated as if it were the page's own language. Show original brings the original back with the site's update in it where the update landed in the site's own element, and otherwise leaves the block as the site made it and says how many it left.
 - Warning text in the light theme is darker, so it's readable at the size the popup uses.
 - Pages that keep hiding and showing large parts of themselves no longer make Glossa look over every tooltip and label in there again each time. It now asks the browser for just the ones still to translate, which on a 2,000-element test feed cut the work on a repeat pass by more than 40 times.
 - Translating through English no longer loads the English model a second time. With Spanish pages translated into English, French and German in turn, the engine's memory peaked at 406 MB instead of 585 MB, and it now holds at most three models.

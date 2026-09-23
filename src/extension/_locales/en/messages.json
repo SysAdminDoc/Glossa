@@ -650,5 +650,9 @@
   "qualityDetailAlone": {
     "message": "$1 scores $2 on Mozilla's test set.",
     "description": "Tooltip; $1 is a language pair, $2 a score such as 85.9"
+  },
+  "popupRestoredExcept": {
+    "message": "Restored the original page. Blocks the page itself changed after translation stay as they are ($1).",
+    "description": "Popup status after show original; $1 is a number of blocks"
   }
 }

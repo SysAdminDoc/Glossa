@@ -379,7 +379,9 @@ async function onAction(): Promise<void> {
     if (page?.translated) {
       page = await sendUi<PageState>({ type: "glossa:restore-page", tabId });
       hideProgress();
-      setStatus(t("popupRestored"), "ok");
+      // Blocks the page edited after translating them stay as they are, and the reader is told.
+      if (page?.unrestored) setStatus(t("popupRestoredExcept", String(page.unrestored)), "warn");
+      else setStatus(t("popupRestored"), "ok");
       render();
       return;
     }
