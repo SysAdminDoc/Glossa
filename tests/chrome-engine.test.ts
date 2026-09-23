@@ -38,6 +38,8 @@ let destroyed = 0;
 // Whether the document holds the user's click, which a message from the clicked popup brings to it.
 let clicked = false;
 Object.defineProperty(globalThis.navigator, "userActivation", { configurable: true, get: () => ({ isActive: clicked }) });
+// How long a create() without a click takes to be refused.
+let refusalDelayMs = 0;
 // Pack downloads a click started, which the test finishes or fails.
 const downloads = new Map<string, { finish: () => void; fail: (error: Error) => void }>();
 
@@ -58,7 +60,8 @@ globals.Translator = {
     const state = availability.get(key) ?? "unavailable";
     if (state === "unavailable") throw refusal("NotSupportedError", "Unable to create translator for the given source and target language.");
     if (state !== "available") {
-      // What Chrome does without a gesture when the pack is not on disk yet.
+      // What Chrome does without a gesture when the pack is not on disk yet, after a moment.
+      if (!clicked && refusalDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, refusalDelayMs));
       if (!clicked) throw refusal("NotAllowedError", 'Requires a user gesture when availability is "downloading" or "downloadable".');
       // With one it downloads the pack, and the translator arrives with it.
       const events = new EventTarget();
@@ -119,6 +122,7 @@ function reset(): void {
   created.length = 0;
   destroyed = 0;
   clicked = false;
+  refusalDelayMs = 0;
   downloads.clear();
   broadcasts.length = 0;
 }
@@ -236,6 +240,26 @@ test("a claimed download that fails fails the page's batch, and the next click c
   assert.deepEqual(await claimEs(host), { claimed: true });
   assert.deepEqual(created, ["es->en", "es->en"], "the failed download was kept and handed out again");
   downloads.get("es->en")?.finish();
+  await host.shutdown();
+});
+
+test("a claim does not hand out a create() that started without the click and is about to be refused", async () => {
+  reset();
+  availability.set("es->en", "downloadable");
+  refusalDelayMs = 30;
+  const { host } = chromeHost();
+  // Another tab's batch asks first, with no click behind it.
+  const early = translateEs(host);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  clicked = true;
+  assert.deepEqual(await claimEs(host), { claimed: true });
+  clicked = false;
+  assert.equal(downloads.size, 1, "the claim started no download of its own");
+  await assert.rejects(early, (error: Error) => error.message === CHROME_NEEDS_DOWNLOAD);
+  // The page the popup hands over waits for the claimed download, not the refused create().
+  const page = translateEs(host);
+  downloads.get("es->en")?.finish();
+  assert.deepEqual((await page).fragments, ["EN[Hola]"]);
   await host.shutdown();
 });
 

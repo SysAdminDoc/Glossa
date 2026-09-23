@@ -37,6 +37,8 @@ export class ChromeEngine {
   // One translator per pair, shared by every request for it. A failed create is not kept: the next
   // request tries again, which is what makes "download it from the popup, then retry" work.
   private readonly translators = new Map<string, Promise<TranslatorInstance>>();
+  // Translators a claim can hand out as they are: started with the user's click, or already made.
+  private readonly usable = new WeakSet<Promise<TranslatorInstance>>();
 
   // Start the pack download here, in the document that outlives the popup. Without it, a popup
   // closed mid-download leaves this document with a pack it cannot open: create() refuses without a
@@ -48,7 +50,11 @@ export class ChromeEngine {
   claimPack(sourceLanguage: string, targetLanguage: string, progress: (fraction: number) => void): Promise<TranslatorInstance> | null {
     const activation = (globalThis as { navigator?: { userActivation?: { isActive?: boolean } } }).navigator?.userActivation;
     if (!activation?.isActive) return null;
-    return this.translator(sourceLanguage, targetLanguage, progress);
+    const known = this.translators.get(`${sourceLanguage}->${targetLanguage}`);
+    if (known && this.usable.has(known)) return known;
+    // One started without a click (another tab's batch, an "always" site) is about to be refused for
+    // want of one. Whatever waits on it gets that answer; from here on the pair waits for this one.
+    return this.start(sourceLanguage, targetLanguage, progress, true);
   }
 
   async routeStatus(sourceLanguage: string, targetLanguage: string): Promise<RouteStatus> {
@@ -107,27 +113,38 @@ export class ChromeEngine {
 
   // A translation that asks while a claimed download is running gets that download's translator,
   // which is how the page waits for the pack.
-  private translator(
+  private translator(sourceLanguage: string, targetLanguage: string): Promise<TranslatorInstance> {
+    return this.translators.get(`${sourceLanguage}->${targetLanguage}`) ?? this.start(sourceLanguage, targetLanguage, null, false);
+  }
+
+  private start(
     sourceLanguage: string,
     targetLanguage: string,
-    progress?: (fraction: number) => void
+    progress: ((fraction: number) => void) | null,
+    clicked: boolean
   ): Promise<TranslatorInstance> {
     const key = `${sourceLanguage}->${targetLanguage}`;
-    const known = this.translators.get(key);
-    if (known) return known;
     const api = translatorApi();
     if (!api) return Promise.reject(new Error(CHROME_UNAVAILABLE));
     const options: TranslatorCreateOptions = { sourceLanguage, targetLanguage };
     if (progress) {
       options.monitor = (monitor) => monitor.addEventListener("downloadprogress", (event) => progress(event.loaded));
     }
-    const created = api.create(options).catch((error: unknown) => {
-      this.translators.delete(key);
-      const name = (error as { name?: unknown } | null)?.name;
-      // The pack is not on disk yet, and only a gesture can start the download.
-      if (name === "NotAllowedError") throw new Error(CHROME_NEEDS_DOWNLOAD);
-      throw error instanceof Error ? error : new Error(String(error));
-    });
+    const created: Promise<TranslatorInstance> = api.create(options).then(
+      (translator) => {
+        this.usable.add(created);
+        return translator;
+      },
+      (error: unknown) => {
+        // A claim may have replaced this one in the meantime, and that one stays.
+        if (this.translators.get(key) === created) this.translators.delete(key);
+        const name = (error as { name?: unknown } | null)?.name;
+        // The pack is not on disk yet, and only a gesture can start the download.
+        if (name === "NotAllowedError") throw new Error(CHROME_NEEDS_DOWNLOAD);
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+    );
+    if (clicked) this.usable.add(created);
     this.translators.set(key, created);
     return created;
   }

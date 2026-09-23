@@ -440,22 +440,47 @@ api.runtime.onMessage.addListener((message: unknown, sender) => {
     return;
   }
   const state = message as { type?: string; state?: PageState };
-  // Every content script in every tab reports here. Only the top frame of the tab this popup acts on
-  // is the page it shows; the other frames are in the count the background merges.
+  // Every content script in every tab reports here. Only the tab this popup acts on counts, and only
+  // its top frame is the page it shows; the other frames are in the count the background merges.
   if (state?.type !== "glossa:page-state" || !state.state) return;
-  if (sender.tab?.id !== tabId || (sender.frameId ?? 0) !== 0) return;
+  if (sender.tab?.id !== tabId) return;
+  if ((sender.frameId ?? 0) !== 0) {
+    // A frame that finishes after the top one is how a reopened popup learns the page is done.
+    if (!busy && page?.translating) rereadSoon();
+    return;
+  }
   const wasTranslating = page?.translating === true;
   page = state.state;
   if (page.translating && page.blocksTotal > 0) {
     showProgress(page.blocksDone / page.blocksTotal, t("popupTranslatingProgress", String(page.blocksDone), String(page.blocksTotal)));
   } else if (wasTranslating && !page.translating && !busy) {
-    // A translation this popup did not start (an earlier popup's, or an "always" site's) has ended.
-    // The click handler reports its own; this one is read back whole, every frame counted.
+    // A translation this popup did not start (an earlier popup's, or an "always" site's) has ended,
+    // at least in the top frame. Say so now, and read the whole tab back for the full count and for
+    // a frame still working. The click handler reports its own.
     hideProgress();
-    void loadPage().catch(() => undefined);
+    if (page.lastError) setStatus(page.lastError, "error");
+    else if (page.translated) showTranslated(page);
+    rereadSoon();
   }
   render();
 });
+
+// Read the tab back whole, every frame counted, once its reports have stopped for a moment. The bar
+// stays up only while some frame is still translating.
+let rereadTimer: number | null = null;
+function rereadSoon(): void {
+  if (rereadTimer !== null) window.clearTimeout(rereadTimer);
+  rereadTimer = window.setTimeout(() => {
+    rereadTimer = null;
+    loadPage().then(
+      () => {
+        if (page?.translating) showProgress(null, t("popupTranslating"));
+        else hideProgress();
+      },
+      () => undefined
+    );
+  }, 300);
+}
 
 async function init(): Promise<void> {
   localize();
