@@ -19,7 +19,7 @@ globals.DOMParser = window.DOMParser;
 globals.NodeFilter = window.NodeFilter;
 
 const { compileGlossary, formatGlossary, parseGlossary, sanitizeGlossary, GLOSSARY_MAX_ENTRIES } = await import("../src/shared/glossary.ts");
-const { collectSegments, segmentFragment } = await import("../src/content/segmenter.ts");
+const { collectSegments, plainFragment, segmentFragment } = await import("../src/content/segmenter.ts");
 const { Renderer } = await import("../src/content/renderer.ts");
 
 const replace = { displayMode: "replace" as const, showOriginalOnHover: false, targetLanguage: "en" };
@@ -135,4 +135,51 @@ test("tooltips and bare text carry the glossary too", () => {
   assert.equal(byId("i").getAttribute("alt"), "Front of the Main Square");
   // Without a glossary the fragment is plain escaped text, as before.
   assert.equal(segmentFragment(alt), "Fachada de la plaza mayor");
+});
+
+// Found by the review of 2026-09-23.
+
+test("a block that is only a term with a translation gets the translation, with no trip to the engine", () => {
+  window.document.body.innerHTML = `<table><tr><td id="a">martes</td><td id="b">martes 10:00</td><td id="c">Glossa</td></tr></table>`;
+  const compiled = glossary("martes = TUESDAY\nGlossa");
+  const segments = collectSegments(window.document.body as unknown as Element, { skipFormFields: true, glossary: compiled });
+  const units = segments.filter((segment) => segment.kind === "element");
+  // The kept term alone has nothing to translate and is left out, as before.
+  assert.deepEqual(units.map((unit) => (unit.kind === "element" ? [unit.element.id, unit.local] : null)), [["a", true], ["b", true]]);
+  const renderer = new Renderer();
+  for (const unit of units) {
+    if (unit.kind === "element") renderer.apply(unit, unit.html, replace);
+  }
+  assert.equal(byId("a").textContent, "TUESDAY");
+  assert.equal(byId("b").textContent, "TUESDAY 10:00");
+  renderer.restoreAll();
+  assert.equal(byId("a").textContent, "martes");
+});
+
+test("a term inside an address in a tooltip, a selection or a text box is part of the address", () => {
+  const compiled = glossary("rust = óxido");
+  assert.equal(plainFragment("https://github.com/rust-lang/rust", compiled), "https://github.com/rust-lang/rust");
+  assert.equal(plainFragment("rust@ejemplo.es", compiled), "rust@ejemplo.es");
+  assert.match(plainFragment("aprende rust hoy", compiled), /^aprende <var [^>]*>óxido<\/var> hoy$/);
+});
+
+test("a term matches whatever whitespace the page puts between its words", () => {
+  const { scanner, translationOf } = glossary("plaza mayor = Main Square");
+  for (const text of ["en la plaza\n      mayor hoy", "en la plaza\u00a0mayor hoy"]) {
+    const found = text.match(scanner) ?? [];
+    assert.equal(found.length, 1, `no match in ${JSON.stringify(text)}`);
+    assert.equal(translationOf(found[0]!), "Main Square");
+  }
+});
+
+test("a Latin term is a whole word next to Japanese or Chinese text", () => {
+  const { scanner } = glossary("iPhone = アイフォーン");
+  assert.deepEqual("新しいiPhoneが出た".match(scanner), ["iPhone"]);
+  assert.deepEqual("新しいiPhones".match(scanner), null);
+});
+
+test("a term the page ends inside a tag is not a whole word when the next letter follows the tag", () => {
+  const unit = unitOf(`<p>Me gusta el <b id="b">Rust</b>y de la tienda y Rust mismo también.</p>`, "Rust = Óxido");
+  assert.equal(unit.holds.length, 1, `the page's "Rusty" was held as a term: ${unit.html}`);
+  assert.match(unit.html, /<b [^>]*>Rust<\/b>y/);
 });

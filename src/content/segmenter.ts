@@ -4,14 +4,17 @@
 // sentences intact through links and emphasis; Bergamot's HTML mode carries the inline tags
 // through the translation.
 
-import type { Glossary } from "../shared/glossary.ts";
+import { isSpacedWordChar, type Glossary } from "../shared/glossary.ts";
 
 export const UNIT_ATTRIBUTE = "data-glossa-unit";
 export const TRANSLATION_CLASS = "glossa-t";
 export const TRANSLATION_TAG = "GLOSSA-TRANSLATION";
 
 export type Segment =
-  | { kind: "element"; element: Element; html: string; text: string; holds: Hold[]; lang: string | null }
+  // `local` marks a unit that is nothing but glossary terms, at least one with a translation of its
+  // own: its html is already its answer, and it never goes to the engine, which has no text to
+  // translate in it.
+  | { kind: "element"; element: Element; html: string; text: string; holds: Hold[]; lang: string | null; local?: boolean }
   | { kind: "text"; node: Text; text: string; lang: string | null }
   // An attribute a user can read: a tooltip, a placeholder, the text an image stands in for.
   | { kind: "attribute"; element: Element; attribute: string; text: string; lang: string | null }
@@ -176,10 +179,14 @@ function visit(children: Node[], out: Segment[], options: SegmentOptions): void 
       options.deferred?.add(element);
       continue;
     }
-    const { html, holds } = serializeUnit(element, options.glossary);
+    const { html, holds, replaced } = serializeUnit(element, options.glossary);
     // A block that is nothing but a url or a reference number has no prose left once the
     // placeholders are in; sending it wastes a round trip and risks the engine rewriting it.
-    if (holds.length > 0 && !LETTER.test(textOutsideHolds(html))) continue;
+    // A table header that is just a glossary term with a translation still gets the translation.
+    if (holds.length > 0 && !LETTER.test(textOutsideHolds(html))) {
+      if (replaced) out.push({ kind: "element", element, html, text, holds, lang: effectiveLang(element), local: true });
+      continue;
+    }
     out.push({ kind: "element", element, html, text, holds, lang: effectiveLang(element) });
   }
 }
@@ -298,7 +305,7 @@ function effectiveLang(start: Element | null): string | null {
 // Serialise a unit for the engine. Protected inline descendants become `var` placeholders that
 // Bergamot passes through untouched; the originals are returned so the renderer can put them
 // back by index. Clone and original are walked with the same selector, so indexes line up.
-export function serializeUnit(element: Element, glossary?: Glossary | null): { html: string; holds: Hold[] } {
+export function serializeUnit(element: Element, glossary?: Glossary | null): { html: string; holds: Hold[]; replaced: boolean } {
   stampIds(element);
   // A field is never a hold, and neither is anything inside one: fields are emptied below, and
   // original and clone have to be filtered the same way for the indexes to line up.
@@ -307,7 +314,7 @@ export function serializeUnit(element: Element, glossary?: Glossary | null): { h
   const hasFields = element.querySelector(FORM_FIELD_SELECTOR) !== null;
   const source = unitText(element);
   if (holds.length === 0 && !hasFields && !hasRuns(source, glossary)) {
-    return { html: element.innerHTML, holds };
+    return { html: element.innerHTML, holds, replaced: false };
   }
   const clone = element.cloneNode(true) as Element;
   const cloneHolds = Array.from(clone.querySelectorAll(HOLD_SELECTOR)).filter(outsideFields);
@@ -321,8 +328,8 @@ export function serializeUnit(element: Element, glossary?: Glossary | null): { h
     placeholder.textContent = held.textContent ?? "";
     held.replaceWith(placeholder);
   });
-  protectText(clone, holds, glossary);
-  return { html: clone.innerHTML, holds };
+  const replaced = protectText(clone, holds, glossary) > 0;
+  return { html: clone.innerHTML, holds, replaced };
 }
 
 function stampIds(element: Element): void {
@@ -385,6 +392,8 @@ interface Run {
   start: number;
   end: number;
   replacement: string | null;
+  // A glossary term, as against a url, address or number.
+  term: boolean;
 }
 
 function hasGlossaryTerm(text: string, glossary: Glossary | null | undefined): boolean {
@@ -399,27 +408,27 @@ function hasRuns(text: string, glossary: Glossary | null | undefined): boolean {
   return hasProtectedText(text) || hasGlossaryTerm(text, glossary);
 }
 
-// Every run of a text to hold, in order and none overlapping: the user's glossary terms and, unless
-// `patterns` is false, the urls, addresses and numbers above. Where two start at the same place the
-// glossary wins; where two overlap, the one that starts first does, so a term inside a url stays
-// part of the url.
-function findRuns(text: string, glossary: Glossary | null | undefined, patterns = true): Run[] {
+// Every run of a text to hold, in order and none overlapping: the user's glossary terms and the
+// urls, addresses and numbers above. Where two overlap, the one that starts first wins, and of two
+// that start together the longer one, so a term at the start of an email address or inside a url
+// stays part of it. Only a term that covers exactly what a pattern covers wins over it.
+function findRuns(text: string, glossary: Glossary | null | undefined): Run[] {
   const runs: Run[] = [];
   if (hasGlossaryTerm(text, glossary)) {
-    const { scanner, translations } = glossary!;
+    const { scanner, translationOf } = glossary!;
     for (let match = scanner.exec(text); match; match = scanner.exec(text)) {
-      runs.push({ start: match.index, end: match.index + match[0].length, replacement: translations.get(match[0]) ?? null });
+      runs.push({ start: match.index, end: match.index + match[0].length, replacement: translationOf(match[0]), term: true });
     }
     scanner.lastIndex = 0;
   }
-  if (patterns && hasProtectedText(text)) {
+  if (hasProtectedText(text)) {
     PROTECTED_SCANNER.lastIndex = 0;
     for (let match = PROTECTED_SCANNER.exec(text); match; match = PROTECTED_SCANNER.exec(text)) {
-      runs.push({ start: match.index, end: match.index + match[0].length, replacement: null });
+      runs.push({ start: match.index, end: match.index + match[0].length, replacement: null, term: false });
     }
   }
-  // A stable sort keeps the glossary's runs ahead of a pattern's at the same start.
-  runs.sort((a, b) => a.start - b.start);
+  // A stable sort keeps a term ahead of a pattern of the same span.
+  runs.sort((a, b) => a.start - b.start || b.end - a.end);
   let end = 0;
   return runs.filter((run) => {
     if (run.start < end) return false;
@@ -437,8 +446,9 @@ const RUN_BREAK_TAGS = new Set(["BR", "HR", "IMG", "INPUT", "SELECT", "TEXTAREA"
 // a time, the tail inside the tag reaches the engine as prose. Each such run becomes one placeholder
 // holding every node it touches, inline tags included, so the engine gets none of it and the tags
 // come back intact. A run inside a single text node is left to the per-node pass that follows.
-function protectRunsAcrossTags(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): void {
+function protectRunsAcrossTags(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): number {
   const doc = clone.ownerDocument;
+  let replaced = 0;
   const pieces: Array<{ node: Text; start: number }> = [];
   let flat = "";
   const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
@@ -456,7 +466,7 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[], glossary: Glossary
     pieces.push({ node: text, start: flat.length });
     flat += text.data;
   }
-  if (pieces.length < 2 || !hasRuns(flat, glossary)) return;
+  if (pieces.length < 2 || !hasRuns(flat, glossary)) return 0;
   // Last first: holding a run splits and moves only nodes after every run still to be handled.
   for (const { start, end, replacement } of findRuns(flat, glossary).reverse()) {
     const first = locateInPieces(pieces, start, false);
@@ -501,7 +511,9 @@ function protectRunsAcrossTags(clone: Element, holds: Hold[], glossary: Glossary
     // A glossary term with a translation of its own comes back as that text, without the page's
     // tags inside the term: there is nothing in the translation for them to wrap.
     holds.push(replacement === null ? fragment : doc.createTextNode(replacement));
+    if (replacement !== null) replaced++;
   }
+  return replaced;
 }
 
 // The text node holding a position of the joined text. An end position belongs to the node it
@@ -531,19 +543,27 @@ function locateInPieces(pieces: Array<{ node: Text; start: number }>, offset: nu
 
 // Text-level holds, applied to the clone only. Each match becomes the same `var` placeholder an
 // untranslatable element gets, and the exact original characters are kept to be put back.
-function protectText(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): void {
-  protectRunsAcrossTags(clone, holds, glossary);
+// Returns how many glossary terms were held with a translation of their own.
+function protectText(clone: Element, holds: Hold[], glossary: Glossary | null | undefined): number {
+  let replaced = protectRunsAcrossTags(clone, holds, glossary);
   const doc = clone.ownerDocument;
   const walker = doc.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) texts.push(node as Text);
   for (const text of texts) {
     // Anything already protected, verbatim by the engine or by a placeholder, is left alone.
-    if (text.parentElement?.closest(`var, code, kbd, samp, math, ${HOLD_SELECTOR}`)) continue;
+    if (text.parentElement?.closest(PROTECTED_SELECTOR)) continue;
     if (!hasRuns(text.data, glossary)) continue;
     const fragment = doc.createDocumentFragment();
     let cursor = 0;
-    for (const { start, end, replacement } of findRuns(text.data, glossary)) {
+    for (const { start, end, replacement, term } of findRuns(text.data, glossary)) {
+      // A term is a whole word only if the text around it says so, and at the edge of a text node
+      // that text is in the next node: `el <b>Rust</b>y` has no word "Rust" in it.
+      if (term && start === 0 && isSpacedWordChar(text.data.charAt(0)) && isSpacedWordChar(neighbourChar(clone, text, false))) continue;
+      if (term && end === text.data.length && isSpacedWordChar(text.data.charAt(end - 1)) && isSpacedWordChar(neighbourChar(clone, text, true))) {
+        continue;
+      }
+      if (replacement !== null) replaced++;
       if (start > cursor) fragment.append(doc.createTextNode(text.data.slice(cursor, start)));
       const kept = replacement ?? text.data.slice(start, end);
       const placeholder = doc.createElement("var");
@@ -557,6 +577,30 @@ function protectText(clone: Element, holds: Hold[], glossary: Glossary | null | 
     if (cursor < text.data.length) fragment.append(doc.createTextNode(text.data.slice(cursor)));
     text.replaceWith(fragment);
   }
+  return replaced;
+}
+
+// Text the engine copies through as it is, or that a placeholder already stands for.
+const PROTECTED_SELECTOR = `var, code, kbd, samp, math, ${HOLD_SELECTOR}`;
+
+// The character a reader sees next to one edge of a text node, across inline tags. A line break, a
+// field or anything protected in between is a gap, the same as the edge of the unit.
+function neighbourChar(clone: Element, text: Text, forward: boolean): string {
+  const walker = clone.ownerDocument.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  walker.currentNode = text;
+  const step = () => (forward ? walker.nextNode() : walker.previousNode());
+  for (let node = step(); node && node !== clone; node = step()) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as Element;
+      if (RUN_BREAK_TAGS.has(element.tagName) || element.matches(PROTECTED_SELECTOR)) return "";
+      continue;
+    }
+    const data = (node as Text).data;
+    if (!data) continue;
+    if ((node as Text).parentElement?.closest(PROTECTED_SELECTOR)) return "";
+    return forward ? data.charAt(0) : data.slice(-1);
+  }
+  return "";
 }
 
 const SPACE = /\s/u;
@@ -625,7 +669,16 @@ function emptyFields(root: Element): void {
 // extension API, get the open root.
 type DomApi = { dom?: { openOrClosedShadowRoot?: (element: HTMLElement) => ShadowRoot | null | undefined } };
 
+// The elements a page can attach a shadow root to: custom elements and the tags attachShadow()
+// accepts. Firefox's property also hands out the browser's own roots behind an <input type=date>,
+// <video> controls or <details>, and the text in there is the browser's, not the page's.
+const SHADOW_HOSTS = new Set([
+  "ARTICLE", "ASIDE", "BLOCKQUOTE", "BODY", "DIV", "FOOTER", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER",
+  "MAIN", "NAV", "P", "SECTION", "SPAN"
+]);
+
 function shadowRootOf(element: Element): ShadowRoot | null {
+  if (!SHADOW_HOSTS.has(element.tagName) && !element.localName.includes("-")) return null;
   const own = (element as { openOrClosedShadowRoot?: ShadowRoot | null }).openOrClosedShadowRoot;
   if (own !== undefined) return own;
   const extension = globalThis as { browser?: DomApi; chrome?: DomApi };
@@ -709,11 +762,14 @@ export function segmentFragment(segment: Segment, glossary?: Glossary | null): s
 
 // Plain text for the engine (a tooltip, a label, a selection), with each glossary term in a `var`
 // the engine copies through. The var already holds what the term becomes, and a hold number no
-// unit uses, so the renderer keeps its text.
+// unit uses, so the renderer keeps its text. Urls and addresses are found too, only so that a term
+// inside one is left alone: `rust` in https://github.com/rust-lang/rust is part of the address.
 export function plainFragment(text: string, glossary?: Glossary | null): string {
+  if (!hasGlossaryTerm(text, glossary)) return escapeHtml(text);
   let out = "";
   let cursor = 0;
-  for (const { start, end, replacement } of findRuns(text, glossary, false)) {
+  for (const { start, end, replacement, term } of findRuns(text, glossary)) {
+    if (!term) continue;
     out += escapeHtml(text.slice(cursor, start));
     const pad = padSides(text, start, end);
     out += `<var ${HOLD_ATTRIBUTE}="-1" ${PAD_ATTRIBUTE}="${pad}">${escapeHtml(replacement ?? text.slice(start, end))}</var>`;

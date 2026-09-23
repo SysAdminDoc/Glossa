@@ -351,9 +351,24 @@ async function translateSegments(
 ): Promise<void> {
   // Text the engine produced earlier on this page is not source text, whatever the page does with
   // it afterwards. Drop those segments before anything is marked or sent.
-  const fresh = segments.filter((segment) => !controller.output.has(segment.text));
-  const echoed = segments.length - fresh.length;
+  const unseen = segments.filter((segment) => !controller.output.has(segment.text));
+  const echoed = segments.length - unseen.length;
   if (echoed > 0) controller.state.blocksTotal -= echoed;
+  // A unit made only of glossary terms is its own translation, and the engine gets nothing from it.
+  const local = unseen.filter((segment) => segment.kind === "element" && segment.local === true);
+  const fresh = unseen.filter((segment) => !local.includes(segment));
+  if (local.length > 0) {
+    withObserverPaused(controller, local, () => {
+      for (const segment of local) {
+        const applied = segment.kind === "element" ? controller.renderer.apply(segment, segment.html, controller.options!) : null;
+        if (applied) {
+          controller.output.remember(applied);
+          controller.state.blocksDone++;
+        }
+      }
+    });
+    report(controller);
+  }
   withObserverPaused(controller, fresh, () => {
     for (const segment of fresh) controller.renderer.markPending(segment);
   });

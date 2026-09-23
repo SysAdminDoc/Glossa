@@ -381,6 +381,20 @@ test("closed shadow roots are walked through the extension's DOM API, tooltips i
   }
 });
 
+test("the browser's own widget roots are not the page's: a date field keeps its sentence whole", () => {
+  const body = load(`<p id="p">Fecha: <input type="date" id="d"> y la hora de la reserva.</p><my-card id="card"></my-card>`);
+  // What Firefox's content-script property does: a root for the date field's own widget too.
+  const widgetRoot = window.document.createElement("div").attachShadow({ mode: "open" });
+  widgetRoot.innerHTML = "<span>mm/dd/yyyy</span>";
+  const cardRoot = window.document.getElementById("card")!.attachShadow({ mode: "closed" });
+  cardRoot.innerHTML = "<p>Una tarjeta cerrada</p>";
+  Object.defineProperty(window.document.getElementById("d"), "openOrClosedShadowRoot", { value: widgetRoot, configurable: true });
+  Object.defineProperty(window.document.getElementById("card"), "openOrClosedShadowRoot", { value: cardRoot, configurable: true });
+  const segments = collectSegments(body, { ...options, attributes: false });
+  const texts = segments.map((segment) => segment.text.trim());
+  assert.deepEqual(texts, ["Fecha:  y la hora de la reserva.", "Una tarjeta cerrada"], `split or wandered: ${JSON.stringify(texts)}`);
+});
+
 test("collectFromNodes treats the given nodes themselves as candidates", () => {
   load("");
   const fresh = window.document.createElement("p");

@@ -38,8 +38,9 @@ export function sanitizeGlossary(value: unknown): GlossaryEntry[] {
     if (!item || typeof item !== "object") continue;
     const { term, translation } = item as { term?: unknown; translation?: unknown };
     if (typeof term !== "string") continue;
-    const cleanTerm = term.trim();
-    const cleanTranslation = typeof translation === "string" ? translation.trim() : "";
+    // One space between words: the page's own spacing is matched loosely (see compileGlossary).
+    const cleanTerm = term.trim().replace(/\s+/gu, " ").normalize("NFC");
+    const cleanTranslation = typeof translation === "string" ? translation.trim().normalize("NFC") : "";
     // A term with no letter or digit in it would match punctuation all over the page.
     if (!/[\p{L}\p{N}]/u.test(cleanTerm)) continue;
     if (cleanTerm.length > GLOSSARY_MAX_LENGTH || cleanTranslation.length > GLOSSARY_MAX_LENGTH) continue;
@@ -55,31 +56,44 @@ export interface Glossary {
   // Global and case-sensitive. Longer terms are tried first, so "New York Times" is one match
   // rather than "New York" plus a stray word.
   scanner: RegExp;
-  // The translation for each term that has one.
-  translations: Map<string, string>;
+  // The user's translation of a matched term, or null to keep it as written.
+  translationOf(match: string): string | null;
 }
 
 // Scripts written without spaces between words. A term in one of them is matched wherever it
-// occurs; anywhere else it has to stand as a whole word, so "Rust" leaves "Rusty" alone.
-const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+// occurs. A term in any other script has to stand as a whole word, so "Rust" leaves "Rusty" alone,
+// and only a letter of such a script next to it makes it part of a longer word: "iPhone" is still a
+// word in the middle of Japanese text.
+const UNSPACED_CLASS =
+  "\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}";
+const UNSPACED = new RegExp(`[${UNSPACED_CLASS}]`, "u");
 const WORD_CHAR = /[\p{L}\p{M}\p{N}]/u;
+const SPACED_WORD = `(?:(?![${UNSPACED_CLASS}])[\\p{L}\\p{M}\\p{N}])`;
+
+// A letter or digit of a script that puts spaces between words.
+export function isSpacedWordChar(char: string): boolean {
+  return char !== "" && WORD_CHAR.test(char) && !UNSPACED.test(char);
+}
 
 export function compileGlossary(entries: GlossaryEntry[]): Glossary | null {
   if (entries.length === 0) return null;
   const alternatives = [...entries]
     .sort((a, b) => b.term.length - a.term.length)
     .map(({ term }) => {
-      const first = term.charAt(0);
-      const last = term.slice(-1);
-      const before = WORD_CHAR.test(first) && !UNSPACED.test(first) ? "(?<![\\p{L}\\p{M}\\p{N}])" : "";
-      const after = WORD_CHAR.test(last) && !UNSPACED.test(last) ? "(?![\\p{L}\\p{M}\\p{N}])" : "";
-      return `${before}${escapeRegExp(term)}${after}`;
+      const before = isSpacedWordChar(term.charAt(0)) ? `(?<!${SPACED_WORD})` : "";
+      const after = isSpacedWordChar(term.slice(-1)) ? `(?!${SPACED_WORD})` : "";
+      // Any run of whitespace between the words: pages wrap their source lines and put no-break
+      // spaces between the parts of a name.
+      return `${before}${term.split(" ").map(escapeRegExp).join("\\s+")}${after}`;
     });
   const translations = new Map<string, string>();
   for (const entry of entries) {
     if (entry.translation) translations.set(entry.term, entry.translation);
   }
-  return { scanner: new RegExp(alternatives.join("|"), "gu"), translations };
+  return {
+    scanner: new RegExp(alternatives.join("|"), "gu"),
+    translationOf: (match) => translations.get(match.replace(/\s+/gu, " ")) ?? null
+  };
 }
 
 function escapeRegExp(text: string): string {
