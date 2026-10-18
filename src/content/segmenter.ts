@@ -27,11 +27,11 @@ export type Segment =
 // or a protected run the page split across inline tags, held as the fragment of nodes it touches.
 export type Hold = Element | Text | DocumentFragment;
 
-// Inline elements inside a unit that must survive untouched. Bergamot copies `code`, `kbd`,
-// `samp`, `var` and `math` through verbatim on its own; translate="no" and .notranslate are DOM
-// conventions it knows nothing about, so those are swapped for a `var` placeholder before the
-// fragment leaves the page and swapped back when the translation returns.
-const HOLD_SELECTOR = '[translate="no" i], .notranslate';
+// Inline elements whose contents must be preserved verbatim.
+// Bergamot can drop their contents in HTML translation mode, so these elements,
+// along with translate="no" and .notranslate, are replaced with placeholders.
+// The renderer restores the original elements after translation.
+const HOLD_SELECTOR = 'code, kbd, samp, var, math, [translate="no" i], .notranslate';
 export const HOLD_ATTRIBUTE = "data-glossa-hold";
 
 // Every element inside a unit is numbered before the unit is sent. The engine carries data-*

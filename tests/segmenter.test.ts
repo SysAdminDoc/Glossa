@@ -85,8 +85,11 @@ test("code, pre, translate=no, notranslate, hidden, and inputs are skipped", () 
   const segments = collectSegments(body, options);
   const texts = segments.map((s) => (s.kind === "element" ? s.element.textContent : s.text));
   assert.deepEqual(texts, ["Ejecuta npm install ahora.", "Marca registrada"]);
-  // The unit still carries the inline code element; the engine's HTML mode leaves it as-is.
-  assert.match((segments[0] as { html: string }).html, /<code data-glossa-id="0">npm install<\/code>/);
+  // Inline code is protected with a placeholder and restored after translation.
+  const code = segments[0] as { html: string; holds: Element[] };
+  assert.match(code.html, /<var data-glossa-hold="0">npm install<\/var>/);
+  assert.equal(code.holds.length, 1);
+  assert.equal(code.holds[0]?.tagName, "CODE");
   // An inline translate="no" span becomes a var placeholder the engine copies verbatim.
   const brand = segments[1] as { html: string; holds: Element[] };
   assert.equal(brand.html, '<var data-glossa-hold="0">Marca</var> registrada');
@@ -110,6 +113,36 @@ test("renderer restores protected inline elements from their placeholders", () =
   assert.equal(block.querySelector("var"), null);
   assert.equal(block.querySelector("span.brand")?.outerHTML, '<span translate="no" class="brand">Café Aurora</span>');
   assert.equal(block.textContent, "The brand Café Aurora opens today with many new things.");
+});
+
+test("inline code survives bilingual translation", () => {
+  const body = load(
+    '<p id="p">Ejecuta <code>npm install</code> ahora mismo.</p>'
+  );
+  const [segment] = collectSegments(body, options);
+
+  assert.ok(segment && segment.kind === "element");
+
+  const renderer = new Renderer();
+  renderer.apply(
+    segment,
+    'Run <var data-glossa-hold="0">npm install</var> now.',
+    {
+      displayMode: "bilingual",
+      showOriginalOnHover: false,
+      targetLanguage: "en"
+    }
+  );
+
+  const block = body.querySelector("#p glossa-translation");
+
+  assert.ok(block);
+  assert.equal(block.querySelector("code")?.textContent, "npm install");
+  assert.equal(block.querySelector("var"), null);
+  assert.equal(
+    body.querySelector("#p > code")?.textContent,
+    "npm install"
+  );
 });
 
 test("urls, email addresses and reference numbers become placeholders", () => {
